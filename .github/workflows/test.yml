@@ -1,0 +1,37 @@
+name: Tester
+
+# Kör enhetstester och end-to-end-tester (utan de visuella jämförelserna, vars bilder är tagna på Mac, och utan den långa slumpsimuleringen).
+# Publiceringen (pages.yml) väntar inte på dessa: de visar om något gått sönder men stoppar inte en publicering.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx tsc --noEmit
+      - run: npm run test:unit
+      - run: npx playwright install --with-deps chromium
+      - run: npx playwright test --grep-invert "slumpad" --reporter=list
+        env:
+          CI: "true"
+          NO_VISUAL: "1"
+      - uses: actions/upload-artifact@v7
+        if: failure()
+        with:
+          name: playwright-fel
+          path: test-results/
+          retention-days: 7

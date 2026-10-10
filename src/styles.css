@@ -336,3 +336,7 @@ body[data-overlay] .gantt_tooltip { display: none !important; }
 .filter-pop { min-width: 190px; gap: 8px; }
 .filter-pop fieldset { margin: 0; padding: 0; border: 0; display: grid; gap: 4px; }
 .filter-pop legend { padding: 0; margin-bottom: 4px; font-family: var(--font-title); font-size: 12px; letter-spacing: 0.04em; }
+
+/* Dragning av rad: gruppen som raden hamnar i markeras, och en etikett vid pekaren säger vart den läggs */
+.dhx-host .gantt_row.drop-group, .dhx-host .gantt_task_row.drop-group { background: color-mix(in srgb, var(--accent) 24%, transparent) !important; box-shadow: inset 0 0 0 1px var(--accent); }
+.drag-hint { position: fixed; z-index: 120; pointer-events: none; max-width: 320px; padding: 3px 9px; border-radius: 6px; font-size: var(--fs-sm); background: var(--text); color: var(--surface); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

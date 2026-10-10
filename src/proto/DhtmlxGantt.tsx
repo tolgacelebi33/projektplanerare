@@ -26,6 +26,7 @@ const ZOOM = {
 
 import { GRID_MIN } from "../layout";
 import { COLUMN_WIDTH, type ColumnId } from "../columns";
+import { startRowDragFeedback } from "./rowDrag";
 import { consumeFocusMedian, scrollCarry } from "../scrollCarry";
 /** Rutnätets fasta bredd är GRID_WIDTH (layout.ts). Panelen till höger tar plats från tidslinjen, aldrig från rutnätet. */
 
@@ -220,12 +221,18 @@ export function DhtmlxGantt({ store, items, deps, zoom, onError, onPersisted, re
     scrollCarry.read = () => gantt.getScrollState();
     void document.fonts.ready.then(() => gantt.render()); // textmåtten beror på att typsnittet är laddat
     (window as unknown as { __dhx: typeof gantt }).__dhx = gantt;
+    let stopDragFeedback: (() => void) | null = null;
     const ids = [
       // Epics härleds ur innehållet och kan inte dras eller ändras i kanten
       // Dra rader i rutnätet. Biblioteket flyttar raden live medan man drar och nästlar den under vilken rad som helst man håller över, men bara en
       // epic kan innehålla andra poster. Vid släpp avvisas därför ett läge inne i en uppgift (raden hoppar tillbaka), annars sparas det läge biblioteket visar.
-      gantt.attachEvent("onRowDragStart", (_id, target) => !(target as HTMLElement)?.closest?.(".row-check, .row-add, .cell-select, .gantt_tree_icon"), {}),
+      gantt.attachEvent("onRowDragStart", (id, target) => {
+        if ((target as HTMLElement)?.closest?.(".row-check, .row-add, .cell-select, .gantt_tree_icon")) return false;
+        stopDragFeedback?.(); stopDragFeedback = startRowDragFeedback(String(id));
+        return true;
+      }, {}),
       gantt.attachEvent("onBeforeRowDragEnd", (id) => {
+        stopDragFeedback?.(); stopDragFeedback = null;
         let parent = gantt.getParent(id);
         const norm = (p: unknown) => (!p || String(p) === String(gantt.config.root_id) ? null : String(p));
         let after: string | null = null; // släpp på en uppgift: placeras efter den, bredvid den (en uppgift kan inte innehålla något)
@@ -326,7 +333,7 @@ export function DhtmlxGantt({ store, items, deps, zoom, onError, onPersisted, re
     // Panelen till höger tar plats: DHTMLX måste få veta när behållaren ändrar storlek
     const ro = new ResizeObserver(() => gantt.setSizes());
     ro.observe(host.current!);
-    return () => { scrollCarry.read = null; hostEl.removeEventListener("change", onCellChange, true); hostEl.removeEventListener("keydown", onCheckKey, true); hostEl.removeEventListener("keyup", onCheckKey, true); hostEl.removeEventListener("click", onCheck, true); document.removeEventListener("pointermove", onAnyMove, true); document.removeEventListener("pointerleave", hideTip, true); window.removeEventListener("blur", hideTip); hostEl.removeEventListener("dblclick", onDblClick, true); hostEl.removeEventListener("contextmenu", onContextMenu, true); ro.disconnect(); ids.forEach((id) => gantt.detachEvent(id)); gantt.clearAll(); };
+    return () => { scrollCarry.read = null; hostEl.removeEventListener("change", onCellChange, true); hostEl.removeEventListener("keydown", onCheckKey, true); hostEl.removeEventListener("keyup", onCheckKey, true); hostEl.removeEventListener("click", onCheck, true); document.removeEventListener("pointermove", onAnyMove, true); document.removeEventListener("pointerleave", hideTip, true); window.removeEventListener("blur", hideTip); hostEl.removeEventListener("dblclick", onDblClick, true); hostEl.removeEventListener("contextmenu", onContextMenu, true); ro.disconnect(); ids.forEach((id) => gantt.detachEvent(id)); stopDragFeedback?.(); gantt.clearAll(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

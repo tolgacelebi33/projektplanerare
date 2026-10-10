@@ -2,6 +2,8 @@ import { defineConfig } from "@playwright/test";
 
 export default defineConfig({
   testDir: "e2e",
+  // NO_VISUAL: hoppa över de visuella jämförelserna (bilderna är tagna på Mac och skiljer sig på andra system)
+  testIgnore: process.env.NO_VISUAL ? "**/visual.spec.ts" : undefined,
   timeout: 60_000,
   workers: 1,
   reporter: [["list"]],

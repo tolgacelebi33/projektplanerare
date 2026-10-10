@@ -35,6 +35,7 @@ export const enDict: Dict = {
     ],
   },
   cols: { label: "Columns", hint: "Choose which columns the grid shows. Status, assignee and priority can be changed right in the row.", none: "None" },
+  drag: { into: (name: string) => `Goes into the group "${name}"`, top: "Goes at the top (no group)" },
   grid: { title: "Title", end: "End", resize: "Column width", resizeHint: "Drag to change the width of the left column. Double-click to fit the text. Arrow keys change it in steps." },
   dates: {
     monthsFull: ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"],
