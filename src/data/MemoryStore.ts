@@ -123,9 +123,10 @@ export class MemoryStore implements DataStore {
 
   snapshot(): Snapshot {
     return {
-      projects: [...this.projects.values()].map((p) => ({ ...p })),
-      items: [...this.items.values()].map((i) => ({ ...i })),
-      dependencies: [...this.deps.values()].map((d) => ({ ...d })),
+      // Poster delas, inte kopieras: lagret byter ut en post vid ändring och ändrar den aldrig på plats (restore() kopierar vid inläsning)
+      projects: [...this.projects.values()],
+      items: [...this.items.values()],
+      dependencies: [...this.deps.values()],
       users: this.users.map((u) => ({ ...u })),
       seq: this.seq,
     };

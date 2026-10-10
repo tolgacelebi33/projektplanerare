@@ -13,15 +13,19 @@ export interface Patch {
   users: Entry<User>[];
 }
 
+// Poster i lagret byts ut och ändras aldrig på plats, så texten för en post kan sparas per objekt. Annars blir varje skrivning en omskrivning av hela projektet.
+const text = new WeakMap<object, string>();
+const json = (x: object) => { let s = text.get(x); if (s === undefined) { s = JSON.stringify(x); text.set(x, s); } return s; };
+
 function diffList<T extends { id: string }>(from: T[], to: T[]): Entry<T>[] {
-  const before = new Map(from.map((x) => [x.id, JSON.stringify(x)]));
+  const before = new Map(from.map((x) => [x.id, json(x)]));
   const out: Entry<T>[] = [];
   const seen = new Set<string>();
   to.forEach((x, i) => {
     seen.add(x.id);
     const was = before.get(x.id);
     if (was === undefined) out.push([x.id, { ...x }, i]); // ny post: med sin plats i målet, så att ordningen blir densamma efteråt
-    else if (was !== JSON.stringify(x)) out.push([x.id, { ...x }]);
+    else if (was !== json(x)) out.push([x.id, { ...x }]);
   });
   for (const x of from) if (!seen.has(x.id)) out.push([x.id, null]);
   return out;

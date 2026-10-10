@@ -36,7 +36,7 @@ export class PersistentStore extends MemoryStore {
   private rescued = false;
   private rev = 0;
   private readOnly = false;
-  private latest: Stored | null = null;
+  private dirty = false; // något har ändrats sedan senaste sparningen började (kopian byggs först när sparningen startar, inte vid varje skrivning)
   private saving = false;
   private pending: Promise<void> = Promise.resolve();
 
@@ -150,14 +150,14 @@ export class PersistentStore extends MemoryStore {
 
   protected override afterWrite(): void {
     if (!this.loaded || this.readOnly) return;
-    this.latest = this.stored();
+    this.dirty = true;
     if (this.saving) return; // en sparning pågår: den tar det senaste läget när den är klar
     this.saving = true;
     this.pending = (async () => {
       try {
-        while (this.latest) {
-          const s = this.latest; this.latest = null;
-          try { await this.backend.save(s); if (!this.latest) this.backend.clearRescue?.(); if (this.saveError) { this.saveError = null; this.notify(); } }
+        while (this.dirty) {
+          this.dirty = false; const s = this.stored();
+          try { await this.backend.save(s); if (!this.dirty) this.backend.clearRescue?.(); if (this.saveError) { this.saveError = null; this.notify(); } }
           catch (e) { this.saveError = `${sv.panel.errors.unknown} ${msg(e)}`; this.notify(); }
         }
       } finally { this.saving = false; }
@@ -169,7 +169,7 @@ export class PersistentStore extends MemoryStore {
    * eftersom en asynkron sparning kan avbrytas av en omladdning (då skulle bara en äldre mellanversion ligga kvar).
    */
   rescueSync(): void {
-    if (!this.loaded || this.readOnly || (!this.saving && !this.latest)) return;
+    if (!this.loaded || this.readOnly || (!this.saving && !this.dirty)) return;
     this.backend.rescueSync?.(this.stored());
   }
 
