@@ -53,18 +53,20 @@ export function ItemPanel({ store, projectId, itemId, dataVersion, autoSelectTit
   useEffect(() => {
     if (!autoSelectTitle || !data) return;
     const focus = () => { titleRef.current?.focus(); titleRef.current?.select(); };
+    // Ett fält, en dialog eller en meny som användaren själv gått till ska aldrig få fokus tillbaka stulet (text man skrev där hamnade annars i titeln på posten)
+    const deliberate = (el: Element | null) => !!el && !!el.closest("input, textarea, select, [role=dialog], [role=menu], [contenteditable=true]");
     focus();
     // Gantt-biblioteket tar fokus till sig själv en kort stund efter ett klick. Under de första 700 ms tas fokus tillbaka direkt när det flyttas
     // utanför panelen, så att tecken man redan börjat skriva inte går förlorade (utan att markera om texten).
     const t0 = Date.now();
     const back = (e: FocusEvent) => {
-      if (Date.now() - t0 > 700) return;
+      if (Date.now() - t0 > 700 || deliberate(e.target as Element)) return;
       const panelEl = titleRef.current?.closest("aside.panel");
       if (panelEl && !panelEl.contains(e.target as Node)) titleRef.current?.focus({ preventScroll: true });
     };
     document.addEventListener("focusin", back, true);
     // (markera om bara om inget hunnit skrivas, så att text man redan skrivit aldrig skrivs över)
-    const timers = [60, 200].map((ms) => window.setTimeout(() => { const el = titleRef.current; if (el && document.activeElement !== el && el.value === data.item.title) focus(); }, ms));
+    const timers = [60, 200].map((ms) => window.setTimeout(() => { const el = titleRef.current; if (el && document.activeElement !== el && !deliberate(document.activeElement) && el.value === data.item.title) focus(); }, ms));
     const off = window.setTimeout(() => document.removeEventListener("focusin", back, true), 750);
     return () => { timers.forEach(window.clearTimeout); window.clearTimeout(off); document.removeEventListener("focusin", back, true); };
   }, [autoSelectTitle, data?.item.id]); // eslint-disable-line react-hooks/exhaustive-deps

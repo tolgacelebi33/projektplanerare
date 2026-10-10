@@ -92,3 +92,17 @@ test("RN6 skapa nya grupper med panelen öppen och titelfältet i fokus: den nya
   expect(all.filter((x: string[]) => orig.some((o: string[]) => o[0] === x[0]))).toEqual(orig); // ingen befintlig post bytte namn
   expect(all.filter((x: string[]) => x[1] === "Ny grupp").length).toBe(4); // fyra nya grupper, alla med eget namn
 });
+
+test("RN7 öppnar man en dialog direkt efter att panelen öppnats hamnar det man skriver i dialogen, inte i postens titel", async ({ page }) => {
+  const t18 = await titleOf(page, "i18");
+  await row(page, "i18").dblclick(); // titeln markerad och i fokus, med fördröjt fokus på väg
+  await page.getByRole("button", { name: "+ Återkommande milstolpe..." }).click();
+  const d = page.getByRole("dialog", { name: "Återkommande milstolpe" });
+  await d.getByLabel("Titel").fill("Skrivet i dialogen");
+  await page.waitForTimeout(400);
+  await expect(d.locator('input[name="recur-title"]')).toHaveValue("Skrivet i dialogen");
+  await expect(page.locator('aside.panel input[name="title"]')).toHaveValue(t18);
+  await page.keyboard.press("Escape");
+  await page.waitForTimeout(300);
+  expect(await titleOf(page, "i18")).toBe(t18);
+});
