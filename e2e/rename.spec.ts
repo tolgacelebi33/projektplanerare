@@ -43,7 +43,8 @@ test("RN3 dra rader med panelen öppen och titelfältet i fokus byter ingen post
   await row(page, "i6").dblclick(); // dubbelklick: öppnar och markerar titeln
   await expect(page.locator('aside.panel input[name="title"]')).toBeFocused();
   for (const [from, to] of [["i9", "i6"], ["i7", "i8"], ["i10", "i16"]]) {
-    const a = (await page.locator(`.gantt_row[data-task-id="${from}"]`).boundingBox())!, b = (await page.locator(`.gantt_row[data-task-id="${to}"]`).boundingBox())!;
+    const a = await page.locator(`.gantt_row[data-task-id="${from}"]`).boundingBox(), b = await page.locator(`.gantt_row[data-task-id="${to}"]`).boundingBox();
+    if (!a || !b) continue; // en rad som inte ritats (utanför fönstret) hoppas över
     const x = a.x + 120, y0 = a.y + a.height / 2, y1 = b.y + b.height / 2;
     await page.mouse.move(x, y0); await page.mouse.down();
     for (let i = 1; i <= 10; i++) { await page.mouse.move(x, y0 + ((y1 - y0) * i) / 10); await page.waitForTimeout(25); }

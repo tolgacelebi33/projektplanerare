@@ -6,6 +6,8 @@ import { openApp, saveJson, shotPath } from "./helpers";
 test("K11 typsnitt laddas, titel i NB Architekt, text i Söhne, gemener renderas som versaler", async ({ page }) => {
   await openApp(page, "dhtmlx");
   await page.evaluate(() => document.fonts.ready);
+  // Safari laddar en typsnittsfil först när något använder den: be om alla tre så att statusen går att kontrollera
+  await page.evaluate(() => Promise.all([document.fonts.load('400 16px "NB Architekt Pro R"'), document.fonts.load("400 16px Söhne"), document.fonts.load("500 16px Söhne")]));
   const info = await page.evaluate(() => {
     const faces = [...document.fonts].map((f) => ({ family: f.family.replace(/"/g, ""), weight: f.weight, status: f.status }));
     const h1 = getComputedStyle(document.querySelector("h1")!);
@@ -53,9 +55,9 @@ test("K11 typsnitt laddas, titel i NB Architekt, text i Söhne, gemener renderas
   expect(loaded("NB Architekt Pro R", "400")).toBe(true);
   expect(loaded("Söhne", "400")).toBe(true);
   expect(loaded("Söhne", "500")).toBe(true);
-  expect(info.h1.family.startsWith('"NB Architekt Pro R"')).toBe(true);
+  expect(info.h1.family.replace(/"/g, "").startsWith("NB Architekt Pro R")).toBe(true); // webbläsarna skriver familjenamnet med eller utan citattecken
   expect(info.h1.transform).toBe("none"); // vi lägger inte på text-transform på gissning
-  expect(info.body.family.startsWith("Söhne") || info.body.family.startsWith('"Söhne"')).toBe(true);
+  expect(info.body.family.replace(/"/g, "").startsWith("Söhne")).toBe(true);
   expect(bodyLowerEqualsUpper).toBe(false);
   expect(titleLowerEqualsUpper).toBe(true);
 });

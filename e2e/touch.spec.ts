@@ -2,6 +2,7 @@ import { devices, expect, test } from "@playwright/test";
 import { openApp } from "./helpers";
 
 // En telefonprofil (Pixel 7: mobil användaragent och pekskärm): biblioteket slår på pekläget bara på enheter det känner igen som pekenheter. Bred skärm så att samma rader syns som i övriga tester.
+test.beforeEach(({ browserName }) => { test.skip(browserName !== "chromium", "pekhändelser skickas via Chromium DevTools"); });
 test.use({ ...devices["Pixel 7"], viewport: { width: 1500, height: 850 } });
 
 // Pekskärm: dragning med ett finger via riktiga pekhändelser (CDP), inte musen.

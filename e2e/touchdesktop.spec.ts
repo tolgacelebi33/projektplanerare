@@ -2,6 +2,7 @@ import { expect, test } from "@playwright/test";
 import { openApp } from "./helpers";
 
 // En dator med pekskärm (vanlig datoranvändaragent, men med pekenhet): fingerdragning ska fungera, och musen ska fungera som förut.
+test.beforeEach(({ browserName }) => { test.skip(browserName !== "chromium", "pekhändelser skickas via Chromium DevTools"); });
 test.use({ hasTouch: true });
 
 test("TD1 med pekskärm på en dator går en stapel att dra med fingret", async ({ page }) => {

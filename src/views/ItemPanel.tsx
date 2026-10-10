@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { canMove, deleteSeries, deleteSubtree, descendants, epicChoices, extendSeries, MAX_SERIES, seriesMembers, swapWithSibling } from "../data/actions";
+import { canMove, changeRecurrence, deleteSeries, deleteSubtree, descendants, epicChoices, extendSeries, MAX_SERIES, renameSeries, seriesMembers, swapWithSibling } from "../data/actions";
 import { effectiveColors } from "../data/colors";
-import { GROUP_COLORS, type GroupColor } from "../data/types";
+import { GROUP_COLORS, RECURRENCES, type GroupColor, type Recurrence } from "../data/types";
 import type { DataStore } from "../data/DataStore";
 import { isISODate, todayISO } from "../data/dates";
 import { MAX_DESCRIPTION, MAX_TITLE, RuleError, isOverdue, validateItemShape } from "../data/rules";
@@ -35,6 +35,8 @@ export function ItemPanel({ store, projectId, itemId, dataVersion, autoSelectTit
   const [fieldError, setFieldError] = useState<{ field: string; message: string } | null>(null);
   const [title, setTitle] = useState("");
   const [extendN, setExtendN] = useState("12");
+  const [seriesTitle, setSeriesTitle] = useState("");
+  const [seriesKind, setSeriesKind] = useState<Recurrence>("monthly");
   const [seriesAsk, setSeriesAsk] = useState<null | "later" | "all">(null);
   const [description, setDescription] = useState("");
   const [progress, setProgress] = useState("0");
@@ -106,7 +108,7 @@ export function ItemPanel({ store, projectId, itemId, dataVersion, autoSelectTit
     } catch (e) { if (currentItem.current === itemId) setLoadError(String(e)); }
   }, [store, projectId, itemId]);
 
-  useEffect(() => { setData(null); setFieldError(null); setConfirmDelete(false); setSeriesAsk(null); setSave({ kind: "idle" }); void load(); }, [load]);
+  useEffect(() => { setData(null); setFieldError(null); setConfirmDelete(false); setSeriesAsk(null); setSeriesTitle(""); setSave({ kind: "idle" }); void load(); }, [load]);
   useEffect(() => { dataRef.current = dataRef.current?.item.id === itemId ? dataRef.current : null; }, [itemId]); // aldrig data för en annan post än den som visas
   // Data ändrade utanför panelen: ladda om utan att blanka panelen
   useEffect(() => { if (dataVersion !== undefined) void load(); }, [dataVersion]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -371,6 +373,21 @@ export function ItemPanel({ store, projectId, itemId, dataVersion, autoSelectTit
             <section className="panel-section" data-section="series">
               <h3>{sv.recur.series}</h3>
               <p className="panel-muted">{sv.recur.info(sv.recur.kinds[item.recur], mem.length)}</p>
+              <label className="panel-field"><span>{sv.recur.renameAll}</span>
+                <div className="panel-row">
+                  <input name="series-title" value={seriesTitle || item.title} maxLength={200} onChange={(e) => setSeriesTitle(e.target.value)} />
+                  <button type="button" className="mini" onClick={() => void depAction("series", async () => { await renameSeries(store, all, item, seriesTitle || item.title); setSeriesTitle(""); })}>{sv.recur.renameAllBtn}</button>
+                </div>
+              </label>
+              <label className="panel-field"><span>{sv.recur.changeEvery}</span>
+                <div className="panel-row">
+                  <select name="series-kind" value={seriesKind} onChange={(e) => setSeriesKind(e.target.value as Recurrence)}>
+                    {RECURRENCES.map((k) => <option key={k} value={k}>{sv.recur.kinds[k]}</option>)}
+                  </select>
+                  <button type="button" className="mini" onClick={() => void depAction("series", async () => { await changeRecurrence(store, all, item, seriesKind); })}>{sv.recur.changeEveryBtn}</button>
+                </div>
+              </label>
+              <p className="panel-muted">{sv.recur.changeEveryHint}</p>
               {room > 0 && (
                 <div className="panel-row">
                   <input type="number" name="series-more" min={1} max={room} step={1} value={extendN} aria-label={sv.recur.extendCount} onChange={(e) => setExtendN(e.target.value)} style={{ width: 80 }} />

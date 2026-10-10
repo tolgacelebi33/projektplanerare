@@ -98,7 +98,7 @@ test.describe("beroenden skapade genom att dra mellan handtag", () => {
 
 test.describe("text i staplar", () => {
   for (const th of ["Standard", "Ljust", "Mörkt"]) {
-    test(`X text är lodrätt centrerad i staplarna (${th})`, async ({ page }) => {
+    test(`X text är lodrätt centrerad i staplarna (${th})`, async ({ page, browserName }) => {
       await openApp(page, "dhtmlx");
       await page.getByRole("radio", { name: th }).click();
       await setZoom(page, "Månad"); await setZoom(page, "Vecka"); // bredare staplar än i månadsvyn
@@ -108,7 +108,7 @@ test.describe("text i staplar", () => {
       expect(wide.length, "minst två staplar med text inuti att mäta").toBeGreaterThanOrEqual(2);
       for (const id of wide.slice(0, 4)) {
         const m = await inkMargins(page, page.locator(`.gantt_task_line[data-task-id="${id}"]`));
-        expect(Math.abs(m.delta), `${th} ${id}: marginal ovan ${m.marginTop} och under ${m.marginBottom}`).toBeLessThanOrEqual(process.platform === "darwin" ? 2 : 4); // text ritas lite annorlunda på Linux (uppmätt: upp till 4 px där, 1 till 2 px på Mac)
+        expect(Math.abs(m.delta), `${th} ${id}: marginal ovan ${m.marginTop} och under ${m.marginBottom}`).toBeLessThanOrEqual((process.platform === "darwin" && browserName === "chromium") ? 2 : 4); // text ritas lite annorlunda på Linux (uppmätt: upp till 4 px där, 1 till 2 px på Mac)
       }
     });
   }

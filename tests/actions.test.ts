@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createSeries, deleteSeries, extendSeries, seriesMembers, boardOrder, planBoardDrop, bulkDelete, bulkMove, bulkStatus, canMove, deleteSubtree, descendants, epicChoices, moveTargets, newItemDraft, planMove, rangeIds, selectionRoots, swapWithSibling } from "../src/data/actions";
+import { changeRecurrence, renameSeries, createSeries, deleteSeries, extendSeries, seriesMembers, boardOrder, planBoardDrop, bulkDelete, bulkMove, bulkStatus, canMove, deleteSubtree, descendants, epicChoices, moveTargets, newItemDraft, planMove, rangeIds, selectionRoots, swapWithSibling } from "../src/data/actions";
 import { smallFixture } from "../src/data/fixtures";
 import { MemoryStore } from "../src/data/MemoryStore";
 
@@ -261,5 +261,43 @@ describe("återkommande milstolpar", () => {
     const s = new MemoryStore(smallFixture());
     const m = (await createSeries(s, draft(s, "2026-10-12"), "weekly", 1, "X"))[0];
     await expect(s.updateItem(m.id, { recur: "daily" as never })).rejects.toThrow();
+  });
+});
+
+describe("redigera en hel serie", () => {
+  const draft = (start: string) => ({ ...newItemDraft("milestone", [], null, ids, start), sort_order: 5000 });
+  it("renameSeries byter titel på alla tillfällen och inget annat", async () => {
+    const s = new MemoryStore(smallFixture());
+    const made = await createSeries(s, draft("2026-10-12"), "weekly", 4, "Gammal");
+    await new Promise((r) => setTimeout(r, 300)); // skilt steg från skapandet
+    let items = await s.listItems("proj_1");
+    const n = await renameSeries(s, items, items.find((i) => i.id === made[1].id)!, "  Ny titel ");
+    expect(n).toBe(4);
+    items = await s.listItems("proj_1");
+    expect(seriesMembers(items, made[0]).map((i) => i.title)).toEqual(Array(4).fill("Ny titel"));
+    expect(items.filter((i) => i.title === "Gammal")).toEqual([]);
+    await expect(renameSeries(s, items, made[0], "  ")).rejects.toThrow();
+    expect(await s.undo()).toBe(true); // ett steg
+    expect(seriesMembers(await s.listItems("proj_1"), made[0]).map((i) => i.title)).toEqual(Array(4).fill("Gammal"));
+  });
+  it("changeRecurrence flyttar detta och senare till nytt avstånd, tidigare behåller sina datum, och hela serien får ny upprepning", async () => {
+    const s = new MemoryStore(smallFixture());
+    const made = await createSeries(s, draft("2026-10-12"), "weekly", 5, "Kontroll");
+    let items = await s.listItems("proj_1");
+    const third = seriesMembers(items, made[0])[2]; // 26 okt
+    expect(await changeRecurrence(s, items, third, "monthly")).toBe(3); // tredje (samma datum, ny upprepning) samt fjärde och femte (nya datum)
+    items = await s.listItems("proj_1");
+    const mem = seriesMembers(items, made[0]);
+    expect(mem.map((i) => i.start)).toEqual(["2026-10-12", "2026-10-19", "2026-10-26", "2026-11-26", "2026-12-26"]);
+    expect(mem.every((i) => i.recur === "monthly" && i.start === i.end)).toBe(true);
+  });
+  it("extendSeries fortsätter från det sista tillfället efter en ändrad upprepning", async () => {
+    const s = new MemoryStore(smallFixture());
+    const made = await createSeries(s, draft("2026-10-12"), "weekly", 3, "K");
+    let items = await s.listItems("proj_1");
+    await changeRecurrence(s, items, seriesMembers(items, made[0])[1], "biweekly"); // 12 okt, 19 okt, 2 nov
+    items = await s.listItems("proj_1");
+    const more = await extendSeries(s, items, items.find((i) => i.id === made[0].id)!, 2);
+    expect(more.map((i) => i.start)).toEqual(["2026-11-16", "2026-11-30"]);
   });
 });

@@ -166,6 +166,7 @@ export const svDict = {
     series: "Återkommande", info: (kind: string, n: number) => `${kind}. ${n} tillfällen i serien.`, extend: "Lägg till fler", extendCount: "Antal att lägga till",
     removeLater: "Ta bort detta och senare...", removeAll: "Ta bort hela serien...", confirmLater: (n: number) => `Ta bort ${n} milstolpar (den här och alla senare)?`, confirmAll: (n: number) => `Ta bort alla ${n} milstolpar i serien?`,
     done: (n: number) => `Skapade ${n} milstolpar.`,
+    renameAll: "Titel för hela serien", renameAllBtn: "Byt namn på alla", changeEvery: "Ändra upprepning", changeEveryBtn: "Ändra för detta och senare", changeEveryHint: "Det här tillfället och alla senare får nya datum med det nya avståndet. Tidigare tillfällen behåller sina datum.",
   },
   quick: { label: "Lägg till uppgift", placeholder: "Lägg till uppgift...  (Enter)" },
   today: "Idag",

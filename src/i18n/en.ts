@@ -161,6 +161,7 @@ export const enDict: Dict = {
     series: "Recurring", info: (kind: string, n: number) => `${kind}. ${n} occurrences in the series.`, extend: "Add more", extendCount: "Number to add",
     removeLater: "Delete this and later...", removeAll: "Delete the whole series...", confirmLater: (n: number) => `Delete ${n} milestones (this one and all later)?`, confirmAll: (n: number) => `Delete all ${n} milestones in the series?`,
     done: (n: number) => `Created ${n} milestones.`,
+    renameAll: "Title for the whole series", renameAllBtn: "Rename all", changeEvery: "Change repetition", changeEveryBtn: "Change for this and later", changeEveryHint: "This occurrence and all later ones get new dates with the new interval. Earlier occurrences keep their dates.",
   },
   quick: { label: "Add task", placeholder: "Add task...  (Enter)" },
   today: "Today",

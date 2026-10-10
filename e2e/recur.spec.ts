@@ -106,8 +106,7 @@ test("RC6 serien markeras i listan och i boarden, och en vanlig milstolpe gör d
   await expect(page.locator(`.gantt_row[data-task-id="${s[0].id}"]`)).toHaveClass(/has-series/);
   const plain = (await items(page)).find((i) => i.type === "milestone" && !i.series)!;
   await expect(page.locator(`.gantt_row[data-task-id="${plain.id}"]`)).not.toHaveClass(/has-series/);
-  const after = await page.locator(`.gantt_row[data-task-id="${s[0].id}"] .grid-title`).evaluate((e) => getComputedStyle(e, "::after").content);
-  expect(after).toContain("↻");
+  await expect.poll(() => page.locator(`.gantt_row[data-task-id="${s[0].id}"] .grid-title`).evaluate((e) => getComputedStyle(e, "::after").content)).toContain("↻");
   await page.getByRole("group", { name: "Vy" }).getByRole("button", { name: "Board" }).click();
   await expect(page.locator(`article[data-id="${s[0].id}"] .board-series`)).toContainText("Var 3:e månad");
 });
@@ -125,4 +124,24 @@ test("RC7 genvägar är avstängda i dialogen, och serien följer med i JSON-exp
   const text = toJson(toParsed({ name: "P", dependency_mode: "shift" }, withSeries, [], []), "2026-10-09");
   const back = parseJson(text);
   expect(back.items[0]).toMatchObject({ series: "s_x", recur: "weekly" });
+});
+
+test("RC8 i panelen: byt namn på hela serien, och ändra upprepningen för detta och senare", async ({ page }) => {
+  const d = await create(page, { title: "Gammal titel", first: "2026-10-12", kind: "weekly", count: "5" });
+  await d.getByRole("button", { name: "Skapa" }).click();
+  let s = await series(page);
+  await page.locator(`.gantt_row[data-task-id="${s[2].id}"] .grid-title`).click(); // tredje tillfället, 26 okt
+  const sec = page.locator('aside.panel [data-section="series"]');
+  await sec.getByLabel("Titel för hela serien").fill("Ny gemensam titel");
+  await sec.getByRole("button", { name: "Byt namn på alla" }).click();
+  await expect.poll(async () => (await series(page)).map((i) => i.title)).toEqual(Array(5).fill("Ny gemensam titel"));
+  await expect(page.locator('aside.panel input[name="title"]')).toHaveValue("Ny gemensam titel");
+  await page.waitForTimeout(350); // en människa är långsammare än 250 ms: egna ångra-steg
+  await sec.getByLabel("Ändra upprepning").selectOption("monthly");
+  await sec.getByRole("button", { name: "Ändra för detta och senare" }).click();
+  await expect.poll(async () => (await series(page)).map((i) => i.start)).toEqual(["2026-10-12", "2026-10-19", "2026-10-26", "2026-11-26", "2026-12-26"]);
+  await expect(sec).toContainText("Varje månad. 5 tillfällen i serien.");
+  await page.waitForTimeout(350);
+  await page.getByRole("button", { name: "Ångra", exact: true }).click(); // ändringen av upprepningen är ett steg
+  await expect.poll(async () => (await series(page)).map((i) => i.start)).toEqual(["2026-10-12", "2026-10-19", "2026-10-26", "2026-11-02", "2026-11-09"]);
 });

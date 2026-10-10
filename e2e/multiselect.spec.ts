@@ -63,9 +63,7 @@ test("MS5 flytta markerade till en grupp, och en markerad grupp erbjuds inte som
   const opts = await bar(page).getByLabel("Flytta till...").locator("option").allInnerTexts();
   expect(opts).toContain("Översta nivån");
   await bar(page).getByLabel("Flytta till...").selectOption({ label: "Utveckling" });
-  await expect.poll(async () => (await items(page)).find((i) => i.id === "i2")!.parent_id).not.toBe("i1");
-  const all = await items(page);
-  expect(all.find((i) => i.id === "i2")!.parent_id).toBe(all.find((i) => i.id === "i3")!.parent_id);
+  await expect.poll(async () => { const a = await items(page); return [a.find((i) => i.id === "i2")!.parent_id, a.find((i) => i.id === "i3")!.parent_id]; }).toEqual(["i12", "i12"]); // båda flyttas, en i taget
   await page.getByRole("button", { name: "Ångra", exact: true }).click();
   await expect.poll(async () => (await items(page)).find((i) => i.id === "i3")!.parent_id).toBe("i1"); // båda tillbaka med ett ångra
   expect((await items(page)).find((i) => i.id === "i2")!.parent_id).toBe("i1");

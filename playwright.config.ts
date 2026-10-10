@@ -12,6 +12,7 @@ export default defineConfig({
     timezoneId: "Europe/Stockholm",
     locale: "sv-SE",
     viewport: { width: 1800, height: 900 },
+    browserName: (process.env.PW_BROWSER as "chromium" | "webkit" | "firefox" | undefined) ?? "chromium", // PW_BROWSER=webkit eller firefox: kör testerna i en annan webbläsarmotor
     hasTouch: !!process.env.PW_TOUCH, // PW_TOUCH=1: kör testerna som på en dator med pekskärm (pekläget i Gantt slås då på)
   },
   // BASE_URL satt = mät mot redan startad server (t.ex. vite preview av produktionsbygget)

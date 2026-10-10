@@ -268,7 +268,9 @@ export async function extendSeries(store: DataStore, items: Item[], member: Item
   if (!last || !member.recur) return [];
   const n = Math.max(1, Math.min(MAX_SERIES - all.length, Math.floor(count)));
   if (n < 1) return [];
-  const dates = recurringDates(all[0].start, member.recur, all.length + n).slice(all.length);
+  // Datumen räknas från seriens första datum (dagen glider inte: 31 jan, 28 feb, 31 mars). Stämmer inte det med det sista tillfället (serien har ändrats) räknas de från det sista.
+  const fromFirst = recurringDates(all[0].start, member.recur, all.length + n);
+  const dates = fromFirst[all.length - 1] === last.start ? fromFirst.slice(all.length) : recurringDates(last.start, member.recur, n + 1).slice(1);
   const top = items.reduce((m, i) => Math.max(m, i.sort_order), 0);
   const { id: _id, ...rest } = last; void _id;
   const made: Item[] = [];
@@ -281,4 +283,29 @@ export async function deleteSeries(store: DataStore, items: Item[], member: Item
   const list = seriesMembers(items, member).filter((i) => scope === "all" || i.start >= member.start);
   for (const i of list) await store.deleteItem(i.id);
   return list.length;
+}
+
+/** Ändrar titeln på alla tillfällen i serien. Returnerar antal ändrade. */
+export async function renameSeries(store: DataStore, items: Item[], member: Item, title: string): Promise<number> {
+  const t = title.trim();
+  if (!t) throw new Error(sv.recur.emptyTitle);
+  const list = seriesMembers(items, member).filter((i) => i.title !== t);
+  for (const i of list) await store.updateItem(i.id, { title: t });
+  return list.length;
+}
+
+/**
+ * Ändrar upprepningen från och med `member`: det här tillfället och alla senare får nya datum med det nya avståndet (räknat från det här tillfällets datum),
+ * och hela serien får den nya upprepningen som beskrivning av hur den fortsätter. Tidigare tillfällen behåller sina datum. Returnerar antal flyttade tillfällen.
+ */
+export async function changeRecurrence(store: DataStore, items: Item[], member: Item, kind: Recurrence): Promise<number> {
+  const all = seriesMembers(items, member);
+  const later = all.filter((i) => i.start >= member.start);
+  const dates = recurringDates(member.start, kind, later.length);
+  let moved = 0;
+  for (let i = 0; i < later.length; i++) {
+    if (later[i].start !== dates[i] || later[i].recur !== kind) { await store.updateItem(later[i].id, { start: dates[i], end: dates[i], recur: kind }); moved++; }
+  }
+  for (const i of all) if (i.start < member.start && i.recur !== kind) await store.updateItem(i.id, { recur: kind });
+  return moved;
 }

@@ -370,12 +370,26 @@ export function DhtmlxGantt({ store, items, deps, zoom, onError, onPersisted, re
     hostEl.addEventListener("keyup", onCheckKey, true);
     hostEl.addEventListener("click", onSelectClick, true);
     hostEl.addEventListener("click", onCheck, true);
-    hostEl.addEventListener("dblclick", onDblClick, true);
+    // Dubbelklick känns igen här av två tryck i följd (inom 400 ms och 8 px) i stället för webbläsarens dblclick. Raden ritas om efter första klicket (panelen
+    // öppnas och ytan ändras), och Safari skickar då varken klick eller dblclick när raden byts ut under det andra trycket. Därför räknas tryck på pointerup.
+    let down = { x: 0, y: 0 }, lastClick = { t: 0, x: 0, y: 0 };
+    const forget = () => { lastClick = { t: 0, x: 0, y: 0 }; }; // en tangent eller ett annat musknapptryck emellan gör det till två enkla klick
+    const onPtrDown = (e: PointerEvent) => { down = { x: e.clientX, y: e.clientY }; if (e.button !== 0) forget(); };
+    const onPtrUp = (e: PointerEvent) => {
+      if (e.button !== 0 || Math.hypot(e.clientX - down.x, e.clientY - down.y) > 6) return; // dragning, inget klick
+      const now = performance.now();
+      const dbl = now - lastClick.t < 400 && Math.hypot(e.clientX - lastClick.x, e.clientY - lastClick.y) < 8;
+      lastClick = dbl ? { t: 0, x: 0, y: 0 } : { t: now, x: e.clientX, y: e.clientY };
+      if (dbl) onDblClick(e as unknown as MouseEvent);
+    };
+    hostEl.addEventListener("pointerdown", onPtrDown, true);
+    hostEl.addEventListener("pointerup", onPtrUp, true);
+    document.addEventListener("keydown", forget, true);
     hostEl.addEventListener("contextmenu", onContextMenu, true);
     // Panelen till höger tar plats: DHTMLX måste få veta när behållaren ändrar storlek
     const ro = new ResizeObserver(() => gantt.setSizes());
     ro.observe(host.current!);
-    return () => { scrollCarry.read = null; hostEl.removeEventListener("change", onCellChange, true); hostEl.removeEventListener("keydown", onCheckKey, true); hostEl.removeEventListener("keyup", onCheckKey, true); hostEl.removeEventListener("click", onSelectClick, true); hostEl.removeEventListener("click", onCheck, true); document.removeEventListener("pointermove", onAnyMove, true); document.removeEventListener("pointerleave", hideTip, true); window.removeEventListener("blur", hideTip); hostEl.removeEventListener("dblclick", onDblClick, true); hostEl.removeEventListener("contextmenu", onContextMenu, true); ro.disconnect(); ids.forEach((id) => gantt.detachEvent(id)); stopDragFeedback?.(); gantt.clearAll(); };
+    return () => { scrollCarry.read = null; hostEl.removeEventListener("change", onCellChange, true); hostEl.removeEventListener("keydown", onCheckKey, true); hostEl.removeEventListener("keyup", onCheckKey, true); hostEl.removeEventListener("click", onSelectClick, true); hostEl.removeEventListener("click", onCheck, true); document.removeEventListener("pointermove", onAnyMove, true); document.removeEventListener("pointerleave", hideTip, true); window.removeEventListener("blur", hideTip); hostEl.removeEventListener("pointerdown", onPtrDown, true); hostEl.removeEventListener("pointerup", onPtrUp, true); document.removeEventListener("keydown", forget, true); hostEl.removeEventListener("contextmenu", onContextMenu, true); ro.disconnect(); ids.forEach((id) => gantt.detachEvent(id)); stopDragFeedback?.(); gantt.clearAll(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
