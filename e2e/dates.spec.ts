@@ -69,3 +69,28 @@ test("DT4 samma format och placeholder på engelska", async ({ page }) => {
   await page.locator('aside.panel .datepick').nth(1).getByRole("button", { name: "Open the calendar" }).click();
   await expect(page.getByRole("dialog", { name: "Pick a date" })).toBeVisible();
 });
+
+for (const lang of ["Svenska", "English"]) {
+  test(`DT5 alla månadsnamn och årtalet ryms i kalenderns listor (${lang})`, async ({ page }) => {
+    await page.getByRole("group", { name: "Språk" }).getByRole("button", { name: lang }).click();
+    await page.locator('.gantt_row[data-task-id="i7"] .grid-title').click();
+    await page.locator("aside.panel .datepick").nth(1).getByRole("button", { name: /kalendern|calendar/ }).click();
+    const pop = page.getByRole("dialog");
+    const tooWide: string[] = [];
+    for (let m = 1; m <= 12; m++) {
+      await pop.locator('select[name="datepick-month"]').selectOption(String(m));
+      tooWide.push(...await pop.evaluate((p) => [...p.querySelectorAll("select")].flatMap((e) => {
+        const cs = getComputedStyle(e), o = (e as HTMLSelectElement).selectedOptions[0].text;
+        const probe = document.createElement("span"); probe.style.cssText = `font:${cs.font};letter-spacing:${cs.letterSpacing};text-transform:${cs.textTransform};position:absolute;visibility:hidden;white-space:nowrap`; probe.textContent = o; document.body.append(probe);
+        const need = probe.getBoundingClientRect().width + parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight) + 22; // 22: pilen
+        probe.remove();
+        return need > e.getBoundingClientRect().width ? [`${o}: behöver ${Math.round(need)}px, har ${Math.round(e.getBoundingClientRect().width)}px`] : [];
+      })));
+    }
+    expect(tooWide).toEqual([]);
+    const box = (await pop.boundingBox())!, panel = (await page.locator("aside.panel").boundingBox())!;
+    const vp = page.viewportSize()!;
+    expect(box.x).toBeGreaterThanOrEqual(0); expect(box.x + box.width).toBeLessThanOrEqual(vp.width); // kalendern ryms i fönstret
+    expect(box.x + box.width).toBeLessThanOrEqual(panel.x + panel.width + 1); // och sticker inte ut ur panelen
+  });
+}

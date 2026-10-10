@@ -18,6 +18,7 @@ export function DatePicker({ name, value, onValue, onCommit }: {
   const [open, setOpen] = useState(false);
   const [focus, setFocus] = useState<string>(isISODate(value) ? value : todayISO());
   const [bad, setBad] = useState(false);
+  const [flip, setFlip] = useState(false); // kalendern ligger mot fältets högra kant när den annars skulle sticka ut ur fönstret
   const root = useRef<HTMLSpanElement>(null);
   const grid = useRef<HTMLDivElement>(null);
   useEffect(() => { setText(value); setBad(false); }, [value]);
@@ -69,19 +70,19 @@ export function DatePicker({ name, value, onValue, onCommit }: {
         onBlur={commitText}
         onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); else if (e.key === "ArrowDown" && e.altKey) { e.preventDefault(); setFocus(parseTypedDate(text) ?? focus); setOpen(true); } }} />
       <button type="button" className="datepick-btn" aria-label={sv.dates.picker.open} aria-haspopup="dialog" aria-expanded={open}
-        onClick={() => { if (!open) setFocus(parseTypedDate(text) ?? (isISODate(value) ? value : todayISO())); setOpen((o) => !o); }}>
+        onClick={() => { if (!open) { setFocus(parseTypedDate(text) ?? (isISODate(value) ? value : todayISO())); const r = root.current!.getBoundingClientRect(); setFlip(r.left + Math.min(344, window.innerWidth - 32) > window.innerWidth - 8); } setOpen((o) => !o); }}>
         <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" focusable="false"><rect x="2" y="3" width="12" height="11" rx="1.5" fill="none" stroke="currentColor" strokeWidth="1.2" /><path d="M2 6.5h12M5.5 1.8v2.4M10.5 1.8v2.4" fill="none" stroke="currentColor" strokeWidth="1.2" /></svg>
       </button>
       {bad && <span id={`${name}-bad`} className="datepick-bad" role="alert">{sv.dates.picker.invalid}</span>}
       {open && (
-        <div className="datepick-pop" role="dialog" aria-label={sv.dates.picker.dialog} onKeyDown={key}>
+        <div className={`datepick-pop${flip ? " flip" : ""}`} role="dialog" aria-label={sv.dates.picker.dialog} onKeyDown={key}>
           <div className="datepick-head">
             <button type="button" className="datepick-nav" aria-label={sv.dates.picker.prevYear} onClick={() => setFocus(addMonths(focus, -12))}>{"«"}</button>
             <button type="button" className="datepick-nav" aria-label={sv.dates.picker.prevMonth} onClick={() => setFocus(addMonths(focus, -1))}>{"‹"}</button>
-            <select aria-label={sv.dates.picker.month} value={fm} onChange={(e) => setFocus(addMonths(focus, Number(e.target.value) - fm))}>
+            <select name="datepick-month" aria-label={sv.dates.picker.month} value={fm} onChange={(e) => setFocus(addMonths(focus, Number(e.target.value) - fm))}>
               {sv.dates.monthsFull.map((n, i) => <option key={n} value={i + 1}>{n}</option>)}
             </select>
-            <select aria-label={sv.dates.picker.year} value={fy} onChange={(e) => setFocus(addMonths(focus, (Number(e.target.value) - fy) * 12))}>
+            <select name="datepick-year" aria-label={sv.dates.picker.year} value={fy} onChange={(e) => setFocus(addMonths(focus, (Number(e.target.value) - fy) * 12))}>
               {years.map((y) => <option key={y} value={y}>{y}</option>)}
             </select>
             <button type="button" className="datepick-nav" aria-label={sv.dates.picker.nextMonth} onClick={() => setFocus(addMonths(focus, 1))}>{"›"}</button>
