@@ -238,3 +238,18 @@ test("W12 hover flyttar aldrig sidan: lågt fönster och lång förklaring (fele
   expect(tried).toBeGreaterThan(3);
   expect(moved, "sidan flyttades under hover").toBe(0);
 });
+
+test("W-färg gruppens färg syns som smal kant i teckenförklaringen och som ring, och följer valet i panelen", async ({ page }) => {
+  await page.setViewportSize({ width: 1500, height: 850 });
+  await page.clock.setFixedTime(new Date("2026-04-20T10:00:00"));
+  await page.goto("/?fixture=small&latency=0&view=wheel");
+  await page.waitForSelector(".wheel-svg");
+  const heads = page.locator(".wheel-legend h2.has-grp");
+  expect(await heads.count()).toBeGreaterThan(1);
+  const shadows = await heads.evaluateAll((a) => a.map((e) => getComputedStyle(e).boxShadow));
+  expect(new Set(shadows).size).toBe(shadows.length); // olika färg per grupp
+  expect(shadows.every((s) => /4px 0px 0px 0px inset/.test(s))).toBe(true); // smal kant, inte en färgad ruta
+  expect(await page.locator(".wheel-band-ring").count()).toBe(await heads.count());
+  const bg = await heads.first().evaluate((e) => getComputedStyle(e).backgroundColor);
+  expect(bg).toBe("rgba(0, 0, 0, 0)");
+});

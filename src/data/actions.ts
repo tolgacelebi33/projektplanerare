@@ -199,3 +199,43 @@ export async function bulkDelete(store: DataStore, projectId: string, ids: strin
   const roots = selectionRoots(await store.listItems(projectId), ids);
   return eachId(roots, async (id) => { await deleteSubtree(store, await store.listItems(projectId), id); });
 }
+
+/** Id:n i den ordning de visas i listan (träd, djupet först, syskon efter sort_order). */
+export function treeOrderIds(items: Item[]): string[] {
+  const kids = new Map<string | null, Item[]>();
+  for (const i of [...items].sort((a, b) => a.sort_order - b.sort_order)) kids.set(i.parent_id, [...(kids.get(i.parent_id) ?? []), i]);
+  const out: string[] = [];
+  const walk = (pid: string | null) => { for (const i of kids.get(pid) ?? []) { out.push(i.id); walk(i.id); } };
+  walk(null);
+  return out;
+}
+
+/** Korten i en boardkolumn i visad ordning: de med egen plats först (lägst först), därefter resten i listans ordning. Grupper är inga kort. */
+export function boardOrder(items: Item[], status: Status): Item[] {
+  const tree = new Map(treeOrderIds(items).map((id, i) => [id, i] as const));
+  const hasRank = (i: Item) => typeof i.board_rank === "number";
+  return items.filter((i) => i.type !== "epic" && i.status === status).sort((a, b) =>
+    hasRank(a) && hasRank(b) ? a.board_rank! - b.board_rank! || tree.get(a.id)! - tree.get(b.id)!
+    : hasRank(a) ? -1 : hasRank(b) ? 1 : tree.get(a.id)! - tree.get(b.id)!);
+}
+
+/**
+ * Ändringar när `movedIds` släpps i kolumnen `status` före kortet `beforeId` (null = sist). Hela kolumnen får nya platser (10, 20, ...) så att
+ * ordningen är entydig, och flyttade kort byter status. Bara de poster som faktiskt ändras returneras.
+ */
+export function planBoardDrop(items: Item[], movedIds: string[], status: Status, beforeId: string | null): { id: string; patch: Partial<Item> }[] {
+  const moving = new Set(movedIds);
+  const byId = new Map(items.map((i) => [i.id, i]));
+  const rest = boardOrder(items, status).filter((i) => !moving.has(i.id));
+  const moved = movedIds.map((id) => byId.get(id)).filter((i): i is Item => !!i && i.type !== "epic");
+  const at = beforeId && !moving.has(beforeId) ? rest.findIndex((i) => i.id === beforeId) : -1;
+  const order = at >= 0 ? [...rest.slice(0, at), ...moved, ...rest.slice(at)] : [...rest, ...moved];
+  const out: { id: string; patch: Partial<Item> }[] = [];
+  order.forEach((it, idx) => {
+    const patch: Partial<Item> = {};
+    if (it.board_rank !== (idx + 1) * 10) patch.board_rank = (idx + 1) * 10;
+    if (moving.has(it.id) && it.status !== status) patch.status = status;
+    if (Object.keys(patch).length) out.push({ id: it.id, patch });
+  });
+  return out;
+}

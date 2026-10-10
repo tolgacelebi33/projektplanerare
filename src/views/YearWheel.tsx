@@ -1,7 +1,7 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { todayISO } from "../data/dates";
 import { isOverdue } from "../data/rules";
-import type { Item, Status } from "../data/types";
+import type { GroupColor, Item, Status } from "../data/types";
 import { sv } from "../i18n/sv";
 import { STATUS_GLYPH } from "../proto/statusUi";
 import {
@@ -22,9 +22,9 @@ interface Placed {
   item: Item; s: number; e: number; rIn: number; rOut: number; a0: number; a1: number;
   inside: boolean; no: number | null; clippedStart: boolean; clippedEnd: boolean;
 }
-interface Band { letter: string; epic: Item | null; rIn: number; rOut: number; placed: Placed[] }
+interface Band { letter: string; color: GroupColor | null; epic: Item | null; rIn: number; rOut: number; placed: Placed[] }
 
-export function YearWheel({ items, year, selectedId = null, onOpen, onContext }: { items: Item[]; year: number; selectedId?: string | null; onOpen?: (id: string) => void; onContext?: (a: { id: string | null; x: number; y: number }) => void }) {
+export function YearWheel({ items, year, colors, selectedId = null, onOpen, onContext }: { items: Item[]; year: number; colors?: ReadonlyMap<string, GroupColor | "none">; selectedId?: string | null; onOpen?: (id: string) => void; onContext?: (a: { id: string | null; x: number; y: number }) => void }) {
   const [hover, setHover] = useState<string | null>(null);
   const source = useRef<"shape" | "row">("row");
   const legendRef = useRef<HTMLElement>(null);
@@ -70,7 +70,7 @@ export function YearWheel({ items, year, selectedId = null, onOpen, onContext }:
     prepared.forEach(({ g, gi, spans, pack }) => {
       const rIn = r + BAND_GAP;
       const thick = pack.count * (laneH + lanePad) + lanePad;
-      const band: Band = { letter: LETTERS[gi % 26], epic: g.epic, rIn, rOut: rIn + thick, placed: [] };
+      const band: Band = { letter: LETTERS[gi % 26], color: ((c) => (c && c !== "none" ? c : null))(g.epic ? colors?.get(g.epic.id) : undefined), epic: g.epic, rIn, rOut: rIn + thick, placed: [] };
       spans.forEach((x, k) => {
         const lane = pack.lanes[k];
         const li = rIn + lanePad + lane * (laneH + lanePad);
@@ -94,7 +94,7 @@ export function YearWheel({ items, year, selectedId = null, onOpen, onContext }:
     const showToday = today >= `${year}-01-01` && today <= `${year}-12-31`;
     const todayAngle = showToday ? angleOf(Math.round((new Date(today).getTime() - new Date(`${year}-01-01`).getTime()) / 86400000) + 0.5, y) : null;
     return { y, bands, rMax, size: rMax * 2 + 24, todayAngle, today, laneH, lanePad, roomy };
-  }, [items, year]);
+  }, [items, year, colors]);
 
   const { bands, size } = layout;
   const count = bands.reduce((n, b) => n + b.placed.length, 0);
@@ -160,7 +160,7 @@ const WheelSvg = memo(function WheelSvg({ layout, year, size, onEnter, onLeave, 
         );
       })}
       <circle className="wheel-grid" cx={c} cy={c} r={R0 - 34} fill="none" />
-      {bands.map((b, bi) => <circle key={`o${bi}`} className="wheel-grid" cx={c} cy={c} r={b.rOut} fill="none" />)}
+      {bands.map((b, bi) => <circle key={`o${bi}`} className={`wheel-grid${b.color ? " wheel-band-ring" : ""}`} style={b.color ? ({ stroke: `var(--grp-${b.color})` }) : undefined} cx={c} cy={c} r={b.rOut} fill="none" />)}
       <text className="wheel-year" x={c} y={c} textAnchor="middle" dominantBaseline="middle">{year}</text>
 
       {bands.map((b) => b.placed.map((p) => {
@@ -229,7 +229,7 @@ const WheelLegend = memo(function WheelLegend({ bands, legendRef, onEnter, onLea
       <aside className="wheel-legend" aria-label={sv.wheel.legend} ref={legendRef}>
       {bands.map((b) => (
         <section key={`s${b.letter}${b.rIn}`}>
-          <h2><span className="wheel-chip">{b.letter}</span>{b.epic ? b.epic.title : sv.wheel.noEpic}</h2>
+          <h2 className={b.color ? "has-grp" : undefined} style={b.color ? ({ "--band-grp": `var(--grp-${b.color})` } as React.CSSProperties) : undefined}><span className="wheel-chip">{b.letter}</span>{b.epic ? b.epic.title : sv.wheel.noEpic}</h2>
           <ul>
             {b.placed.map((p) => (
               <li key={p.item.id} tabIndex={0} data-id={p.item.id} data-on-arc={p.inside ? "1" : undefined}

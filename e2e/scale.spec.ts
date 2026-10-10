@@ -61,3 +61,41 @@ for (const n of SIZES) {
     expect(boardMs, "board").toBeLessThan(10_000);
   });
 }
+
+// Sparning i IndexedDB med många poster (riktig lagring, inte minnesläget): skapa poster, vänta in sparningen, läs in igen.
+for (const n of SIZES.filter((x) => x <= 6000)) {
+  test(`SC-IDB ${n} poster: skapa, spara och läs in vid start`, async ({ page }) => {
+    test.setTimeout(240_000);
+    await page.setViewportSize({ width: 1500, height: 850 });
+    await page.goto("/");
+    await page.waitForSelector(".gantt_task_line");
+    const made = await page.evaluate(async (count) => {
+      const store = (window as any).__store;
+      const proj = (await store.listProjects())[0];
+      const base = (await store.listItems(proj.id))[0];
+      const t0 = performance.now();
+      const group = await store.createItem({ workspace_id: base.workspace_id, project_id: proj.id, parent_id: null, type: "epic", title: "Skalgrupp", start: "2026-01-05", end: "2026-01-06", status: "not_started", assignee_id: null, description: "", priority: "normal", progress: 0, sort_order: 9000 });
+      for (let i = 0; i < count; i++) {
+        await store.createItem({ workspace_id: base.workspace_id, project_id: proj.id, parent_id: group.id, type: "task", title: `Skalpost ${i}`, start: "2026-01-05", end: "2026-01-06", status: "not_started", assignee_id: null, description: "", priority: "normal", progress: 0, sort_order: 9001 + i });
+      }
+      const createMs = performance.now() - t0;
+      const t1 = performance.now();
+      await store.flush();
+      return { createMs, flushMs: performance.now() - t1 };
+    }, n);
+    const bytes = await page.evaluate(() => new Promise<number>((res) => {
+      const r = indexedDB.open("projektplanerare", 1);
+      r.onsuccess = () => { const g = r.result.transaction("kv", "readonly").objectStore("kv").get("state"); g.onsuccess = () => { r.result.close(); res(JSON.stringify(g.result).length); }; };
+    }));
+    const t2 = Date.now();
+    await page.reload();
+    await page.waitForSelector(".gantt_row"); // rader, inte staplar: med så många poster ligger de synliga staplarna inte nödvändigtvis i det första utsnittet
+    const reloadMs = Date.now() - t2;
+    const count = await page.evaluate(async () => { const s = (window as any).__store; const p = (await s.listProjects())[0]; return (await s.listItems(p.id)).length; });
+    expect(count).toBeGreaterThan(n);
+    const prev = fs.existsSync("docs/test-output/scale-idb.json") ? JSON.parse(fs.readFileSync("docs/test-output/scale-idb.json", "utf8")) : {};
+    prev[String(n)] = { ...made, storedKB: Math.round(bytes / 1024), reloadMs };
+    fs.writeFileSync("docs/test-output/scale-idb.json", JSON.stringify(prev, null, 2));
+    expect(reloadMs, "start efter omladdning").toBeLessThan(20_000);
+  });
+}

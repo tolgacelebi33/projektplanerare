@@ -35,6 +35,8 @@ export interface Item {
   progress: number;
   /** Gruppens färg, bara meningsfull för en grupp (epic). Saknas eller null: automatisk färg efter plats. "none": ingen färg. */
   color?: GroupColor | "none" | null;
+  /** Plats i kolumnen i boardvyn (lägre först). Saknas: efter de med plats, i listans ordning. */
+  board_rank?: number | null;
   sort_order: number;
 }
 

@@ -261,16 +261,16 @@ export function ItemPanel({ store, projectId, itemId, dataVersion, autoSelectTit
             <>
               <label className="panel-field">
                 <span>{milestone ? sv.panel.date : sv.panel.start}</span>
-                <input type="date" name="start" value={start}
-                  onChange={(e) => { setStart(e.target.value); planDate("start", e.target.value, milestone); }}
-                  onBlur={(e) => planDate("start", e.target.value, milestone, true)} />
+                <DateField name="start" value={start}
+                  onValue={(v) => { setStart(v); if (isISODate(v)) planDate("start", v, milestone); }}
+                  onCommit={(v) => { if (isISODate(v)) planDate("start", v, milestone, true); else setStart(item.start); }} />
               </label>
               {!milestone && (
                 <label className="panel-field">
                   <span>{sv.panel.end}</span>
-                  <input type="date" name="end" value={end}
-                    onChange={(e) => { setEnd(e.target.value); planDate("end", e.target.value, false); }}
-                    onBlur={(e) => planDate("end", e.target.value, false, true)} />
+                  <DateField name="end" value={end}
+                    onValue={(v) => { setEnd(v); if (isISODate(v)) planDate("end", v, false); }}
+                    onCommit={(v) => { if (isISODate(v)) planDate("end", v, false, true); else setEnd(item.end); }} />
                 </label>
               )}
             </>
@@ -389,3 +389,17 @@ function PanelHead({ onClose, kind, crumbs = [], saveState }: { onClose: () => v
 }
 
 const messageFor = friendlyError;
+
+/** Datum som text i formen ÅÅÅÅ-MM-DD (samma på båda språken, till skillnad från webbläsarens egna datumfält som följer webbläsarens språk), med kalendern som val. */
+function DateField({ name, value, onValue, onCommit }: { name: string; value: string; onValue: (v: string) => void; onCommit: (v: string) => void }) {
+  const native = useRef<HTMLInputElement>(null);
+  return (
+    <span className="date-field">
+      <input type="text" inputMode="numeric" name={name} value={value} placeholder={sv.panel.datePlaceholder} maxLength={10} autoComplete="off"
+        onChange={(e) => onValue(e.target.value)} onBlur={(e) => onCommit(e.target.value)} />
+      <button type="button" className="date-pick" aria-label={sv.panel.pickDate} onClick={() => native.current?.showPicker?.()}>{"\u25BE"}</button>
+      <input ref={native} type="date" className="date-native" tabIndex={-1} aria-hidden="true" value={isISODate(value) ? value : ""}
+        onChange={(e) => { if (e.target.value) { onValue(e.target.value); onCommit(e.target.value); } }} />
+    </span>
+  );
+}

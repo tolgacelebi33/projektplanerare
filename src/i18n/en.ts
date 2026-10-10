@@ -177,6 +177,7 @@ export const enDict: Dict = {
     onArc: "the title is shown on the arc",
   },
   panel: {
+    datePlaceholder: "YYYY-MM-DD", pickDate: "Pick a date in the calendar",
     label: "Details",
     close: "Close",
     type: { epic: "Group", milestone: "Milestone", task: "Task" },

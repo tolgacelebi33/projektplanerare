@@ -53,3 +53,58 @@ test("B5 vyn finns kvar efter byte av språk och zoom/årsverktyg visas inte", a
   await page.getByRole("group", { name: "Språk" }).getByRole("button", { name: "English" }).click();
   await expect(page.getByRole("group", { name: "Board, items by status" })).toBeVisible();
 });
+
+const MOD = process.platform === "darwin" ? "Meta" : "Control";
+const order = (page: Page, s: string) => col(page, s).locator("article.board-card").evaluateAll((a) => a.map((x) => x.getAttribute("data-id")));
+
+test("B6 ett klick på tom yta släpper både markering och öppnad post", async ({ page }) => {
+  await card(page, "i6").locator(".board-title").click();
+  await expect(page.locator("aside.panel")).toBeVisible();
+  await expect(card(page, "i6")).toHaveClass(/open/);
+  await page.locator(".board").click({ position: { x: 5, y: 600 } });
+  await expect(page.locator("aside.panel")).toHaveCount(0);
+  await expect(card(page, "i6")).not.toHaveClass(/open/);
+  await card(page, "i6").click({ modifiers: [MOD] });
+  await card(page, "i9").click({ modifiers: [MOD] });
+  await expect(page.getByRole("region", { name: "Markerade poster" })).toBeVisible();
+  await page.locator(".board").click({ position: { x: 5, y: 600 } });
+  await expect(page.getByRole("region", { name: "Markerade poster" })).toHaveCount(0);
+});
+
+test("B7 ordna kort inom en kolumn, sparas som plats och går att ångra", async ({ page }) => {
+  const s = (await items(page)).find((i) => i.id === "i6")!.status;
+  const before = (await order(page, s)) as string[];
+  expect(before.length).toBeGreaterThan(1);
+  const first = before[0], last = before[before.length - 1];
+  await card(page, first).dragTo(card(page, last), { targetPosition: { x: 40, y: 3 } }); // övre halvan: före sista kortet
+  await expect.poll(async () => (await order(page, s))).toEqual(before.length === 2 ? [first, last] : [...before.slice(1, -1), first, last]);
+  await page.getByRole("button", { name: "Ångra", exact: true }).click();
+  await expect.poll(async () => (await order(page, s))).toEqual(before);
+});
+
+test("B8 flerval: Ctrl/Cmd och Shift markerar, markerade kort flyttas tillsammans, och de markerade syns tydligt", async ({ page }) => {
+  const s = (await items(page)).find((i) => i.id === "i6")!.status;
+  const ids = ((await order(page, s)) as string[]).slice(0, 2);
+  await card(page, ids[0]).click({ modifiers: [MOD] });
+  await card(page, ids[1]).click({ modifiers: [MOD] });
+  await expect(page.getByRole("region", { name: "Markerade poster" }).getByRole("status")).toHaveText("2 markerade");
+  await expect(card(page, ids[0])).toHaveClass(/sel/);
+  const o0 = await card(page, ids[0]).evaluate((e) => getComputedStyle(e).opacity);
+  const other = ((await order(page, s)) as string[]).find((x) => !ids.includes(x));
+  if (other) expect(Number(await card(page, other).evaluate((e) => getComputedStyle(e).opacity))).toBeLessThan(Number(o0)); // omarkerade tonas ned
+  const target = s === "done" ? "blocked" : "done";
+  await card(page, ids[0]).dragTo(col(page, target));
+  await expect.poll(async () => (await items(page)).filter((i) => ids.includes(i.id)).map((i) => i.status)).toEqual([target, target]);
+  await card(page, ids[0]).click(); // vanligt klick släpper markeringen
+  await expect(page.getByRole("region", { name: "Markerade poster" })).toHaveCount(0);
+});
+
+test("B9 gruppfärg är en smal kant på kortet, inte en färgad ruta", async ({ page }) => {
+  const c = card(page, "i6");
+  await expect(c).toHaveClass(/grp-/);
+  const st = await c.evaluate((e) => { const cs = getComputedStyle(e); return { shadow: cs.boxShadow, bg: cs.backgroundColor, surface: getComputedStyle(document.body).getPropertyValue("--surface") }; });
+  expect(st.shadow).not.toBe("none");
+  expect(st.shadow).toMatch(/4px 0px 0px 0px inset/);
+  const d = await page.evaluate(() => { const a = document.createElement("div"); a.style.background = "var(--surface)"; document.body.append(a); const v = getComputedStyle(a).backgroundColor; a.remove(); return v; });
+  expect(st.bg).toBe(d); // kortets fyllning är temats yta
+});

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { bulkDelete, bulkMove, bulkStatus, canMove, deleteSubtree, descendants, epicChoices, moveTargets, newItemDraft, planMove, rangeIds, selectionRoots, swapWithSibling } from "../src/data/actions";
+import { boardOrder, planBoardDrop, bulkDelete, bulkMove, bulkStatus, canMove, deleteSubtree, descendants, epicChoices, moveTargets, newItemDraft, planMove, rangeIds, selectionRoots, swapWithSibling } from "../src/data/actions";
 import { smallFixture } from "../src/data/fixtures";
 import { MemoryStore } from "../src/data/MemoryStore";
 
@@ -165,5 +165,44 @@ describe("flerval", () => {
     const r = await bulkDelete(s, "proj_1", ["i4", "i5", "i14"]);
     expect([r.done, r.failed]).toEqual([2, 0]);
     expect((await s.listItems("proj_1")).length).toBe(n0 - (1 + descendants(items(), "i4").length) - 1);
+  });
+});
+
+describe("ordning i boardkolumner", () => {
+  const apply = async (s: MemoryStore, plan: { id: string; patch: object }[]) => { for (const u of plan) await s.updateItem(u.id, u.patch); };
+  it("utan egen plats följer korten listans ordning, och grupper är inga kort", () => {
+    const o = boardOrder(smallFixture().items, "not_started");
+    expect(o.every((i) => i.type !== "epic" && i.status === "not_started")).toBe(true);
+    const tree = smallFixture().items.map((i) => i.id);
+    expect(o.map((i) => i.id)).toEqual([...o.map((i) => i.id)].sort((a, b) => tree.indexOf(a) - tree.indexOf(b)));
+  });
+  it("släpp före ett kort ger rätt plats, och ett kort från en annan kolumn byter status", async () => {
+    const s = new MemoryStore(smallFixture());
+    const items = await s.listItems("proj_1");
+    const col = boardOrder(items, "not_started");
+    const other = items.find((i) => i.type !== "epic" && i.status !== "not_started")!;
+    await apply(s, planBoardDrop(items, [other.id], "not_started", col[1].id));
+    const after = boardOrder(await s.listItems("proj_1"), "not_started");
+    expect(after.map((i) => i.id).slice(0, 3)).toEqual([col[0].id, other.id, col[1].id]);
+    expect(after.find((i) => i.id === other.id)!.status).toBe("not_started");
+  });
+  it("flytt inom kolumnen till slutet, och flera kort i ordning", async () => {
+    const s = new MemoryStore(smallFixture());
+    const items = await s.listItems("proj_1");
+    const col = boardOrder(items, "not_started");
+    await apply(s, planBoardDrop(items, [col[0].id, col[1].id], "not_started", null));
+    const after = boardOrder(await s.listItems("proj_1"), "not_started").map((i) => i.id);
+    expect(after.slice(-2)).toEqual([col[0].id, col[1].id]);
+    expect(after.length).toBe(col.length);
+  });
+  it("ett oförändrat släpp ger inga ändringar efter första gången, och ångras som ett steg", async () => {
+    const s = new MemoryStore(smallFixture());
+    let items = await s.listItems("proj_1");
+    const col = boardOrder(items, "not_started");
+    await apply(s, planBoardDrop(items, [col[2].id], "not_started", col[0].id));
+    items = await s.listItems("proj_1");
+    expect(planBoardDrop(items, [col[2].id], "not_started", col[0].id)).toEqual([]);
+    await s.undo();
+    expect(boardOrder(await s.listItems("proj_1"), "not_started").map((i) => i.id)).toEqual(col.map((i) => i.id));
   });
 });

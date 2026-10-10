@@ -377,10 +377,36 @@ body[data-overlay] .gantt_tooltip { display: none !important; }
 .board-empty { margin: 0; font-size: 12px; color: var(--text-muted); }
 .board-card { background: var(--surface); border: var(--line-width) solid var(--line); border-radius: 6px; padding: 8px; cursor: grab; display: flex; flex-direction: column; gap: 4px; }
 .board-card:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
-.board-card.selected { box-shadow: inset 0 0 0 2px var(--accent); }
+.board-slot { display: flex; flex-direction: column; gap: 4px; }
+.board-drop-line { height: 3px; border-radius: 2px; background: var(--accent); }
+.board-card { position: relative; }
+.board-card.open { outline: 2px solid var(--accent); outline-offset: -1px; }
+.board-card.sel { outline: 2px solid var(--accent); outline-offset: -1px; background: color-mix(in srgb, var(--accent) 16%, var(--surface)); }
+.board.has-sel .board-card:not(.sel) { opacity: 0.72; }
+/* Gruppfärg: smal kant till vänster, aldrig hela rutan */
+.board-card[class*="grp-"] { box-shadow: inset 4px 0 0 var(--card-grp); padding-left: 12px; }
 .board-card.dragging { opacity: 0.5; }
 .board-title { font-size: var(--fs-md); font-weight: var(--weight-strong); }
 .board-path, .board-meta { font-size: 12px; color: var(--text-muted); }
 .board-meta { display: flex; flex-wrap: wrap; gap: 4px 10px; }
 .board-over { color: var(--text); font-weight: var(--weight-strong); text-decoration: underline; }
 .board-status { align-self: flex-start; font: inherit; font-size: 12px; color: var(--text); background: var(--surface); border: var(--line-width) solid var(--line); border-radius: var(--radius-pill); padding: 2px 8px; }
+.board-card.grp-gron { --card-grp: var(--grp-gron); }
+.board-card.grp-rod { --card-grp: var(--grp-rod); }
+.board-card.grp-koppar { --card-grp: var(--grp-koppar); }
+.board-card.grp-brons { --card-grp: var(--grp-brons); }
+.board-card.grp-guld { --card-grp: var(--grp-guld); }
+.board-card.grp-bla { --card-grp: var(--grp-bla); }
+.board-card.grp-stal { --card-grp: var(--grp-stal); }
+
+/* Årshjul: gruppfärg som smal kant i teckenförklaringen och som ring runt gruppens fält */
+.wheel-legend h2.has-grp { box-shadow: inset 4px 0 0 var(--band-grp); padding-left: 10px; }
+.wheel-grid.wheel-band-ring { stroke-width: 3; }
+
+/* Datumfält: text (ÅÅÅÅ-MM-DD) med kalendern som val */
+.date-field { position: relative; display: block; }
+.date-field input[type="text"] { padding-right: 34px; }
+.date-pick { position: absolute; right: 4px; top: 50%; transform: translateY(-50%); width: 26px; height: 26px; padding: 0; border: none; background: transparent; color: var(--text); cursor: pointer; border-radius: var(--radius-pill); }
+.panel .date-native { position: absolute; right: 4px; bottom: 0; width: 1px; height: 1px; opacity: 0; pointer-events: none; padding: 0; border: 0; }
+/* Många kort: kort utanför bilden ritas inte förrän de behövs (enklare än virtualisering, och rullningslisten stämmer ungefär) */
+.board-slot { content-visibility: auto; contain-intrinsic-size: auto 110px; }

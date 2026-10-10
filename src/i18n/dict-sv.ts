@@ -182,6 +182,7 @@ export const svDict = {
     onArc: "titeln syns på bågen",
   },
   panel: {
+    datePlaceholder: "ÅÅÅÅ-MM-DD", pickDate: "Välj datum i kalendern",
     label: "Detaljer",
     close: "Stäng",
     type: { epic: "Grupp", milestone: "Milstolpe", task: "Uppgift" },

@@ -31,6 +31,7 @@ export function validateItemShape(item: Item): void {
   if (!Number.isInteger(item.progress) || item.progress < 0 || item.progress > 100)
     throw new RuleError("bad_progress", `Framsteg måste vara ett heltal 0-100: ${item.progress}`);
   if (item.color !== undefined && item.color !== null && item.color !== "none" && !GROUP_COLORS.includes(item.color)) throw new RuleError("bad_color", `Ogiltig färg: ${String(item.color)}`);
+  if (item.board_rank !== undefined && item.board_rank !== null && !Number.isFinite(item.board_rank)) throw new RuleError("bad_rank", `Ogiltig plats i boarden: ${String(item.board_rank)}`);
   if (item.description.length > MAX_DESCRIPTION) throw new RuleError("description_too_long", `Beskrivningen är längre än ${MAX_DESCRIPTION} tecken`);
 }
 

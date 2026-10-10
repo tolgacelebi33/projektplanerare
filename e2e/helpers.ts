@@ -69,6 +69,8 @@ export async function dragBar(page: Page, lib: Lib, id: string, days: number, dw
     await page.mouse.move(x + (dx * i) / N, y);
     await page.waitForTimeout(20);
   }
+  await page.mouse.move(x + dx, y); // sista läget en gång till: DHTMLX kastar ibland de sista mushändelserna (misstänkt orsak till att K5 en gång föll med en dag fel i CI)
+  await page.waitForTimeout(60);
   await page.waitForTimeout(150);
   await page.mouse.up();
   await page.waitForTimeout(250);

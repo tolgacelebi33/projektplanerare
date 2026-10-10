@@ -2,7 +2,7 @@ import { Suspense, lazy, useEffect, useMemo, useRef, useState } from "react";
 import { downloadText } from "./download";
 import { MAX_IMPORT_BYTES, ImportError, parseFile } from "./data/exchange";
 import { duplicateProject, exportProject, importParsed, type ExportFormat, type ImportResult } from "./data/importExport";
-import { bulkDelete, bulkMove, bulkStatus, canMove, deleteSubtree, descendants, epicChoices, filterActive, filterView, moveTargets, newItemDraft, planMove, rangeIds, selectionRoots, swapWithSibling, type BulkResult } from "./data/actions";
+import { bulkDelete, bulkMove, bulkStatus, canMove, deleteSubtree, descendants, epicChoices, filterActive, filterView, moveTargets, newItemDraft, planBoardDrop, planMove, rangeIds, selectionRoots, swapWithSibling, type BulkResult } from "./data/actions";
 import { BulkBar } from "./views/BulkBar";
 import { friendlyError } from "./i18n/errors";
 import { ContextMenu, type MenuItem } from "./views/ContextMenu";
@@ -128,6 +128,14 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
     if (!selAnchor.current) selAnchor.current = from;
     setSelected(new Set(rangeIds(visible, from, id)));
   };
+  const dropCards = async (moved: string[], status: Status, before: string | null) => {
+    if (!projects.projectId) return;
+    try {
+      for (const u of planBoardDrop(await store.listItems(projects.projectId), moved, status, before)) await store.updateItem(u.id, u.patch);
+      await refresh();
+    } catch (e) { setWriteError(friendlyError(e)); reload(); }
+  };
+  const dropSelection = () => { selAnchor.current = null; setSelected(new Set()); setEditId(null); };
   const runBulk = async (fn: (projectId: string) => Promise<BulkResult>) => {
     if (!projects.projectId) return;
     try {
@@ -446,7 +454,7 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
           <button type="button" className="mini" onClick={() => setCollapse((c) => ({ n: c.n + 1, open: true }))}>{sv.filter.expandAll}</button>
         </>)}
       </div>
-      {view === "gantt" && selected.size > 0 && state.kind === "ready" && (
+      {(view === "gantt" || view === "board") && selected.size > 0 && state.kind === "ready" && (
         <BulkBar count={selected.size} inside={selectionRoots(state.items, selected).reduce((n, id) => n + descendants(state.items, id).length, 0)}
           targets={(() => { const ok = new Set(moveTargets(state.items, selected).map((i) => i.id)); return epicChoices(state.items, "").filter((c) => ok.has(c.id)); })()}
           onStatus={(s) => void runBulk((pid) => bulkStatus(store, [...selected], s))}
@@ -469,8 +477,8 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
         {projects.projects && projects.projects.length === 0 && (
           <div className="empty-state"><p>{sv.project.none}</p><button type="button" className="btn btn-primary" onClick={() => void projects.create(sv.project.defaultName)}>{sv.project.createFirst}</button></div>
         )}
-        {state.kind === "ready" && projects.projectId && view === "board" && <BoardView items={shown.items} allItems={state.items} users={users} selectedId={editId} onOpen={setEditId} onStatus={(id, s) => void editField(id, "status", s)} onContext={openMenu} />}
-        {state.kind === "ready" && projects.projectId && view === "wheel" && <YearWheel items={shown.items} year={effectiveYear} selectedId={editId} onOpen={setEditId} onContext={openMenu} />}
+        {state.kind === "ready" && projects.projectId && view === "board" && <BoardView items={shown.items} allItems={state.items} users={users} colors={colors} openId={editId} selected={selected} onOpen={setEditId} onSelect={selectRow} onBackground={dropSelection} onDrop={(m, s, b) => void dropCards(m, s, b)} onStatus={(id, s) => void editField(id, "status", s)} onContext={openMenu} />}
+        {state.kind === "ready" && projects.projectId && view === "wheel" && <YearWheel items={shown.items} year={effectiveYear} colors={colors} selectedId={editId} onOpen={setEditId} onContext={openMenu} />}
         {state.kind === "ready" && projects.projectId && view === "gantt" && (
           <div className="gantt-wrap">
           <div className="gantt-main">
