@@ -1,4 +1,4 @@
-import { exampleAround, largeFixture, smallFixture } from "./data/fixtures";
+import { exampleAround, hugeFixture, largeFixture, smallFixture } from "./data/fixtures";
 import { todayISO } from "./data/dates";
 import { IdbBackend, LocalStorageBackend, type Backend } from "./data/backends";
 import { MemoryStore } from "./data/MemoryStore";
@@ -32,7 +32,7 @@ export function createStore(params: URLSearchParams): AppStore {
   const fix = params.get("fixture");
   const latency = Number(params.get("latency") ?? (fix ? 50 : 0));
   if (fix) {
-    const fixture = fix === "large" ? largeFixture() : smallFixture();
+    const fixture = fix === "huge" ? hugeFixture(Number(params.get("n") ?? 3000)) : fix === "large" ? largeFixture() : smallFixture();
     return {
       store: new MemoryStore(fixture, { latencyMs: latency, failOnCall: params.get("fail") === "1" ? (_n, m) => m === "listItems" : undefined }),
       persistent: false, workspaceId: fixture.workspace.id,

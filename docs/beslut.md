@@ -228,3 +228,9 @@ Format: datum, beslut, skäl, vad som är overifierat.
 - **Dra ett kort till en annan kolumn** ändrar status (via samma `updateItem` som övriga ändringar, alltså med regler och ångra). Varje kort har också ett statusval, som är sättet för tangentbord och pekskärm (HTML5-dragning fungerar oftast inte på pekskärm: overifierat). Klick på ett kort öppnar posten, högerklick ger samma meny som i listan. Sök, Dölj klara och Filtrera gäller även här.
 - **Inte med:** att ordna kort inom en kolumn (ordningen sparas inte per kolumn), flerval i boarden, och gruppfärger på korten. Zoom och årsverktyg visas inte i boarden.
 - Verifierat: 5 e2e-tester (B1 till B5, inklusive dragning med musen och ångra). Overifierat: dragning i Safari och på pekskärm.
+
+## 2026-10-10: Skalprov (många poster)
+
+- Ny provdata `?fixture=huge&n=<antal>` (bara minnesläge, `hugeFixture`) och testet `e2e/scale.spec.ts` (SC), som skriver mätvärden till `docs/test-output/scale.json`. Gränserna i testet är generösa (start under 20 s, sök och board under 10 s) och ska bara fånga katastrofer.
+- **Mätt på Mac, headless Chromium, 1000 / 3000 / 6000 poster:** första stapel ca 0,9 s i alla tre; rullning 16 till 18 ms per bildruta (60 bilder/s, p95 under 19 ms); sök 20 till 30 ms; **Fäll ihop alla 0,2 / 0,6 / 1,6 s** (växer med antalet, det långsammaste steget); byte till Board 0,25 / 0,5 / 0,9 s (alla kort ritas, ingen virtualisering: 5882 kort i DOM); statusändring på ett kort 44 / 134 / 273 ms.
+- **Overifierat:** lagring i IndexedDB med så många poster (fixturen är i minnet, så sparning, ångra-historikens storlek och inläsning vid start är inte mätta), dragning av rader och beroenden i stora projekt, långsammare datorer och telefoner, och Gantt med djupt nästlade grupper (fixturen är platt: grupper med 50 uppgifter). Board ritar alla kort och blir tyngre med flera tusen (en kolumn med många kort kan behöva virtualiseras om det visar sig i verklig användning).

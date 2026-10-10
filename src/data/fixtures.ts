@@ -159,3 +159,30 @@ export function exampleAround(today: string): Fixture {
   const delta = diffDays("2026-03-23", addDays(today, -2));
   return { ...f, items: f.items.map((i) => ({ ...i, start: addDays(i.start, delta), end: addDays(i.end, delta) })) };
 }
+
+/** Mycket stor fixture för skalprov: `count` poster i grupper om 50 uppgifter, med ett beroende per uppgift (kedja inom gruppen). Bara för tester (?fixture=huge&n=3000). */
+export function hugeFixture(count: number): Fixture {
+  const rand = rng(7);
+  const statuses: Status[] = ["not_started", "in_progress", "done", "blocked"];
+  const items: Item[] = [];
+  const deps: Dependency[] = [];
+  let n = 0;
+  const per = 50;
+  const groups = Math.max(1, Math.ceil(count / (per + 1)));
+  for (let g = 0; g < groups && items.length < count; g++) {
+    const gid = `H${++n}`;
+    const gStart = addDays("2026-01-05", g * 3);
+    items.push({ id: gid, workspace_id: WS, project_id: "proj_big", parent_id: null, type: "epic", title: `Grupp ${g + 1}`, start: gStart, end: gStart, status: "in_progress", assignee_id: null, description: "", priority: "normal", progress: 0, sort_order: n });
+    let cursor = gStart, prev: string | null = null;
+    for (let t = 0; t < per && items.length < count; t++) {
+      const id = `H${++n}`, end = addDays(cursor, 1 + Math.floor(rand() * 5)), status = statuses[Math.floor(rand() * 4)];
+      items.push({ id, workspace_id: WS, project_id: "proj_big", parent_id: gid, type: "task", title: `Uppgift ${g + 1}.${t + 1}`, start: cursor, end, status, assignee_id: ASSIGNEES[n % ASSIGNEES.length], description: "", priority: PRIORITIES[n % PRIORITIES.length], progress: status === "done" ? 100 : 0, sort_order: n });
+      if (prev) deps.push({ id: `d${deps.length + 1}`, workspace_id: WS, from_item_id: prev, to_item_id: id, type: "finish_to_start" });
+      prev = id; cursor = addDays(end, 1);
+    }
+    const kids = items.filter((i) => i.parent_id === gid);
+    const head = items.find((i) => i.id === gid)!;
+    head.start = kids[0].start; head.end = kids[kids.length - 1].end;
+  }
+  return { workspace: workspace(), project: { id: "proj_big", workspace_id: WS, name: "Skalprov", created_at: "2026-01-01T00:00:00.000Z" }, items, dependencies: deps, users: FIXTURE_USERS };
+}
