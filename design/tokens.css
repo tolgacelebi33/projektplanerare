@@ -1,0 +1,136 @@
+/*
+ * Designtokens. Källa: Svedbergs Varumärkesplattform, Grafiska riktlinjer, sid 23.
+ * HEX-värden kontrollerade mot angivna RGB-värden (alla tio stämmer).
+ * Allt under "Semantiska val" är VÅRA val för detta verktyg, inte från riktlinjerna.
+ * Tokennamn är ASCII med flit (säkrare mot verktyg). Använd aldrig rå HEX i komponenter. Referera alltid till en token.
+ */
+
+/* Typsnitt. Filerna ligger i /fonts och är gitignorerade (webblicens ej bekräftad). */
+@font-face {
+  font-family: "NB Architekt Pro R";
+  src: url("/fonts/NB_Architekt_Pro_R_Regular.otf") format("opentype");
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Söhne";
+  src: url("/fonts/Söhne-Buch.otf") format("opentype");
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Söhne";
+  src: url("/fonts/Söhne-Kräftig.otf") format("opentype");
+  font-weight: 500;
+  font-display: swap;
+}
+
+:root {
+  /* Palett (riktlinjerna) */
+  --sv-svart: #2C2724;
+  --sv-vit: #FFFFFF;
+  --sv-guld: #CCB163;
+  --sv-kopparrod: #BD5E4F;
+  --sv-rubinrod: #893849;
+  --sv-bronsbrun: #4F392E;
+  --sv-aluminiumgra: #ABA699;
+  --sv-marmorgron: #304F40;
+  --sv-glasbla: #D3EDEE;
+  --sv-stalgra: #7E7C80;
+
+  /* Semantiska val: status. All text i staplar är vit (samma färg överallt), så fyllningarna är valda för att bära den: kontrast mot vit text
+     Marmorgrön 9,1, Rubinröd 7,7, Bronsbrun 10,7 och Ockra (Guld blandad 55 % mot Svart) 4,6. Alla beräknade. Samma i alla teman. */
+  --status-not-started-bg: var(--sv-bronsbrun);
+  --status-not-started-fg: var(--sv-vit);
+  --status-in-progress-bg: color-mix(in srgb, var(--sv-guld) 55%, var(--sv-svart));
+  --status-in-progress-fg: var(--sv-vit);
+  --status-done-bg: var(--sv-marmorgron);
+  --status-done-fg: var(--sv-vit);
+  --status-blocked-bg: var(--sv-rubinrod);
+  --status-blocked-fg: var(--sv-vit);
+
+  --line-width: 1px;
+  --bar-outline: var(--line-width) solid var(--bar-outline-color);
+
+  /* Typografi */
+  --font-title: "NB Architekt Pro R", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --font-body: "Söhne", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  /* Textskala: 12 för skalor och metatext, 13 för allt innehåll (rader, etiketter i och bredvid staplar, förklaringar), 14 för fält. */
+  --fs-sm: 12px;
+  --fs-md: 13px;
+  --fs-lg: 14px;
+  --weight-regular: 400;
+  --weight-strong: 500;
+
+  /* Former */
+  --radius-pill: 999px;
+}
+
+body {
+  background: var(--bg-base);
+  color: var(--text);
+  font-family: var(--font-body);
+  font-weight: var(--weight-regular);
+}
+
+/*
+ * Teman. Våra val, inte från riktlinjerna (riktlinjerna definierar inget mörkt läge, mörkt är beställt av användaren).
+ * Valt tema sätts som data-theme på <html>. Standard är grundläget: Aluminiumgrå bas.
+ * Staplarnas kontur är svart i Standard och Ljust. I Mörkt är den vit, eftersom svart försvinner mot mörk yta.
+ */
+/* Standard: Aluminiumgrå i hela appen, även innehållsytorna. Bara naturfärger: grön, gul, röd och jordbrun.
+   Markering och hover går mot mörkare, aldrig mot vitt. */
+:root,
+[data-theme="standard"] {
+  color-scheme: light;
+  --bg-base: var(--sv-aluminiumgra);
+  --surface: var(--sv-aluminiumgra);
+  --surface-alt: color-mix(in srgb, var(--sv-svart) 7%, var(--sv-aluminiumgra));
+  --text: var(--sv-svart);
+  --text-muted: color-mix(in srgb, var(--sv-svart) 78%, transparent);
+  --line: var(--sv-svart);
+  --grid-line: color-mix(in srgb, var(--sv-svart) 18%, transparent);
+  --row-hover: color-mix(in srgb, var(--sv-svart) 8%, transparent);
+  --row-select: color-mix(in srgb, var(--sv-svart) 20%, var(--sv-aluminiumgra));
+  --weekend: color-mix(in srgb, var(--sv-svart) 8%, transparent);
+  --link-color: color-mix(in srgb, var(--sv-svart) 78%, transparent);
+  --accent: var(--sv-bronsbrun);
+  --bar-outline-color: var(--sv-svart);
+  --grid-line-solid: #948F84; /* svart 18 % över aluminiumgrå. Ogenomskinlig: SVAR ritar rutnätet på en canvas som inte tolkar color-mix */
+}
+
+[data-theme="ljust"] {
+  color-scheme: light;
+  --bg-base: var(--sv-vit);
+  --surface: var(--sv-vit);
+  --surface-alt: color-mix(in srgb, var(--sv-svart) 4%, var(--sv-vit));
+  --text: var(--sv-svart);
+  --text-muted: color-mix(in srgb, var(--sv-svart) 62%, transparent);
+  --line: var(--sv-svart);
+  --grid-line: color-mix(in srgb, var(--sv-svart) 12%, transparent);
+  --row-hover: color-mix(in srgb, var(--sv-svart) 5%, transparent);
+  --row-select: var(--sv-glasbla);
+  --weekend: color-mix(in srgb, var(--sv-svart) 5%, transparent);
+  --link-color: color-mix(in srgb, var(--sv-svart) 62%, transparent);
+  --accent: var(--sv-svart);
+  --bar-outline-color: var(--sv-svart);
+  --grid-line-solid: #E1E1E0;
+}
+
+[data-theme="morkt"] {
+  color-scheme: dark;
+  --bg-base: var(--sv-svart);
+  --surface: color-mix(in srgb, var(--sv-svart) 90%, var(--sv-vit));
+  --surface-alt: color-mix(in srgb, var(--sv-svart) 82%, var(--sv-vit));
+  --text: var(--sv-vit);
+  --text-muted: color-mix(in srgb, var(--sv-vit) 68%, transparent);
+  --line: color-mix(in srgb, var(--sv-vit) 70%, transparent);
+  --grid-line: color-mix(in srgb, var(--sv-vit) 14%, transparent);
+  --row-hover: color-mix(in srgb, var(--sv-vit) 7%, transparent);
+  --row-select: color-mix(in srgb, var(--sv-guld) 28%, var(--sv-svart));
+  --weekend: color-mix(in srgb, var(--sv-vit) 6%, transparent);
+  --link-color: color-mix(in srgb, var(--sv-vit) 70%, transparent);
+  --accent: var(--sv-guld);
+  --bar-outline-color: var(--sv-vit);
+  --grid-line-solid: #5C5856; /* vit 14 % över ytan */
+}

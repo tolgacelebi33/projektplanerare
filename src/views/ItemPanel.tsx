@@ -1,0 +1,355 @@
+import { useCallback, useEffect, useRef, useState } from "react";
+import { canMove, deleteSubtree, descendants, epicChoices, swapWithSibling } from "../data/actions";
+import type { DataStore } from "../data/DataStore";
+import { isISODate, todayISO } from "../data/dates";
+import { MAX_DESCRIPTION, MAX_TITLE, RuleError, isOverdue, validateItemShape } from "../data/rules";
+import type { Dependency, Item, Priority, Status, User } from "../data/types";
+import { friendlyError } from "../i18n/errors";
+import { sv } from "../i18n/sv";
+import { STATUS_GLYPH } from "../proto/statusUi";
+
+const STATUSES: Status[] = ["not_started", "in_progress", "done", "blocked"];
+const PRIORITIES: Priority[] = ["low", "normal", "high", "urgent"];
+
+interface Loaded { item: Item; all: Item[]; deps: Dependency[]; users: User[] }
+type SaveState = { kind: "idle" } | { kind: "saving" } | { kind: "saved" } | { kind: "error"; message: string };
+
+/**
+ * Detaljpanel för en post, fast bredd, dockad till höger. Ändringar sparas per fält direkt (inget spara-steg), så att man
+ * kan hoppa mellan poster utan att tappa något. Läser alltid färska data från DataStore (drag i vyerna sparas direkt i storen).
+ */
+export function ItemPanel({ store, projectId, itemId, dataVersion, autoSelectTitle = false, onClose, onChanged, onOpen }: {
+  store: DataStore; projectId: string; itemId: string; autoSelectTitle?: boolean;
+  /** Ändras när data ändrats utanför panelen (t.ex. ett drag i vyn), så att panelen visar det som är sparat. */
+  dataVersion?: unknown;
+  onClose: () => void; onChanged: () => void; onOpen: (id: string) => void;
+}) {
+  const [data, setData] = useState<Loaded | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [save, setSave] = useState<SaveState>({ kind: "idle" });
+  const [fieldError, setFieldError] = useState<{ field: string; message: string } | null>(null);
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [progress, setProgress] = useState("0");
+  const [start, setStart] = useState("");
+  const [end, setEnd] = useState("");
+  const savedTimer = useRef<number | undefined>(undefined);
+  const dateTimer = useRef<number | undefined>(undefined);
+  const pendingDate = useRef<"start" | "end" | null>(null); // datum som väntar på att sparas och inte får skrivas över av en omladdning
+  const dataRef = useRef<Loaded | null>(null);
+  // Vilken post panelen visar just nu. Ett svar från lagret för en tidigare post (t.ex. en sparning som pågick när man bytte post) får inte skriva över den nya.
+  const currentItem = useRef(itemId);
+  currentItem.current = itemId;
+  const titleRef = useRef<HTMLInputElement>(null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  // Ny post: titeln är markerad så att man kan skriva över den direkt
+  useEffect(() => {
+    if (!autoSelectTitle || !data) return;
+    const focus = () => { titleRef.current?.focus(); titleRef.current?.select(); };
+    focus();
+    // Gantt-biblioteket tar fokus till sig själv en kort stund efter ett klick. Under de första 700 ms tas fokus tillbaka direkt när det flyttas
+    // utanför panelen, så att tecken man redan börjat skriva inte går förlorade (utan att markera om texten).
+    const t0 = Date.now();
+    const back = (e: FocusEvent) => {
+      if (Date.now() - t0 > 700) return;
+      const panelEl = titleRef.current?.closest("aside.panel");
+      if (panelEl && !panelEl.contains(e.target as Node)) titleRef.current?.focus({ preventScroll: true });
+    };
+    document.addEventListener("focusin", back, true);
+    // (markera om bara om inget hunnit skrivas, så att text man redan skrivit aldrig skrivs över)
+    const timers = [60, 200].map((ms) => window.setTimeout(() => { const el = titleRef.current; if (el && document.activeElement !== el && el.value === data.item.title) focus(); }, ms));
+    const off = window.setTimeout(() => document.removeEventListener("focusin", back, true), 750);
+    return () => { timers.forEach(window.clearTimeout); window.clearTimeout(off); document.removeEventListener("focusin", back, true); };
+  }, [autoSelectTitle, data?.item.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const load = useCallback(async () => {
+    try {
+      const [all, deps, users] = await Promise.all([store.listItems(projectId), store.listDependencies(projectId), store.listUsers()]);
+      if (currentItem.current !== itemId) return; // man har redan bytt post
+      const item = all.find((i) => i.id === itemId);
+      if (!item) { setLoadError(sv.panel.errors.not_found); return; }
+      setLoadError(null);
+      const loaded = { item, all, deps, users };
+      dataRef.current = loaded;
+      setData(loaded);
+      // Fältet man skriver i skrivs aldrig över av en omladdning
+      const typing = (document.activeElement as HTMLElement | null)?.closest?.("aside.panel") ? (document.activeElement as HTMLElement).getAttribute("name") : null;
+      if (typing !== "title") setTitle(item.title);
+      if (typing !== "description") setDescription(item.description);
+      if (typing !== "progress") setProgress(String(item.progress));
+      // datum återställs alltid (så att ett avvisat värde inte blir kvar i fältet), utom det som väntar på att sparas
+      if (pendingDate.current !== "start") setStart(item.start);
+      if (pendingDate.current !== "end") setEnd(item.end);
+    } catch (e) { if (currentItem.current === itemId) setLoadError(String(e)); }
+  }, [store, projectId, itemId]);
+
+  useEffect(() => { setData(null); setFieldError(null); setConfirmDelete(false); setSave({ kind: "idle" }); void load(); }, [load]);
+  // Data ändrade utanför panelen: ladda om utan att blanka panelen
+  useEffect(() => { if (dataVersion !== undefined) void load(); }, [dataVersion]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => () => { window.clearTimeout(savedTimer.current); window.clearTimeout(dateTimer.current); }, []);
+
+  // Esc stänger panelen (utom när en listruta är öppen, där Esc stänger listan)
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape" && !(e.target instanceof HTMLSelectElement)) onClose(); };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  const flashSaved = () => {
+    setSave({ kind: "saved" });
+    window.clearTimeout(savedTimer.current);
+    savedTimer.current = window.setTimeout(() => setSave({ kind: "idle" }), 1800);
+  };
+
+  /** Sparar ett fält. Vid fel visas meddelandet vid fältet och fältet återställs till lagrat värde. */
+  const commit = async (field: string, patch: Partial<Item>) => {
+    // Alltid den senaste posten (inte den som fanns när redigeringen planerades): två fält som ändras tätt efter varandra, t.ex. start och slut,
+    // ska valideras mot varandra och inte mot ett gammalt värde.
+    const cur = dataRef.current ?? data;
+    if (!cur) return;
+    const { item } = cur;
+    const changed = Object.fromEntries(Object.entries(patch).filter(([k, v]) => (item as unknown as Record<string, unknown>)[k] !== v)) as Partial<Item>;
+    if (!Object.keys(changed).length) { setFieldError(null); return; }
+    setSave({ kind: "saving" });
+    try {
+      for (const k of ["start", "end"] as const) if (k in changed && !isISODate(String(changed[k]))) throw new RuleError("bad_date", String(changed[k]));
+      validateItemShape({ ...item, ...changed });
+      await store.updateItem(item.id, changed);
+      if (currentItem.current === item.id) setFieldError(null);
+      await load();
+      onChanged();
+      if (currentItem.current === item.id) flashSaved();
+    } catch (err) {
+      if (currentItem.current === item.id) { setFieldError({ field, message: messageFor(err) }); setSave({ kind: "idle" }); }
+      await load(); // fältet går tillbaka till det som faktiskt är sparat
+    }
+  };
+
+  /** Datum sparas efter en kort paus eller när man lämnar fältet, inte för varje siffra man skriver (år 0002, 0020, ... är giltiga datum på vägen). */
+  const planDate = (field: "start" | "end", value: string, milestone: boolean, immediate = false) => {
+    window.clearTimeout(dateTimer.current);
+    pendingDate.current = null;
+    if (!isISODate(value) || Number(value.slice(0, 4)) < 1900 || Number(value.slice(0, 4)) > 2200) return;
+    const patch: Partial<Item> = milestone ? { start: value, end: value } : { [field]: value };
+    if (immediate) void commit(field, patch);
+    else { pendingDate.current = field; dateTimer.current = window.setTimeout(() => { pendingDate.current = null; void commit(field, patch); }, 600); }
+  };
+
+  const depAction = async (field: string, run: () => Promise<unknown>) => {
+    setSave({ kind: "saving" });
+    try { await run(); setFieldError(null); await load(); onChanged(); flashSaved(); }
+    catch (err) { setFieldError({ field, message: messageFor(err) }); setSave({ kind: "idle" }); }
+  };
+
+  if (loadError) return (
+    <aside className="panel" aria-label={sv.panel.label}>
+      <PanelHead onClose={onClose} kind={sv.panel.label} />
+      <p role="alert" className="panel-error">{loadError}</p>
+    </aside>
+  );
+  if (!data) return (
+    <aside className="panel" aria-label={sv.panel.label}>
+      <PanelHead onClose={onClose} kind={sv.panel.label} />
+      <p role="status" className="panel-muted">{sv.panel.loading}</p>
+    </aside>
+  );
+
+  const { item, all, deps, users } = data;
+  const byId = new Map(all.map((i) => [i.id, i]));
+  const milestone = item.type === "milestone";
+  const epic = item.type === "epic";
+  const chain: string[] = [];
+  for (let p = item.parent_id ? byId.get(item.parent_id) : undefined; p; p = p.parent_id ? byId.get(p.parent_id) : undefined) chain.unshift(p.title);
+  const preds = deps.filter((d) => d.to_item_id === item.id).map((d) => ({ dep: d, other: byId.get(d.from_item_id)! })).filter((x) => x.other);
+  const succs = deps.filter((d) => d.from_item_id === item.id).map((d) => ({ dep: d, other: byId.get(d.to_item_id)! })).filter((x) => x.other);
+  const linkable = all.filter((i) => i.type !== "epic" && i.id !== item.id && i.project_id === item.project_id);
+  const children = all.filter((i) => i.parent_id === item.id).sort((a, b) => a.sort_order - b.sort_order);
+  const overdue = isOverdue(item, todayISO());
+  const choices = epicChoices(all, item.id);
+  const subtreeCount = descendants(all, item.id).length;
+  const doDelete = async () => {
+    setSave({ kind: "saving" });
+    try { await deleteSubtree(store, all, item.id); onChanged(); onClose(); }
+    catch (e) { setFieldError({ field: "delete", message: messageFor(e) }); setSave({ kind: "idle" }); }
+  };
+  const err = (f: string) => (fieldError?.field === f ? <p role="alert" className="panel-error" data-field={f}>{fieldError.message}</p> : null);
+
+  const depList = (kind: "pred" | "succ") => {
+    const rows = kind === "pred" ? preds : succs;
+    const used = new Set(rows.map((r) => r.other.id));
+    return (
+      <section className="panel-section" data-section={kind === "pred" ? "predecessors" : "successors"}>
+        <h3>{kind === "pred" ? sv.panel.predecessors : sv.panel.successors}</h3>
+        {rows.length === 0 ? <p className="panel-muted">{sv.panel.noneYet}</p> : (
+          <ul className="panel-list">
+            {rows.map(({ dep, other }) => (
+              <li key={dep.id}>
+                <button type="button" className="panel-link" onClick={() => onOpen(other.id)}>{STATUS_GLYPH[other.status]} {other.title}</button>
+                <button type="button" className="panel-x" aria-label={sv.panel.removeDep(other.title)} onClick={() => depAction(`dep-${kind}`, () => store.deleteDependency(dep.id))}>×</button>
+              </li>
+            ))}
+          </ul>
+        )}
+        <select aria-label={kind === "pred" ? sv.panel.addPredecessor : sv.panel.addSuccessor} value=""
+          onChange={(e) => {
+            const other = e.target.value;
+            if (!other) return;
+            void depAction(`dep-${kind}`, () => store.createDependency({
+              workspace_id: item.workspace_id, type: "finish_to_start",
+              from_item_id: kind === "pred" ? other : item.id, to_item_id: kind === "pred" ? item.id : other,
+            }));
+          }}>
+          <option value="">{kind === "pred" ? sv.panel.addPredecessor : sv.panel.addSuccessor}</option>
+          {linkable.filter((i) => !used.has(i.id)).map((i) => <option key={i.id} value={i.id}>{i.title}</option>)}
+        </select>
+        {err(`dep-${kind}`)}
+      </section>
+    );
+  };
+
+  return (
+    <aside className="panel" aria-label={sv.panel.label} data-item-id={item.id}>
+      <PanelHead onClose={onClose} kind={sv.panel.type[item.type]} crumbs={chain} saveState={save} />
+      <div className="panel-body">
+        <label className="panel-field panel-title">
+          <span className="sr-only">{sv.panel.name}</span>
+          <input id="panel-title" ref={titleRef} name="title" value={title} maxLength={MAX_TITLE + 50} aria-label={sv.panel.name}
+            onChange={(e) => setTitle(e.target.value)} onBlur={() => void commit("title", { title: title.trim() })}
+            onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }} />
+        </label>
+        {err("title")}
+
+        <div className="panel-grid">
+          <label className="panel-field">
+            <span>{sv.panel.status}</span>
+            <select name="status" value={item.status} onChange={(e) => void commit("status", { status: e.target.value as Status })}>
+              {STATUSES.map((s) => <option key={s} value={s}>{STATUS_GLYPH[s]} {sv.status[s]}</option>)}
+            </select>
+          </label>
+          <label className="panel-field">
+            <span>{sv.panel.priority}</span>
+            <select name="priority" value={item.priority} onChange={(e) => void commit("priority", { priority: e.target.value as Priority })}>
+              {PRIORITIES.map((p) => <option key={p} value={p}>{sv.panel.priorities[p]}</option>)}
+            </select>
+          </label>
+          <label className="panel-field panel-wide">
+            <span>{sv.panel.assignee}</span>
+            <select name="assignee" value={item.assignee_id ?? ""} onChange={(e) => void commit("assignee", { assignee_id: e.target.value || null })}>
+              <option value="">{sv.panel.unassigned}</option>
+              {users.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
+            </select>
+          </label>
+          {epic ? (
+            <p className="panel-muted panel-wide">{sv.panel.epicDates} ({item.start} till {item.end})</p>
+          ) : (
+            <>
+              <label className="panel-field">
+                <span>{milestone ? sv.panel.date : sv.panel.start}</span>
+                <input type="date" name="start" value={start}
+                  onChange={(e) => { setStart(e.target.value); planDate("start", e.target.value, milestone); }}
+                  onBlur={(e) => planDate("start", e.target.value, milestone, true)} />
+              </label>
+              {!milestone && (
+                <label className="panel-field">
+                  <span>{sv.panel.end}</span>
+                  <input type="date" name="end" value={end}
+                    onChange={(e) => { setEnd(e.target.value); planDate("end", e.target.value, false); }}
+                    onBlur={(e) => planDate("end", e.target.value, false, true)} />
+                </label>
+              )}
+            </>
+          )}
+        </div>
+        {err("start")}{err("end")}{err("status")}{err("priority")}{err("assignee")}
+        {overdue && <p className="panel-muted">{sv.panel.overdueNote}</p>}
+
+        <label className="panel-field">
+          <span>{sv.panel.progress}</span>
+          <div className="panel-progress">
+            <input type="number" name="progress" min={0} max={100} step={1} value={progress} aria-label={sv.panel.progress}
+              onChange={(e) => setProgress(e.target.value)}
+              onBlur={() => void commit("progress", { progress: progress.trim() === "" ? NaN : Number(progress) })}
+              onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }} />
+            <span aria-hidden="true">%</span>
+            <div className="panel-meter" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={item.progress}><div style={{ width: `${item.progress}%` }} /></div>
+          </div>
+        </label>
+        {err("progress")}
+
+        <label className="panel-field">
+          <span>{sv.panel.description}</span>
+          <textarea name="description" rows={5} value={description} maxLength={MAX_DESCRIPTION + 200} placeholder={sv.panel.descriptionHint}
+            onChange={(e) => setDescription(e.target.value)} onBlur={() => void commit("description", { description })} />
+        </label>
+        {err("description")}
+
+        <section className="panel-section" data-section="placement">
+          <h3>{sv.panel.placement}</h3>
+          <label className="panel-field">
+            <span>{sv.panel.moveTo}</span>
+            <select name="parent" value={item.parent_id ?? ""} onChange={(e) => void commit("parent", { parent_id: e.target.value || null })}>
+              <option value="">{sv.panel.topLevel}</option>
+              {choices.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
+            </select>
+          </label>
+          {err("parent")}
+          <div className="panel-row" role="group" aria-label={sv.panel.order}>
+            <button type="button" className="mini" disabled={!canMove(all, item.id, "up")}
+              onClick={() => void depAction("order", async () => { for (const u of swapWithSibling(all, item.id, "up") ?? []) await store.updateItem(u.id, { sort_order: u.sort_order }); })}>↑ {sv.panel.moveUp}</button>
+            <button type="button" className="mini" disabled={!canMove(all, item.id, "down")}
+              onClick={() => void depAction("order", async () => { for (const u of swapWithSibling(all, item.id, "down") ?? []) await store.updateItem(u.id, { sort_order: u.sort_order }); })}>↓ {sv.panel.moveDown}</button>
+          </div>
+          {err("order")}
+        </section>
+
+        {!epic && depList("pred")}
+        {!epic && depList("succ")}
+
+        {epic && (
+          <section className="panel-section" data-section="contents">
+            <h3>{sv.panel.contents}</h3>
+            {children.length === 0 ? <p className="panel-muted">{sv.panel.noneYet}</p> : (
+              <ul className="panel-list">
+                {children.map((c) => (
+                  <li key={c.id}><button type="button" className="panel-link" onClick={() => onOpen(c.id)}>{STATUS_GLYPH[c.status]} {c.title}</button></li>
+                ))}
+              </ul>
+            )}
+          </section>
+        )}
+        <section className="panel-section panel-danger" data-section="delete">
+          {!confirmDelete ? (
+            <button type="button" className="mini" onClick={() => setConfirmDelete(true)}>{sv.panel.remove}</button>
+          ) : (
+            <div className="panel-confirm" role="alert">
+              <p>{sv.panel.removeConfirm(item.title, subtreeCount)}</p>
+              <div className="panel-row">
+                <button type="button" className="mini mini-danger" onClick={() => void doDelete()}>{sv.panel.removeYes}</button>
+                <button type="button" className="mini" onClick={() => setConfirmDelete(false)}>{sv.panel.removeCancel}</button>
+              </div>
+            </div>
+          )}
+          {err("delete")}
+        </section>
+        <p className="panel-muted panel-foot">{sv.panel.autosave}</p>
+      </div>
+    </aside>
+  );
+}
+
+function PanelHead({ onClose, kind, crumbs = [], saveState }: { onClose: () => void; kind: string; crumbs?: string[]; saveState?: SaveState }) {
+  return (
+    <header className="panel-head">
+      <div className="panel-head-text">
+        <span className="panel-kind">{kind}</span>
+        {crumbs.length > 0 && <span className="panel-crumbs">{sv.panel.inEpic}: {crumbs.join(" / ")}</span>}
+      </div>
+      <span className="panel-state" role="status" aria-live="polite">
+        {saveState?.kind === "saving" ? sv.panel.saving : saveState?.kind === "saved" ? sv.panel.saved : ""}
+      </span>
+      <button type="button" className="panel-close" aria-label={sv.panel.close} onClick={onClose}>×</button>
+    </header>
+  );
+}
+
+const messageFor = friendlyError;

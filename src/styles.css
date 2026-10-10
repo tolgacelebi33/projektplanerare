@@ -1,0 +1,280 @@
+html, body, #root { height: 100%; margin: 0; }
+.app { display: flex; flex-direction: column; height: 100%; }
+.app-header { display: flex; align-items: center; gap: 16px; padding: 12px 16px; border-bottom: var(--line-width) solid var(--line); }
+.logo-slot { width: 48px; height: 48px; }
+.app-title { font-family: var(--font-title); font-weight: var(--weight-regular); font-size: 22px; margin: 0; letter-spacing: 0.02em; }
+.pill { font: inherit; font-weight: var(--weight-strong); background: transparent; color: var(--text); border: var(--line-width) solid var(--line); border-radius: var(--radius-pill); padding: 4px 14px; cursor: pointer; }
+.pill[aria-pressed="true"] { background: var(--surface); }
+.notice { padding: 8px 16px; background: var(--surface); border-bottom: var(--line-width) solid var(--line); }
+.app-main { flex: 1; min-height: 0; }
+.gantt-host { height: 100%; }
+
+/* Gantt-staplar: statusfärg från tokens */
+.dhx-host .gantt_task_line { border: var(--bar-outline); box-sizing: border-box; font-size: var(--fs-md); font-weight: var(--weight-strong); }
+.dhx-host .gantt_task_line.st-not_started { background: var(--status-not-started-bg); color: var(--status-not-started-fg); }
+.dhx-host .gantt_task_line.st-in_progress { background: var(--status-in-progress-bg); color: var(--status-in-progress-fg); }
+.dhx-host .gantt_task_line.st-done { background: var(--status-done-bg); color: var(--status-done-fg); }
+.dhx-host .gantt_task_line.st-blocked { background: var(--status-blocked-bg); color: var(--status-blocked-fg); }
+/* Texten centreras lodrätt med flex. DHTMLX sätter fast radhöjd, vilket tillsammans med typsnittets proportioner la texten vid underkanten. */
+.dhx-host .gantt_task_line .gantt_task_content { color: inherit; display: flex; align-items: center; justify-content: flex-start; height: 100% !important; line-height: 1 !important; padding: 0 6px 3px; white-space: nowrap; box-sizing: border-box; }
+.dhx-host .gantt_task_line .gantt_task_content > .bar-glyph { line-height: 1; }
+.dhx-host .gantt_task_line.gantt_milestone { background: transparent; border: 0; }
+.dhx-host .gantt_task_line.gantt_milestone .gantt_task_content { border: var(--bar-outline); box-sizing: border-box; }
+.dhx-host .gantt_task_line.gantt_milestone.st-not_started .gantt_task_content { background: var(--status-not-started-bg); }
+.dhx-host .gantt_task_line.gantt_milestone.st-in_progress .gantt_task_content { background: var(--status-in-progress-bg); }
+.dhx-host .gantt_task_line.gantt_milestone.st-done .gantt_task_content { background: var(--status-done-bg); }
+.dhx-host .gantt_task_line.gantt_milestone.st-blocked .gantt_task_content { background: var(--status-blocked-bg); }
+
+/* Skärmläsartext för status (glyfen är dekorativ) */
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+
+/* DHTMLX levereras med Inter (hämtas från fonts.gstatic.com). Vi använder Söhne. */
+.gantt-host { --dhx-gantt-font-family: var(--font-body); font-family: var(--font-body); }
+
+.bar-glyph { margin-right: 4px; }
+
+/* Tema: ytor och linjer i biblioteken följer våra tokens. */
+.app-main, .gantt-host { background: var(--surface); }
+.app-header { background: var(--bg-base); }
+.pill[aria-pressed="true"] { background: var(--surface); color: var(--text); }
+.notice { color: var(--text); }
+
+
+.gantt-host {
+  --dhx-gantt-container-background: var(--surface);
+  --dhx-gantt-container-color: var(--text);
+  --dhx-gantt-base-colors-background: var(--surface);
+  --dhx-gantt-base-colors-background-alt: var(--surface-alt);
+  --dhx-gantt-base-colors-text-base: var(--text);
+  --dhx-gantt-base-colors-text-light: var(--text-muted);
+  /* Kantvariablerna i DHTMLX är hela deklarationer (1px solid ...) som räknas ut på rotnivå, så de sätts här som kompletta kanter. */
+  --dhx-gantt-base-colors-border: var(--grid-line-solid);
+  --dhx-gantt-base-colors-border-light: var(--grid-line-solid);
+  --dhx-gantt-scale-border-horizontal: var(--line-width) solid var(--grid-line-solid);
+  --dhx-gantt-scale-border-vertical: var(--line-width) solid var(--grid-line-solid);
+  --dhx-gantt-timeline-scale-border-vertical: var(--line-width) solid var(--grid-line-solid);
+  --dhx-gantt-grid-scale-border-vertical: var(--line-width) solid var(--grid-line-solid);
+  --dhx-gantt-grid-row-border: var(--line-width) solid var(--grid-line-solid);
+  --dhx-gantt-task-row-border: var(--line-width) solid var(--grid-line-solid);
+  --dhx-gantt-base-colors-icons: var(--text);
+  --dhx-gantt-base-colors-hover-color: var(--row-hover);
+  --dhx-gantt-base-colors-select: var(--row-select);
+  --dhx-gantt-grid-body-background: var(--surface);
+  --dhx-gantt-grid-scale-background: var(--surface);
+  --dhx-gantt-grid-scale-color: var(--text);
+  --dhx-gantt-scale-background: var(--surface);
+  --dhx-gantt-scale-color: var(--text);
+  --dhx-gantt-timeline-scale-background: var(--surface);
+  --dhx-gantt-timeline-scale-color: var(--text);
+  --dhx-gantt-task-row-background: var(--surface);
+  --dhx-gantt-task-row-background--odd: var(--surface);
+  --dhx-gantt-link-background: var(--link-color);
+  --dhx-gantt-link-background-hover: var(--text);
+}
+
+/* Kontroller. Tema: runda färgprover i headern. Zoom: sammanfogad segmentkontroll i en verktygsrad ovanför diagrammet. */
+.header-controls { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; margin-left: auto; }
+.theme-switch { display: flex; align-items: center; gap: 10px; }
+.lang-switch { display: flex; align-items: center; gap: 6px; font-family: var(--font-title); }
+.lang-switch button { font: inherit; font-size: 13px; color: var(--text); background: transparent; border: 0; border-bottom: 2px solid transparent; padding: 2px 4px; cursor: pointer; }
+.lang-switch button[aria-pressed="true"] { border-bottom-color: var(--text); font-weight: var(--weight-strong); }
+.lang-switch button:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
+.theme-label { font-family: var(--font-title); font-size: 13px; }
+.swatch { width: 26px; height: 26px; padding: 0; border-radius: var(--radius-pill); border: var(--line-width) solid var(--line); cursor: pointer; box-shadow: 0 0 0 0 transparent; }
+.swatch[aria-checked="true"] { box-shadow: 0 0 0 2px var(--bg-base), 0 0 0 3px var(--line); }
+.swatch:focus-visible, .seg button:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
+.swatch[data-theme-swatch="standard"] { background: var(--sv-aluminiumgra); }
+.swatch[data-theme-swatch="ljust"] { background: var(--sv-vit); }
+.swatch[data-theme-swatch="morkt"] { background: var(--sv-svart); }
+
+.toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 8px 16px; border-bottom: var(--line-width) solid var(--line); background: var(--surface); }
+.toolbar-label { font-family: var(--font-title); font-size: 13px; }
+.seg { display: inline-flex; border: var(--line-width) solid var(--line); border-radius: var(--radius-pill); overflow: hidden; }
+.seg button { font: inherit; font-size: 13px; font-weight: var(--weight-strong); background: transparent; color: var(--text); border: 0; padding: 4px 16px; cursor: pointer; }
+.seg button + button { border-left: var(--line-width) solid var(--line); }
+.seg button[aria-pressed="true"] { background: var(--text); color: var(--surface); }
+.lib-tag { margin-left: auto; font-size: 12px; color: var(--text-muted); }
+
+/* Verktygsrad: vy, zoom, år */
+.toolbar-sep { width: 1px; align-self: stretch; margin: 2px 4px; background: var(--grid-line); }
+.stepper { display: inline-flex; align-items: center; border: var(--line-width) solid var(--line); border-radius: var(--radius-pill); overflow: hidden; }
+.stepper button { font: inherit; font-size: 16px; line-height: 1; background: transparent; color: var(--text); border: 0; padding: 3px 12px; cursor: pointer; }
+.stepper output { min-width: 56px; text-align: center; font-weight: var(--weight-strong); font-size: 13px; border-left: var(--line-width) solid var(--line); border-right: var(--line-width) solid var(--line); padding: 4px 8px; }
+.stepper button:focus-visible { outline: 2px solid var(--text); outline-offset: -2px; }
+
+/* Årshjul */
+.app-main { overflow: auto; }
+.wheel { display: flex; gap: 32px; align-items: flex-start; padding: 24px; background: var(--surface); min-height: 100%; box-sizing: border-box; }
+.wheel-svg { flex: 0 1 760px; width: 100%; max-width: 760px; height: auto; color: var(--text); }
+.wheel-empty { padding: 24px; margin: 0; background: var(--surface); height: 100%; }
+.wheel-band { fill: var(--surface); }
+.wheel-band[data-alt="1"] { fill: var(--surface-alt); }
+.wheel-grid { stroke: var(--grid-line-solid); stroke-width: var(--line-width); fill: none; }
+.wheel-month { fill: var(--text); font-family: var(--font-title); font-size: 12px; }
+.wheel-year { fill: var(--text); font-family: var(--font-title); font-size: 28px; }
+.wheel-today { stroke: var(--text); stroke-width: 2; stroke-dasharray: 4 3; }
+.wheel-arc .wheel-shape, .wheel-ms .wheel-shape { stroke: var(--bar-outline-color); stroke-width: var(--line-width); }
+.wheel-arc[data-status="not_started"] .wheel-shape, .wheel-ms[data-status="not_started"] .wheel-shape { fill: var(--status-not-started-bg); }
+.wheel-arc[data-status="in_progress"] .wheel-shape, .wheel-ms[data-status="in_progress"] .wheel-shape { fill: var(--status-in-progress-bg); }
+.wheel-arc[data-status="done"] .wheel-shape, .wheel-ms[data-status="done"] .wheel-shape { fill: var(--status-done-bg); }
+.wheel-arc[data-status="blocked"] .wheel-shape, .wheel-ms[data-status="blocked"] .wheel-shape { fill: var(--status-blocked-bg); }
+.wheel-text, .wheel-no { font-family: var(--font-body); font-size: 11px; pointer-events: none; }
+.wheel-arc[data-status="not_started"] .wheel-text, .wheel-ms[data-status="not_started"] .wheel-no { fill: var(--status-not-started-fg); }
+.wheel-arc[data-status="in_progress"] .wheel-text, .wheel-ms[data-status="in_progress"] .wheel-no { fill: var(--status-in-progress-fg); }
+.wheel-arc[data-status="done"] .wheel-text, .wheel-ms[data-status="done"] .wheel-no { fill: var(--status-done-fg); }
+.wheel-arc[data-status="blocked"] .wheel-text, .wheel-ms[data-status="blocked"] .wheel-no { fill: var(--status-blocked-fg); }
+.wheel-clip { fill: var(--bar-outline-color); }
+.wheel-arc[data-hl="1"] .wheel-shape, .wheel-ms[data-hl="1"] .wheel-shape { stroke-width: 3; }
+.wheel-letter circle { fill: var(--text); }
+.wheel-letter text { fill: var(--surface); font-family: var(--font-title); font-size: 11px; }
+.wheel-legend { flex: 1 1 280px; min-width: 240px; color: var(--text); position: sticky; top: 24px; max-height: calc(100vh - 190px); overflow-y: auto; overscroll-behavior: contain; }
+.wheel-legend h2 { display: flex; align-items: center; gap: 8px; margin: 16px 0 6px; font-family: var(--font-title); font-weight: var(--weight-regular); font-size: 15px; }
+.wheel-legend h2:first-child, .wheel-legend section:first-child h2 { margin-top: 0; }
+.wheel-chip, .wheel-no-chip { display: inline-grid; place-items: center; min-width: 20px; height: 20px; border-radius: var(--radius-pill); font-size: 11px; font-weight: var(--weight-strong); }
+.wheel-chip { background: var(--text); color: var(--surface); }
+.wheel-no-chip { border: var(--line-width) solid var(--line); }
+.wheel-legend ul { list-style: none; margin: 0; padding: 0; }
+.wheel-legend li { display: grid; grid-template-columns: 24px 1fr; column-gap: 8px; padding: 4px 6px; border-bottom: var(--line-width) solid var(--grid-line); font-size: 13px; }
+.wheel-legend li[data-hl="1"], .wheel-legend li:focus-visible { background: var(--row-select); outline: none; }
+.wheel-li-meta { grid-column: 2; font-size: 12px; color: var(--text-muted); }
+.wheel-li-none { color: var(--text-muted); grid-template-columns: 1fr !important; }
+
+/* Årshjul: markering. Träffyta för tunna former, dämpning av övriga och tydlig rad i förklaringen. */
+.wheel-hit { fill: transparent; stroke: none; pointer-events: all; }
+.wheel-arc, .wheel-ms { cursor: pointer; }
+.wheel[data-active] .wheel-arc:not([data-hl]), .wheel[data-active] .wheel-ms:not([data-hl]) { opacity: 0.4; }
+.wheel[data-active] .wheel-legend li:not([data-hl]) { opacity: 0.6; }
+.wheel-legend li { cursor: pointer; }
+.wheel-legend li[data-hl="1"] { box-shadow: inset 3px 0 0 var(--text); }
+.wheel-legend li[data-on-arc="1"] .wheel-no-chip { border-style: dotted; }
+.wheel-legend li:focus-visible { outline: 2px solid var(--text); outline-offset: -2px; }
+
+/* Helgskuggning i dagzoom, samma i båda biblioteken */
+.gantt-host .wk-end, .gantt-host .wk-end.gantt_task_cell, .gantt-host .gantt_scale_cell.wk-end { background: var(--weekend); }
+
+/* Accent: bibliotekens primärfärg (blå) byts mot temats accent, så att fokusramar och knappar följer paletten. */
+.gantt-host {
+  --dhx-gantt-base-colors-primary: var(--accent);
+  --dhx-gantt-base-colors-primary-hover: var(--accent);
+  --dhx-gantt-base-colors-primary-active: var(--accent);
+  --dhx-gantt-base-colors-select: var(--row-select);
+}
+
+/* Detaljpanel: fast bredd, dockad längst till höger bredvid tidslinjen, uppifrån och ner */
+.app-body { flex: 1; min-height: 0; display: flex; }
+.app-body .app-main { flex: 1 1 auto; min-width: 0; }
+.panel { flex: 0 0 420px; width: 420px; box-sizing: border-box; display: flex; flex-direction: column; min-height: 0; background: var(--surface); color: var(--text); border-left: var(--line-width) solid var(--line); font-family: var(--font-body); }
+.panel-head { display: flex; align-items: flex-start; gap: 8px; padding: 14px 16px 10px; border-bottom: var(--line-width) solid var(--grid-line); }
+.panel-head-text { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+.panel-kind { font-family: var(--font-title); font-size: 15px; letter-spacing: 0.04em; }
+.panel-crumbs { font-size: 12px; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.panel-state { font-size: 12px; color: var(--text-muted); min-width: 56px; text-align: right; padding-top: 3px; }
+.panel-close { font: inherit; font-size: 22px; line-height: 1; width: 28px; height: 28px; border-radius: var(--radius-pill); border: var(--line-width) solid var(--line); background: transparent; color: var(--text); cursor: pointer; padding: 0; }
+.panel-body { flex: 1; overflow-y: auto; padding: 14px 16px 24px; display: grid; gap: 12px; align-content: start; }
+.panel-title input { font-size: 18px; font-weight: var(--weight-strong); }
+.panel-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 14px; }
+.panel-wide { grid-column: 1 / -1; }
+.panel-field { display: grid; gap: 4px; }
+.panel-field > span { font-family: var(--font-title); font-size: 12px; letter-spacing: 0.04em; }
+.panel input, .panel select, .panel textarea { font: inherit; font-size: 14px; color: var(--text); background: var(--surface-alt); border: var(--line-width) solid var(--line); border-radius: 6px; padding: 7px 9px; width: 100%; box-sizing: border-box; }
+.panel textarea { resize: vertical; min-height: 90px; }
+.panel input:focus-visible, .panel select:focus-visible, .panel textarea:focus-visible, .panel button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.panel-progress { display: grid; grid-template-columns: 76px auto 1fr; align-items: center; gap: 8px; }
+.panel-meter { height: 8px; border: var(--line-width) solid var(--line); border-radius: var(--radius-pill); overflow: hidden; }
+.panel-meter > div { height: 100%; background: var(--status-done-bg); }
+.panel-section h3 { margin: 4px 0 6px; font-family: var(--font-title); font-weight: var(--weight-regular); font-size: 13px; letter-spacing: 0.04em; }
+.panel-list { list-style: none; margin: 0 0 8px; padding: 0; }
+.panel-list li { display: flex; align-items: center; gap: 6px; padding: 3px 0; border-bottom: var(--line-width) solid var(--grid-line); }
+.panel-link { font: inherit; font-size: 13px; text-align: left; flex: 1; background: transparent; border: 0; color: var(--text); cursor: pointer; padding: 2px 0; text-decoration: underline; text-underline-offset: 2px; }
+.panel-x { font: inherit; font-size: 18px; line-height: 1; width: 24px; height: 24px; border-radius: var(--radius-pill); border: var(--line-width) solid var(--line); background: transparent; color: var(--text); cursor: pointer; padding: 0; }
+.panel-muted { margin: 0; font-size: 12px; color: var(--text-muted); }
+.panel-foot { padding-top: 8px; border-top: var(--line-width) solid var(--grid-line); }
+.panel-error { margin: 0; padding: 6px 9px; font-size: 13px; border: var(--line-width) solid var(--status-blocked-bg); border-left-width: 4px; border-radius: 4px; }
+.btn { font: inherit; font-size: 14px; font-weight: var(--weight-strong); background: transparent; color: var(--text); border: var(--line-width) solid var(--line); border-radius: var(--radius-pill); padding: 6px 20px; cursor: pointer; }
+
+/* Smala fönster: panelen läggs ovanpå i stället för att pressa ihop tidslinjen */
+@media (max-width: 1000px) {
+  .app-body { position: relative; }
+  .panel { position: absolute; top: 0; right: 0; bottom: 0; box-shadow: -12px 0 32px color-mix(in srgb, var(--sv-svart) 30%, transparent); z-index: 5; }
+}
+
+/* Projekt, lägg till, tomt läge */
+.project-row { padding-top: 6px; padding-bottom: 6px; }
+.project-bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.project-select, .project-input { font: inherit; font-size: 13px; color: var(--text); background: var(--surface-alt); border: var(--line-width) solid var(--line); border-radius: 6px; padding: 4px 8px; min-width: 180px; }
+.project-input:focus-visible, .project-select:focus-visible, .mini:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.mini { font: inherit; font-size: 12px; font-weight: var(--weight-strong); background: transparent; color: var(--text); border: var(--line-width) solid var(--line); border-radius: var(--radius-pill); padding: 3px 12px; cursor: pointer; }
+.mini[disabled] { opacity: 0.45; cursor: default; }
+.mini-danger { background: var(--status-blocked-bg); color: var(--status-blocked-fg); border-color: var(--bar-outline-color); }
+.project-confirm { font-size: 13px; }
+.project-error { font-size: 12px; padding: 2px 8px; border: var(--line-width) solid var(--status-blocked-bg); border-left-width: 4px; border-radius: 4px; }
+.add-group { display: flex; align-items: center; gap: 8px; }
+.empty-state { display: grid; gap: 12px; place-content: center; justify-items: center; height: 100%; color: var(--text); }
+.lib-tag { margin-left: auto; font-size: 12px; color: var(--text-muted); }
+
+.panel-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+.panel-confirm p { margin: 0 0 4px; font-size: 13px; }
+.panel-danger { padding-top: 8px; border-top: var(--line-width) solid var(--grid-line); }
+
+/* Dagens kolumn */
+.gantt-host .wk-today, .gantt-host .gantt_task_cell.wk-today { background: color-mix(in srgb, var(--accent) 16%, transparent); }
+
+/* Snabbmeny */
+.ctx-menu { position: fixed; z-index: 20000; min-width: 220px; max-width: 320px; padding: 4px; background: var(--surface); color: var(--text); border: var(--line-width) solid var(--line); border-radius: 8px; box-shadow: 0 8px 28px color-mix(in srgb, var(--sv-svart) 35%, transparent); font-family: var(--font-body); }
+.ctx-item { display: block; width: 100%; text-align: left; font: inherit; font-size: 13px; color: var(--text); background: transparent; border: 0; border-radius: 4px; padding: 6px 10px; cursor: pointer; }
+.ctx-item:hover:not([disabled]), .ctx-item:focus-visible { background: var(--row-select); outline: none; }
+.ctx-item[disabled] { opacity: 0.45; cursor: default; }
+.ctx-danger { text-decoration: underline; text-underline-offset: 2px; }
+.ctx-confirm { padding: 8px 10px; }
+.ctx-confirm p { margin: 0 0 4px; font-size: 13px; }
+.notice { display: flex; align-items: center; gap: 12px; }
+.notice-x { margin-left: auto; font: inherit; font-size: 18px; line-height: 1; width: 24px; height: 24px; border-radius: var(--radius-pill); border: var(--line-width) solid var(--line); background: transparent; color: var(--text); cursor: pointer; padding: 0; }
+
+/* Text som inte ryms i staplen visas till höger om den */
+.dhx-host .gantt_side_content { color: var(--text) !important; font-size: var(--fs-md) !important; font-weight: var(--weight-strong); top: 0 !important; bottom: 0 !important; height: auto !important; display: flex; align-items: center; line-height: 1 !important; white-space: nowrap; margin: 0 !important; padding-left: 8px; box-sizing: border-box; }
+.dhx-host .grid-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block; }
+.gantt_tooltip { pointer-events: none; background: var(--surface) !important; color: var(--text) !important; border: var(--line-width) solid var(--line) !important; border-radius: 6px; font-family: var(--font-body); font-size: 12px; box-shadow: 0 4px 16px color-mix(in srgb, var(--sv-svart) 30%, transparent) !important; }
+
+/* Inga tooltips ovanpå en öppen meny. Tooltips får aldrig ligga ovanför menyn eller ta emot pekaren. */
+body[data-overlay] .gantt_tooltip { display: none !important; }
+.gantt_tooltip { z-index: 100 !important; }
+
+/* Epics: fet titel i rutnätet */
+.dhx-host .epic-row .gantt_tree_content, .dhx-host .epic-row .grid-title { font-weight: var(--weight-strong); }
+
+/* Enhetlig textskala i Gantt: innehåll 13 px, skalor och rubriker 12 px. Samma storlek i rutnät, staplar och etiketter bredvid staplar. */
+.dhx-host .gantt_row, .dhx-host .gantt_cell, .dhx-host .gantt_tree_content, .dhx-host .grid-title { font-size: var(--fs-md); }
+.dhx-host .gantt_scale_cell, .dhx-host .gantt_grid_head_cell { font-size: var(--fs-sm); }
+.dhx-host .gantt_task_line .gantt_task_content { font-size: var(--fs-md); font-weight: var(--weight-strong); }
+
+/* Etiketter bredvid staplar får ytans bakgrund och ligger över beroendepilarna, så att en pil aldrig går genom en titel. */
+.dhx-host .gantt_side_content { background: var(--surface); border-radius: 4px; padding-right: 6px; position: absolute; z-index: 4; }
+.dhx-host .gantt_task_line { z-index: 3; }
+
+.project-deps { display: inline-flex; align-items: center; gap: 6px; margin-left: 8px; }
+.project-select-sm { min-width: 0; padding: 3px 6px; font-size: var(--fs-sm); }
+.dhx-host .gantt_side_content { pointer-events: none; } /* en etikett tar aldrig emot musen, så handtag och staplar under den går att nå */
+.dhx-host .gantt_task_line .gantt_link_control { z-index: 6; }
+.dhx-host .gantt_task_line .gantt_task_drag { z-index: 7; }
+
+/* Hierarki: epics har en svagt tonad rad i rutnätet och tidslinjen, och slutdatumet är dämpat */
+.dhx-host .gantt_row.epic-row, .dhx-host .gantt_task_row.epic-row { background: var(--surface-alt); }
+.dhx-host .grid-date { color: var(--text-muted); font-size: var(--fs-sm); font-weight: var(--weight-regular); }
+
+/* Bock i rutnätsraden: klar eller inte klar */
+.dhx-host .row-check { display: inline-grid; place-items: center; width: 16px; height: 16px; margin: 0 8px 0 2px; padding: 0; vertical-align: middle; font-size: 11px; line-height: 1; border-radius: var(--radius-pill); border: var(--line-width) solid var(--line); background: transparent; color: var(--surface); cursor: pointer; }
+.dhx-host .row-check[aria-checked="true"] { background: var(--status-done-bg); border-color: var(--bar-outline-color); color: var(--status-done-fg); }
+.dhx-host .row-check:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.dhx-host .grid-title { display: inline-block; max-width: calc(100% - 28px); vertical-align: middle; }
+
+/* Rad för snabbtillägg under rutnätet */
+.gantt-wrap { display: flex; flex-direction: column; height: 100%; }
+.gantt-wrap .gantt-host { flex: 1 1 auto; min-height: 0; height: auto; }
+.quick-add { flex: 0 0 auto; padding: 6px 8px; border-top: var(--line-width) solid var(--line); background: var(--surface); }
+.quick-add input { font: inherit; font-size: var(--fs-md); color: var(--text); background: var(--surface-alt); border: var(--line-width) solid var(--line); border-radius: 6px; padding: 6px 10px; box-sizing: border-box; }
+.quick-add input::placeholder { color: var(--text-muted); }
+.quick-add input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.toolbar button, .toolbar .toolbar-label { white-space: nowrap; }
+.toolbar .search { font: inherit; font-size: var(--fs-md); color: var(--text); background: var(--surface-alt); border: var(--line-width) solid var(--line); border-radius: var(--radius-pill); padding: 4px 12px; width: 150px; box-sizing: border-box; }
+.toolbar .search::placeholder { color: var(--text-muted); }
+.toolbar .search:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
