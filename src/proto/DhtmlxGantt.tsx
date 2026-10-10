@@ -44,7 +44,7 @@ function treeOrder(items: Item[]): string[] {
 
 export interface ContextArgs { id: string | null; x: number; y: number; date: ISODate | null }
 
-export function DhtmlxGantt({ store, items, deps, zoom, onError, onPersisted, revealId, onNotice, onCreateAt, onRename, onContext, onToggleDone, onMoveRow, onAddInGroup, onEditField, gridWidth, columns, users, todayToken }: {
+export function DhtmlxGantt({ store, items, deps, zoom, onError, onPersisted, revealId, onNotice, onCreateAt, onRename, onContext, onToggleDone, onMoveRow, onAddInGroup, onEditField, gridWidth, columns, users, collapse, todayToken }: {
   store: DataStore; items: Item[]; deps: Dependency[]; zoom: Zoom; onError: (e: unknown) => void; onPersisted?: () => void;
   /** Post som ska bläddras fram och markeras (t.ex. en nyskapad). */
   revealId?: string | null;
@@ -64,6 +64,8 @@ export function DhtmlxGantt({ store, items, deps, zoom, onError, onPersisted, re
   onAddInGroup?: (groupId: string) => void;
   /** Rutnätets bredd i px (användarens val). */
   gridWidth: number;
+  /** Fäll ihop eller öppna alla grupper (n ökas för varje klick). */
+  collapse?: { n: number; open: boolean };
   /** Valda kolumner (titeln visas alltid) och personer att välja bland som ansvarig. */
   columns: ColumnId[]; users: User[];
   /** En ruta i en rad ändrades (status, prioritet eller ansvarig). Ska spara, och returnera efter att det är gjort. */
@@ -405,6 +407,15 @@ export function DhtmlxGantt({ store, items, deps, zoom, onError, onPersisted, re
     gantt.config.min_column_width = ZOOM[zoom].min;
     gantt.render();
   }, [zoom, mapped]);
+
+  // Fäll ihop alla eller öppna alla grupper
+  const collapseSeen = useRef(collapse?.n ?? 0);
+  useEffect(() => {
+    if (!collapse || collapse.n === collapseSeen.current) return;
+    collapseSeen.current = collapse.n;
+    gantt.eachTask((t) => { if (gantt.hasChild(t.id)) { if (collapse.open) gantt.open(t.id); else gantt.close(t.id); openState.current.set(String(t.id), collapse.open); } });
+    gantt.render();
+  }, [collapse]);
 
   // Idag-knappen
   useEffect(() => { if (todayToken) gantt.showDate(new Date()); }, [todayToken]);

@@ -72,7 +72,7 @@ describe("ångra och gör om", () => {
   });
 });
 
-import { filterView } from "../src/data/actions";
+import { filterActive, filterView } from "../src/data/actions";
 describe("filter av vyn", () => {
   const fx = smallFixture();
   it("utan filter returneras allt oförändrat", () => {
@@ -95,5 +95,46 @@ describe("filter av vyn", () => {
   });
   it("ingen träff ger tom vy", () => {
     expect(filterView(fx.items, fx.dependencies, { query: "finns-inte-xyz", hideDone: false }).items).toEqual([]);
+  });
+});
+
+describe("filter på status, prioritet och ansvarig", () => {
+  const fx = smallFixture();
+  const nonEpics = fx.items.filter((i) => i.type !== "epic");
+  const ancestors = (id: string, all = fx.items): string[] => { const p = all.find((i) => i.id === id)?.parent_id; return p ? [p, ...ancestors(p, all)] : []; };
+  const expected = (pred: (i: (typeof fx.items)[number]) => boolean) => { const ids = new Set<string>(); for (const i of nonEpics.filter(pred)) { ids.add(i.id); ancestors(i.id).forEach((a) => ids.add(a)); } return [...ids].sort(); };
+  const ids = (r: { items: { id: string }[] }) => r.items.map((i) => i.id).sort();
+  const none = { query: "", hideDone: false };
+
+  it("filterActive: bara när något är valt", () => {
+    expect(filterActive(none)).toBe(false);
+    expect(filterActive({ ...none, statuses: [] })).toBe(false);
+    expect(filterActive({ ...none, statuses: ["done"] })).toBe(true);
+    expect(filterActive({ ...none, assignees: [""] })).toBe(true);
+  });
+  it("status: bara poster med vald status, med sina grupper, och en grupp utan träff visas inte", () => {
+    const r = filterView(fx.items, fx.dependencies, { ...none, statuses: ["blocked"] });
+    expect(ids(r)).toEqual(expected((i) => i.status === "blocked"));
+    expect(r.items.some((i) => i.type === "epic" && !r.items.some((k) => k.parent_id === i.id))).toBe(false); // inga tomma grupper
+  });
+  it("flera val inom en egenskap betyder någon av, och egenskaperna kombineras med och", () => {
+    expect(ids(filterView(fx.items, fx.dependencies, { ...none, statuses: ["blocked", "done"] }))).toEqual(expected((i) => i.status === "blocked" || i.status === "done"));
+    const both = filterView(fx.items, fx.dependencies, { ...none, statuses: ["in_progress", "not_started"], priorities: ["high"] });
+    expect(ids(both)).toEqual(expected((i) => (i.status === "in_progress" || i.status === "not_started") && i.priority === "high"));
+  });
+  it("ansvarig: ett id, flera id, och tom sträng för ingen ansvarig", () => {
+    const some = fx.items.find((i) => i.assignee_id)!.assignee_id!;
+    expect(ids(filterView(fx.items, fx.dependencies, { ...none, assignees: [some] }))).toEqual(expected((i) => i.assignee_id === some));
+    expect(ids(filterView(fx.items, fx.dependencies, { ...none, assignees: [""] }))).toEqual(expected((i) => i.assignee_id === null));
+    expect(ids(filterView(fx.items, fx.dependencies, { ...none, assignees: [some, ""] }))).toEqual(expected((i) => i.assignee_id === some || i.assignee_id === null));
+  });
+  it("kombineras med sökning: träffen måste också matcha filtret", () => {
+    const r = filterView(fx.items, fx.dependencies, { query: "a", hideDone: false, statuses: ["done"] });
+    for (const i of r.items.filter((x) => x.type !== "epic")) { expect(i.status).toBe("done"); expect(`${i.title} ${i.description}`.toLowerCase()).toContain("a"); }
+  });
+  it("beroenden visas bara när båda ändar syns", () => {
+    const r = filterView(fx.items, fx.dependencies, { ...none, statuses: ["done"] });
+    const shown = new Set(r.items.map((i) => i.id));
+    for (const d of r.deps) { expect(shown.has(d.from_item_id)).toBe(true); expect(shown.has(d.to_item_id)).toBe(true); }
   });
 });

@@ -6,7 +6,8 @@ type Row = { id: string; title: string; project_id: string };
 const all = (page: Page) => items(page) as unknown as Promise<Row[]>;
 const bar = (page: Page) => page.getByRole("group", { name: "Projekt" });
 const projectSelect = (page: Page) => bar(page).getByRole("combobox", { name: "Projekt" });
-const titles = (page: Page) => page.locator(".gantt_row .grid-title").allTextContents();
+// Titlarna i bibliotekets modell (alla poster), inte DOM: biblioteket ritar bara de rader som ryms i fönstret
+const titles = (page: Page) => page.evaluate(() => { const g = (window as any).__dhx; const t: string[] = []; if (!g) return t; g.eachTask((x: any) => { t.push(String(x.text)); }); return t; });
 
 test.beforeEach(async ({ page }) => {
   await page.setViewportSize({ width: 1500, height: 850 });

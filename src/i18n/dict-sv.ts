@@ -4,6 +4,36 @@ import type { Status } from "../data/types";
 export const svDict = {
   lang: { label: "Språk", sv: "SV", en: "EN", svName: "Svenska", enName: "English" },
   group: { addTask: (title: string) => `Lägg till uppgift i gruppen "${title}"`, count: (n: number) => `${n} poster direkt i gruppen`, quickIn: (title: string) => `Lägg till uppgift i "${title}"...  (Enter)` },
+  help: {
+    label: "Hjälp", title: "Så gör du", close: "Stäng hjälpen",
+    sections: [
+      { h: "Skapa", items: [
+        "Knapparna + Uppgift, + Milstolpe och + Grupp i verktygsfältet lägger till. Uppgifter och milstolpar hamnar i den grupp du senast valde eller skapade.",
+        "Skriv i fältet längst ner i listan och tryck Enter för att lägga till en uppgift snabbt.",
+        "Håll pekaren över en grupprad och klicka + för att lägga till en uppgift i just den gruppen.",
+        "Dubbelklicka på en tom del av tidslinjen för att skapa en uppgift på den dagen.",
+      ] },
+      { h: "Flytta och ordna", items: [
+        "Dra en rad i listan till en annan grupp för att flytta den. Släpp på en grupp för att lägga raden i gruppen, eller på en uppgift för att lägga den efter uppgiften.",
+        "Högerklicka på en rad: Flytta till grupp... låter dig välja grupp i en lista, och Flytta upp och Flytta ner byter ordning.",
+        "Dra en stapel i tidslinjen för att ändra datum, och dra i kanten för att ändra start eller slut. Datum för en grupp räknas ut ur dess innehåll.",
+      ] },
+      { h: "Beroenden", items: [
+        "Dra från cirkeln vid en stapels kant till en annan stapel för att koppla ihop dem (slut till start).",
+        "Eller högerklicka och välj Lägg till föregångare... eller Lägg till efterföljare... för att välja i en lista. Ta bort ett beroende med × i panelen.",
+        "Valet Beroenden i projektraden bestämmer om efterföljare flyttas automatiskt när något flyttas.",
+      ] },
+      { h: "Listan", items: [
+        "Kolumner väljer vad som visas. Status, ansvarig och prioritet ändras direkt i raden.",
+        "Dra i kanten mellan listan och tidslinjen för att ändra bredden. Dubbelklicka på kanten för att passa texten.",
+        "Sök och Dölj klara döljer rader i vyn utan att ändra något.",
+      ] },
+      { h: "Spara, ångra och flytta data", items: [
+        "Allt sparas i den här webbläsaren. Exportera (JSON eller CSV) ger en säkerhetskopia, och Importera... läser in en fil som ett nytt projekt.",
+        "Ångra och Gör om finns i verktygsfältet, och som Cmd eller Ctrl+Z (med Skift för att göra om).",
+      ] },
+    ],
+  },
   cols: { label: "Kolumner", hint: "Välj vilka kolumner som visas i rutnätet. Status, ansvarig och prioritet kan ändras direkt i raden.", none: "Ingen" },
   grid: { title: "Titel", end: "Slut", resize: "Kolumnbredd", resizeHint: "Dra för att ändra bredden på vänstra kolumnen. Dubbelklicka för att passa texten. Pilar ändrar i steg." },
   dates: {
@@ -110,7 +140,7 @@ export const svDict = {
   },
   quick: { label: "Lägg till uppgift", placeholder: "Lägg till uppgift...  (Enter)" },
   today: "Idag",
-  filter: { label: "Filter", search: "Sök", placeholder: "Sök...", hideDone: "Dölj klara", count: (n: number, total: number) => `Visar ${n} av ${total}` },
+  filter: { label: "Filter", attrs: "Filtrera", clear: "Rensa filter", collapseAll: "Fäll ihop alla", expandAll: "Öppna alla", search: "Sök", placeholder: "Sök...", hideDone: "Dölj klara", count: (n: number, total: number) => `Visar ${n} av ${total}` },
   history: { label: "Historik", undo: "Ångra", redo: "Gör om", undoHint: "Ångra senaste ändringen (Cmd/Ctrl+Z)", redoHint: "Gör om (Cmd/Ctrl+Shift+Z)" },
   check: { done: "Markera som klar", undone: "Markera som inte klar" },
   dismiss: "Stäng meddelandet",

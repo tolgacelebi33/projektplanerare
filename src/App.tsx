@@ -2,7 +2,7 @@ import { Suspense, lazy, useEffect, useMemo, useRef, useState } from "react";
 import { downloadText } from "./download";
 import { MAX_IMPORT_BYTES, ImportError, parseFile } from "./data/exchange";
 import { duplicateProject, exportProject, importParsed, type ExportFormat, type ImportResult } from "./data/importExport";
-import { canMove, deleteSubtree, descendants, filterView, newItemDraft, planMove, swapWithSibling } from "./data/actions";
+import { canMove, deleteSubtree, descendants, filterActive, filterView, newItemDraft, planMove, swapWithSibling } from "./data/actions";
 import { friendlyError } from "./i18n/errors";
 import { ContextMenu, type MenuItem } from "./views/ContextMenu";
 import { QuickAdd } from "./views/QuickAdd";
@@ -18,6 +18,8 @@ import { focusMedianOnNextProject, rememberScroll, uiCarry } from "./scrollCarry
 import { clampGrid, loadGridWidth, saveGridWidth } from "./layout";
 import { COLUMN_WIDTH, loadColumns, saveColumns, type ColumnId } from "./columns";
 import { ColumnPicker } from "./views/ColumnPicker";
+import { HelpDialog } from "./views/HelpDialog";
+import { FilterPicker, noAttrFilter, type AttrFilter } from "./views/FilterPicker";
 import { GridResizer } from "./views/GridResizer";
 import { useProjectData } from "./proto/useProjectData";
 import type { Zoom } from "./proto/zoom";
@@ -51,11 +53,13 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
   const [zoom, setZoom] = useState<Zoom>(uiCarry.zoom ?? "week");
   const [query, setQuery] = useState("");
   const [hideDone, setHideDone] = useState(false);
+  const [attrFilter, setAttrFilter] = useState<AttrFilter>(noAttrFilter);
+  const [collapse, setCollapse] = useState({ n: 0, open: true });
   const shown = useMemo(
-    () => (state.kind === "ready" ? filterView(state.items, state.deps, { query, hideDone }) : { items: [], deps: [] }),
-    [state, query, hideDone],
+    () => (state.kind === "ready" ? filterView(state.items, state.deps, { query, hideDone, ...attrFilter }) : { items: [], deps: [] }),
+    [state, query, hideDone, attrFilter],
   );
-  const filtering = query.trim() !== "" || hideDone;
+  const filtering = filterActive({ query, hideDone, ...attrFilter });
   const [view, setView] = useState<"gantt" | "wheel">(uiCarry.view ?? VIEW0);
   const [year, setYear] = useState<number | null>(uiCarry.year ?? null);
   uiCarry.zoom = zoom; uiCarry.view = view; uiCarry.year = year;
@@ -293,10 +297,13 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
         <div className="logo-slot" aria-label={sv.logoSlot} />
         <h1 className="app-title">{sv.title}</h1>
         <div className="header-controls">
+        <div className="header-top">
+        <HelpDialog />
         <div className="lang-switch" role="group" aria-label={sv.lang.label}>
           {LANGS.map((l) => (
             <button key={l} type="button" aria-pressed={lng === l} aria-label={sv.lang[l === "sv" ? "svName" : "enName"]} title={sv.lang[l === "sv" ? "svName" : "enName"]} onClick={() => { if (l !== lng) { rememberScroll(); onLang(l); } }}>{sv.lang[l]}</button>
           ))}
+        </div>
         </div>
         <div className="theme-switch" role="radiogroup" aria-label={sv.theme.label}>
           <span className="theme-label" aria-hidden="true">{sv.theme.label}</span>
@@ -345,26 +352,31 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
           </>
         )}
         <span className="toolbar-sep" aria-hidden="true" />
-        <div className="add-group" role="group" aria-label={sv.filter.label}>
-          <input type="search" className="search" aria-label={sv.filter.search} placeholder={sv.filter.placeholder} value={query}
-            onChange={(e) => setQuery(e.target.value)} onKeyDown={(e) => { if (e.key === "Escape") setQuery(""); }} />
-          <button type="button" className="mini" aria-pressed={hideDone} onClick={() => setHideDone((v) => !v)}>{sv.filter.hideDone}</button>
-          {filtering && state.kind === "ready" && <span className="toolbar-label" role="status">{sv.filter.count(shown.items.length, state.items.length)}</span>}
-        </div>
-        <span className="toolbar-sep" aria-hidden="true" />
-        <ColumnPicker columns={columns} onToggle={toggleColumn} />
-        <span className="toolbar-sep" aria-hidden="true" />
-        <div className="add-group" role="group" aria-label={sv.history.label}>
-          <button type="button" className="mini" disabled={!hist.undo} title={sv.history.undoHint} onClick={() => void travel("undo")}>{sv.history.undo}</button>
-          <button type="button" className="mini" disabled={!hist.redo} title={sv.history.redoHint} onClick={() => void travel("redo")}>{sv.history.redo}</button>
-        </div>
-        <span className="toolbar-sep" aria-hidden="true" />
         <div className="add-group" role="group" aria-label={sv.add.label} title={sv.add.hint}>
           <span className="toolbar-label">{sv.add.label}</span>
           {(["task", "milestone", "epic"] as ItemType[]).map((k) => (
             <button key={k} type="button" className="mini" disabled={!projects.projectId || state.kind !== "ready"} onClick={() => void addItem(k, k === "epic" ? { anchorId: null } : {}).catch(() => undefined)}>+ {sv.add[k]}</button>
           ))}
         </div>
+        <span className="toolbar-sep" aria-hidden="true" />
+        <div className="add-group" role="group" aria-label={sv.history.label}>
+          <button type="button" className="mini" disabled={!hist.undo} title={sv.history.undoHint} onClick={() => void travel("undo")}>{sv.history.undo}</button>
+          <button type="button" className="mini" disabled={!hist.redo} title={sv.history.redoHint} onClick={() => void travel("redo")}>{sv.history.redo}</button>
+        </div>
+        <span className="toolbar-sep" aria-hidden="true" />
+        <div className="add-group" role="group" aria-label={sv.filter.label}>
+          <input type="search" className="search" aria-label={sv.filter.search} placeholder={sv.filter.placeholder} value={query}
+            onChange={(e) => setQuery(e.target.value)} onKeyDown={(e) => { if (e.key === "Escape") setQuery(""); }} />
+          <button type="button" className="mini" aria-pressed={hideDone} onClick={() => setHideDone((v) => !v)}>{sv.filter.hideDone}</button>
+          <FilterPicker filter={attrFilter} users={users} onChange={setAttrFilter} />
+          {filtering && state.kind === "ready" && <span className="toolbar-label" role="status">{sv.filter.count(shown.items.length, state.items.length)}</span>}
+        </div>
+        <span className="toolbar-sep" aria-hidden="true" />
+        <ColumnPicker columns={columns} onToggle={toggleColumn} />
+        {view === "gantt" && (<>
+          <button type="button" className="mini" onClick={() => setCollapse((c) => ({ n: c.n + 1, open: false }))}>{sv.filter.collapseAll}</button>
+          <button type="button" className="mini" onClick={() => setCollapse((c) => ({ n: c.n + 1, open: true }))}>{sv.filter.expandAll}</button>
+        </>)}
       </div>
       {persistent?.loadWarning && <div role="alert" className="notice">{persistent.loadWarning}</div>}
       {notice && <div role="alert" className="notice">{notice}{writeError && <button type="button" className="notice-x" aria-label={sv.dismiss} onClick={() => setWriteError(null)}>×</button>}</div>}
@@ -385,7 +397,7 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
         {state.kind === "ready" && projects.projectId && view === "gantt" && (
           <div className="gantt-wrap">
           <div className="gantt-main">
-          <DhtmlxGantt key={theme} gridWidth={gridWidth} columns={columns} users={users} onEditField={editField} revealId={reveal} todayToken={todayToken} onPersisted={() => void refresh()}
+          <DhtmlxGantt key={theme} collapse={collapse} gridWidth={gridWidth} columns={columns} users={users} onEditField={editField} revealId={reveal} todayToken={todayToken} onPersisted={() => void refresh()}
             onNotice={setWriteError}
             onCreateAt={({ rowId, date }) => void addItem("task", { anchorId: rowId, start: date }).catch(() => undefined)}
             onRename={(id) => { setJustCreated(id); setEditId(id); }}

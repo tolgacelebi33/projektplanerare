@@ -173,8 +173,18 @@ class Sim {
     await this.page.keyboard.press(dir === "Ångra" ? "Control+z" : "Control+Shift+z");
     return `${dir}: tangent`;
   }
+  attrStatuses: string[] = []; // statusfilter som simuleringen satt (vyn ska visa exakt det som filtret släpper igenom)
   async filterOp() {
-    const k = this.pick(["set", "clear", "done"]);
+    const k = this.pick(["set", "clear", "done", "status", "status", "collapse"]);
+    if (k === "status") {
+      const label = this.pick(["Ej påbörjad", "Pågår", "Klar", "Blockerad"]); const key = ({ "Ej påbörjad": "not_started", "Pågår": "in_progress", "Klar": "done", "Blockerad": "blocked" } as Record<string, string>)[label];
+      await this.page.getByRole("button", { name: /^Filtrera/ }).click();
+      const box = this.page.getByRole("group", { name: "Filtrera" }).getByLabel(label);
+      if (this.attrStatuses.includes(key)) { await box.uncheck(); this.attrStatuses = this.attrStatuses.filter((s) => s !== key); } else { await box.check(); this.attrStatuses = [...this.attrStatuses, key]; }
+      await this.page.keyboard.press("Escape");
+      return `filter: status ${label}`;
+    }
+    if (k === "collapse") { const open = this.chance(0.5); await this.page.getByRole("button", { name: open ? "Öppna alla" : "Fäll ihop alla" }).click(); return open ? "öppna alla" : "fäll ihop alla"; }
     if (k === "done") { await this.page.getByRole("button", { name: "Dölj klara" }).click(); return "filter: dölj klara"; }
     const q = this.page.getByRole("searchbox", { name: "Sök" });
     if (k === "clear") { await q.fill(""); return "filter: rensa"; }
@@ -225,7 +235,7 @@ class Sim {
       const hideDone = (await this.page.getByRole("button", { name: "Dölj klara" }).getAttribute("aria-pressed")) === "true";
       const allMine = st.items.filter((i) => i.project_id === pid);
       const allIds = new Set(allMine.map((i) => i.id));
-      const shown = filterView(allMine as never, st.deps.filter((d) => allIds.has(d.from_item_id)) as never, { query, hideDone });
+      const shown = filterView(allMine as never, st.deps.filter((d) => allIds.has(d.from_item_id)) as never, { query, hideDone, statuses: this.attrStatuses as never });
       const mine = shown.items as typeof allMine;
       const myDeps = shown.deps as typeof st.deps;
       await expect.poll(async () => this.page.locator(".gantt_row").count(), { timeout: 2500 }).toBe(mine.length).catch(() => { /* jämförelsen nedan rapporterar den faktiska skillnaden */ });
@@ -306,7 +316,7 @@ for (const seed of SEEDS) {
       [6, () => sim.clickBar()], [5, () => sim.clickRow()], [6, () => sim.rightClick()], [4, () => sim.dblclickEmpty()], [2, () => sim.dblclickBelow()],
       [5, () => sim.dragBar()], [3, () => sim.dragRow()], [3, () => sim.resizeBar()], [3, () => sim.linkDrag()], [3, () => sim.hoverAround()], [3, () => sim.addButton()],
       [9, () => sim.panelEdit()], [2, () => sim.panelDelete()], [2, () => sim.changeZoom()], [1, () => sim.today()], [2, () => sim.theme()],
-      [2, () => sim.escape()], [1, () => sim.resize()], [2, () => sim.switchView()], [1, () => sim.projectOp()], [2, () => sim.history()], [1, () => sim.filterOp()],
+      [2, () => sim.escape()], [1, () => sim.resize()], [2, () => sim.switchView()], [1, () => sim.projectOp()], [2, () => sim.history()], [3, () => sim.filterOp()],
     ];
     const total = actions.reduce((n, a) => n + a[0], 0);
     const STEPS = Number(process.env.FUZZ_STEPS ?? 28);

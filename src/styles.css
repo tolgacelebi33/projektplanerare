@@ -321,3 +321,18 @@ body[data-overlay] .gantt_tooltip { display: none !important; }
 .col-picker { position: relative; }
 .col-picker-pop { position: absolute; top: calc(100% + 6px); left: 0; z-index: 30; min-width: 170px; padding: 8px 10px; display: grid; gap: 6px; background: var(--surface); border: var(--line-width) solid var(--line); border-radius: 8px; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25); }
 .col-picker-row { display: flex; align-items: center; gap: 8px; font-size: var(--fs-md); cursor: pointer; }
+
+/* Hjälp: knapp bredvid språkväxlaren och en kort guide */
+.header-top { display: flex; align-items: center; gap: 14px; }
+.help-btn { font: inherit; font-family: var(--font-title); font-size: 13px; color: var(--text); background: transparent; border: 0; border-bottom: 2px solid transparent; padding: 2px 4px; cursor: pointer; }
+.help-btn:hover, .help-btn[aria-expanded="true"] { border-bottom-color: var(--text); }
+.help-btn:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
+.help-pop { box-sizing: border-box; position: fixed; top: 64px; right: 16px; z-index: 60; width: min(440px, calc(100vw - 32px)); max-height: calc(100vh - 96px); overflow: auto; padding: 14px 18px 8px; background: var(--surface); color: var(--text); border: var(--line-width) solid var(--line); border-radius: 10px; box-shadow: 0 12px 32px rgba(0, 0, 0, 0.3); }
+.help-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+.help-head h2 { margin: 0; font-family: var(--font-title); font-size: 16px; font-weight: 400; letter-spacing: 0.04em; }
+.help-pop h3 { margin: 12px 0 4px; font-family: var(--font-title); font-size: 12px; font-weight: 400; letter-spacing: 0.06em; text-transform: none; }
+.help-pop ul { margin: 0 0 4px; padding-left: 18px; display: grid; gap: 4px; font-size: var(--fs-md); line-height: 1.4; }
+
+.filter-pop { min-width: 190px; gap: 8px; }
+.filter-pop fieldset { margin: 0; padding: 0; border: 0; display: grid; gap: 4px; }
+.filter-pop legend { padding: 0; margin-bottom: 4px; font-family: var(--font-title); font-size: 12px; letter-spacing: 0.04em; }

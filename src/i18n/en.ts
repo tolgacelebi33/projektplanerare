@@ -4,6 +4,36 @@ import type { Dict } from "./dict-sv";
 export const enDict: Dict = {
   lang: { label: "Language", sv: "SV", en: "EN", svName: "Svenska", enName: "English" },
   group: { addTask: (title: string) => `Add task to the group "${title}"`, count: (n: number) => `${n} items directly in the group`, quickIn: (title: string) => `Add task to "${title}"...  (Enter)` },
+  help: {
+    label: "Help", title: "How to", close: "Close the help",
+    sections: [
+      { h: "Create", items: [
+        "The buttons + Task, + Milestone and + Group in the toolbar add items. Tasks and milestones go into the group you last selected or created.",
+        "Type in the field at the bottom of the list and press Enter to add a task quickly.",
+        "Hover a group row and click + to add a task to that group.",
+        "Double-click an empty part of the timeline to create a task on that day.",
+      ] },
+      { h: "Move and arrange", items: [
+        "Drag a row in the list to another group to move it. Drop on a group to put the row in the group, or on a task to place it after that task.",
+        "Right-click a row: Move to group... lets you pick a group from a list, and Move up and Move down change the order.",
+        "Drag a bar in the timeline to change dates, and drag its edge to change start or end. The dates of a group are calculated from its contents.",
+      ] },
+      { h: "Dependencies", items: [
+        "Drag from the circle at a bar's edge to another bar to connect them (finish to start).",
+        "Or right-click and choose Add predecessor... or Add successor... to pick from a list. Remove a dependency with × in the panel.",
+        "The Dependencies setting in the project row decides whether successors move automatically when something moves.",
+      ] },
+      { h: "The list", items: [
+        "Columns chooses what is shown. Status, assignee and priority are changed right in the row.",
+        "Drag the edge between the list and the timeline to change the width. Double-click the edge to fit the text.",
+        "Search and Hide done hide rows in the view without changing anything.",
+      ] },
+      { h: "Save, undo and move data", items: [
+        "Everything is saved in this browser. Export (JSON or CSV) gives a backup, and Import... reads a file in as a new project.",
+        "Undo and Redo are in the toolbar, and as Cmd or Ctrl+Z (with Shift to redo).",
+      ] },
+    ],
+  },
   cols: { label: "Columns", hint: "Choose which columns the grid shows. Status, assignee and priority can be changed right in the row.", none: "None" },
   grid: { title: "Title", end: "End", resize: "Column width", resizeHint: "Drag to change the width of the left column. Double-click to fit the text. Arrow keys change it in steps." },
   dates: {
@@ -105,7 +135,7 @@ export const enDict: Dict = {
   },
   quick: { label: "Add task", placeholder: "Add task...  (Enter)" },
   today: "Today",
-  filter: { label: "Filter", search: "Search", placeholder: "Search...", hideDone: "Hide done", count: (n: number, total: number) => `Showing ${n} of ${total}` },
+  filter: { label: "Filter", attrs: "Filter by", clear: "Clear filters", collapseAll: "Collapse all", expandAll: "Expand all", search: "Search", placeholder: "Search...", hideDone: "Hide done", count: (n: number, total: number) => `Showing ${n} of ${total}` },
   history: { label: "History", undo: "Undo", redo: "Redo", undoHint: "Undo the last change (Cmd/Ctrl+Z)", redoHint: "Redo (Cmd/Ctrl+Shift+Z)" },
   check: { done: "Mark as done", undone: "Mark as not done" },
   dismiss: "Dismiss the message",

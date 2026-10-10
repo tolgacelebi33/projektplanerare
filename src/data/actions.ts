@@ -1,7 +1,7 @@
 import type { DataStore } from "./DataStore";
 import { sv } from "../i18n/sv";
 import { addDays } from "./dates";
-import type { Dependency, Item, ItemType } from "./types";
+import type { Dependency, Item, ItemType, Priority, Status } from "./types";
 
 /** Alla poster under `id` (barn, barnbarn, ...), inte posten själv. */
 export function descendants(items: Item[], id: string): Item[] {
@@ -80,21 +80,35 @@ export function swapWithSibling(items: Item[], id: string, dir: "up" | "down"): 
 
 export function canMove(items: Item[], id: string, dir: "up" | "down") { return swapWithSibling(items, id, dir) !== null; }
 
-export interface ViewFilter { query: string; hideDone: boolean }
+export interface ViewFilter {
+  query: string; hideDone: boolean;
+  /** Val per egenskap: tom lista betyder inget filter. Ansvarig: id, eller "" för ingen ansvarig. */
+  statuses?: Status[]; priorities?: Priority[]; assignees?: string[];
+}
+export const filterActive = (f: ViewFilter): boolean =>
+  f.query.trim() !== "" || f.hideDone || !!f.statuses?.length || !!f.priorities?.length || !!f.assignees?.length;
 
 /**
  * Filtrerar vad som visas (inte vad som lagras). En post visas om den matchar sökningen (titel eller beskrivning, utan hänsyn till versaler)
- * och, vid "dölj klara", inte är klar. Epics ovanför en visad post visas alltid, så att den syns i sitt sammanhang. Beroenden visas
+ * och, vid "dölj klara", inte är klar, och dessutom har en av de valda statusarna, prioriteterna och ansvariga (om några valts). Epics ovanför en visad post visas alltid, så att den syns i sitt sammanhang. Beroenden visas
  * bara när båda ändarna visas.
  */
 export function filterView(items: Item[], deps: Dependency[], f: ViewFilter): { items: Item[]; deps: Dependency[] } {
   const q = f.query.trim().toLowerCase();
-  if (!q && !f.hideDone) return { items, deps };
+  if (!filterActive(f)) return { items, deps };
+  const attr = f.hideDone || !!f.statuses?.length || !!f.priorities?.length || !!f.assignees?.length;
   const byId = new Map(items.map((i) => [i.id, i]));
   const show = new Set<string>();
   for (const i of items) {
     if (q && !i.title.toLowerCase().includes(q) && !i.description.toLowerCase().includes(q)) continue;
-    if (f.hideDone && i.status === "done") continue;
+    // En grupps egen status, prioritet och ansvarig är inte det man filtrerar på: den visas bara om något i den matchar (eller om sökningen träffar dess namn)
+    if (i.type === "epic") { if (attr) continue; }
+    else {
+      if (f.hideDone && i.status === "done") continue;
+      if (f.statuses?.length && !f.statuses.includes(i.status)) continue;
+      if (f.priorities?.length && !f.priorities.includes(i.priority)) continue;
+      if (f.assignees?.length && !f.assignees.includes(i.assignee_id ?? "")) continue;
+    }
     for (let cur: Item | undefined = i; cur && !show.has(cur.id); cur = cur.parent_id ? byId.get(cur.parent_id) : undefined) show.add(cur.id);
   }
   return { items: items.filter((i) => show.has(i.id)), deps: deps.filter((d) => show.has(d.from_item_id) && show.has(d.to_item_id)) };
