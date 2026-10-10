@@ -403,10 +403,40 @@ body[data-overlay] .gantt_tooltip { display: none !important; }
 .wheel-legend h2.has-grp { box-shadow: inset 4px 0 0 var(--band-grp); padding-left: 10px; }
 .wheel-grid.wheel-band-ring { stroke-width: 3; }
 
-/* Datumfält: text (ÅÅÅÅ-MM-DD) med kalendern som val */
-.date-field { position: relative; display: block; }
-.date-field input[type="text"] { padding-right: 34px; }
-.date-pick { position: absolute; right: 4px; top: 50%; transform: translateY(-50%); width: 26px; height: 26px; padding: 0; border: none; background: transparent; color: var(--text); cursor: pointer; border-radius: var(--radius-pill); }
-.panel .date-native { position: absolute; right: 4px; bottom: 0; width: 1px; height: 1px; opacity: 0; pointer-events: none; padding: 0; border: 0; }
-/* Många kort: kort utanför bilden ritas inte förrän de behövs (enklare än virtualisering, och rullningslisten stämmer ungefär) */
-.board-slot { content-visibility: auto; contain-intrinsic-size: auto 110px; }
+/* Datumfält: skrivbart, med en kalender (månad och år går att bläddra) */
+.datepick { position: relative; display: block; }
+.datepick input[type="text"] { padding-right: 38px; }
+.datepick-btn { position: absolute; right: 5px; top: 5px; width: 28px; height: 28px; display: grid; place-items: center; padding: 0; border: var(--line-width) solid transparent; background: transparent; color: var(--text); cursor: pointer; border-radius: var(--radius-pill); }
+.datepick-btn:hover, .datepick-btn[aria-expanded="true"] { border-color: var(--line); background: var(--surface); }
+.datepick-bad { display: block; margin-top: 4px; font-size: 12px; color: var(--text); font-weight: var(--weight-strong); }
+.datepick input[aria-invalid="true"] { border-color: var(--status-blocked-bg); }
+.datepick-pop { position: absolute; z-index: 30; left: 0; top: calc(100% + 4px); width: 296px; padding: 10px; background: var(--surface); color: var(--text); border: var(--line-width) solid var(--line); border-radius: 8px; box-shadow: 0 6px 20px rgba(0, 0, 0, 0.18); }
+.datepick-head { display: flex; align-items: center; gap: 4px; margin-bottom: 8px; }
+.datepick-head select { flex: 1; min-width: 0; width: auto; padding: 4px 6px; font-size: 13px; }
+.datepick-nav { width: 26px; height: 26px; padding: 0; flex: none; border: var(--line-width) solid var(--line); background: transparent; color: var(--text); border-radius: var(--radius-pill); cursor: pointer; font-size: 15px; line-height: 1; }
+.datepick-nav:hover { background: var(--surface-alt); }
+.datepick-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
+.datepick-wd { text-align: center; font-size: 11px; color: var(--text-muted); padding: 2px 0; font-family: var(--font-title); }
+.datepick-day { height: 32px; padding: 0; border: var(--line-width) solid transparent; background: transparent; color: var(--text); border-radius: var(--radius-pill); font: inherit; font-size: 13px; cursor: pointer; }
+.datepick-day.out { color: var(--text-muted); opacity: 0.6; }
+.datepick-day.wk { background: color-mix(in srgb, var(--text) 5%, transparent); }
+.datepick-day:hover { background: var(--surface-alt); }
+.datepick-day.today { border-color: var(--text); }
+.datepick-day.sel { background: var(--text); color: var(--surface); font-weight: var(--weight-strong); opacity: 1; }
+.datepick-day:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.datepick-foot { display: flex; justify-content: flex-end; margin-top: 8px; }
+
+/* Dialog */
+.modal-back { position: fixed; inset: 0; z-index: 70; display: grid; place-items: start center; padding-top: 12vh; background: rgba(0, 0, 0, 0.35); }
+.modal { box-sizing: border-box; width: min(560px, calc(100vw - 32px)); max-height: 80vh; overflow: auto; padding: 18px 20px; background: var(--surface); color: var(--text); border: var(--line-width) solid var(--line); border-radius: 10px; box-shadow: 0 12px 32px rgba(0, 0, 0, 0.3); display: grid; gap: 12px; }
+.modal h2 { margin: 0; font-family: var(--font-title); font-size: 16px; font-weight: 400; letter-spacing: 0.04em; }
+.modal-row { display: grid; grid-template-columns: 1.3fr 1.2fr 0.9fr; gap: 10px; }
+.modal-err { margin: 0; font-weight: var(--weight-strong); }
+.modal-actions { justify-content: flex-start; }
+.modal input, .modal select { font: inherit; font-size: 14px; color: var(--text); background: var(--surface-alt); border: var(--line-width) solid var(--line); border-radius: 6px; padding: 7px 9px; width: 100%; box-sizing: border-box; }
+.modal input:focus-visible, .modal select:focus-visible, .modal button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+@media (max-width: 560px) { .modal-row { grid-template-columns: 1fr; } }
+/* Återkommande: markering i listan och boarden */
+.dhx-host .gantt_row.has-series .grid-title::after { content: " \21BB"; color: var(--text-muted); }
+.board-series { white-space: nowrap; }
+.mini-primary { background: var(--text); color: var(--surface); border-color: var(--text); }

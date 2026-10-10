@@ -22,9 +22,9 @@ test.beforeEach(async ({ page }) => {
   await openApp(page, "dhtmlx");
 });
 
-test("D1 släpp på en syskonuppgift placerar raden efter den, och lagret och vyn är överens", async ({ page }) => {
+test("D1 släpp på nedre halvan av en syskonuppgift placerar raden efter den, och lagret och vyn är överens", async ({ page }) => {
   expect(kids(await rows(page), "i5")).toEqual(["i6", "i7"]);
-  await dragRow(page, "i6", "i7", -8);
+  await dragRow(page, "i6", "i7", 8); // nedre halvan av i7: markören ligger under i7
   const all = await rows(page);
   expect(kids(all, "i5")).toEqual(["i7", "i6"]);
   expect(await libOrder(page)).toContain("i7<i5 i6<i5");
@@ -35,7 +35,7 @@ test("D2 en uppgift kan dras till en annan epic: förälder byts och epicernas d
   const i8 = before.find((i) => i.id === "i8")!; const i5 = before.find((i) => i.id === "i5")!;
   await dragRow(page, "i9", "i6", -8);
   const all = await rows(page);
-  expect(kids(all, "i5")).toEqual(["i6", "i9", "i7"]);
+  expect(kids(all, "i5")).toEqual(["i9", "i6", "i7"]); // övre halvan av i6: markören ligger över i6
   expect(all.find((i) => i.id === "i9")!.parent_id).toBe("i5");
   expect(kids(all, "i8")).toEqual(["i10"]);
   // epics datum följer innehållet (härleds av lagret)
@@ -77,7 +77,7 @@ test("D5 en dragning är ett steg att ångra, och Gör om tar tillbaka den", asy
   await page.getByRole("button", { name: "Ångra" }).click();
   await expect.poll(async () => JSON.stringify(await rows(page))).toBe(before);
   await page.getByRole("button", { name: "Gör om" }).click();
-  await expect.poll(async () => kids(await rows(page), "i5").join(",")).toBe("i6,i9,i7");
+  await expect.poll(async () => kids(await rows(page), "i5").join(",")).toBe("i9,i6,i7");
 });
 
 test("D6 ett klick (utan drag) öppnar fortfarande posten, och bocken sätter klar utan att dra raden", async ({ page }) => {

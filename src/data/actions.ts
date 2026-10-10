@@ -1,7 +1,7 @@
 import type { DataStore } from "./DataStore";
 import { sv } from "../i18n/sv";
-import { addDays } from "./dates";
-import type { Dependency, Item, ItemType, Priority, Status } from "./types";
+import { addDays, recurringDates } from "./dates";
+import type { Dependency, Item, ItemType, Priority, Recurrence, Status } from "./types";
 
 /** Alla poster under `id` (barn, barnbarn, ...), inte posten själv. */
 export function descendants(items: Item[], id: string): Item[] {
@@ -238,4 +238,47 @@ export function planBoardDrop(items: Item[], movedIds: string[], status: Status,
     if (Object.keys(patch).length) out.push({ id: it.id, patch });
   });
   return out;
+}
+
+export const MAX_SERIES = 120;
+
+/** Posterna i samma serie som `item`, tidigast först. */
+export function seriesMembers(items: Item[], item: Pick<Item, "series">): Item[] {
+  if (!item.series) return [];
+  return items.filter((i) => i.series === item.series).sort((a, b) => a.start.localeCompare(b.start) || a.sort_order - b.sort_order);
+}
+
+/** Id för en ny serie. */
+const newSeriesId = () => `s_${Date.now().toString(36)}${Math.floor(Math.random() * 1e6).toString(36)}`;
+
+/** Skapar en återkommande milstolpe: ett tillfälle per datum, alla i samma grupp och med samma serie-id. `base` är ett utkast från `newItemDraft`. Returnerar de skapade posterna. */
+export async function createSeries(store: DataStore, base: Omit<Item, "id">, kind: Recurrence, count: number, title: string): Promise<Item[]> {
+  const n = Math.max(1, Math.min(MAX_SERIES, Math.floor(count)));
+  const series = newSeriesId();
+  const made: Item[] = [];
+  const dates = recurringDates(base.start, kind, n);
+  for (let i = 0; i < dates.length; i++) made.push(await store.createItem({ ...base, title, type: "milestone", start: dates[i], end: dates[i], sort_order: base.sort_order + i, series, recur: kind }) as Item);
+  return made;
+}
+
+/** Lägger till `count` tillfällen efter seriens sista, med samma upprepning och egenskaper som det sista. Returnerar de nya posterna. */
+export async function extendSeries(store: DataStore, items: Item[], member: Item, count: number): Promise<Item[]> {
+  const all = seriesMembers(items, member);
+  const last = all.at(-1);
+  if (!last || !member.recur) return [];
+  const n = Math.max(1, Math.min(MAX_SERIES - all.length, Math.floor(count)));
+  if (n < 1) return [];
+  const dates = recurringDates(all[0].start, member.recur, all.length + n).slice(all.length);
+  const top = items.reduce((m, i) => Math.max(m, i.sort_order), 0);
+  const { id: _id, ...rest } = last; void _id;
+  const made: Item[] = [];
+  for (let i = 0; i < dates.length; i++) made.push(await store.createItem({ ...rest, start: dates[i], end: dates[i], status: "not_started", progress: 0, sort_order: top + 1 + i }) as Item);
+  return made;
+}
+
+/** Tar bort tillfällen i en serie: `later` = det här och alla senare, `all` = hela serien. Returnerar antal borttagna. */
+export async function deleteSeries(store: DataStore, items: Item[], member: Item, scope: "later" | "all"): Promise<number> {
+  const list = seriesMembers(items, member).filter((i) => scope === "all" || i.start >= member.start);
+  for (const i of list) await store.deleteItem(i.id);
+  return list.length;
 }

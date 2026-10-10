@@ -10,6 +10,7 @@ export const enDict: Dict = {
       { h: "Create", items: [
         "The buttons + Task, + Milestone and + Group in the toolbar add items. Tasks and milestones go into the group you last selected or created.",
         "Type in the field at the bottom of the list and press Enter to add a task quickly.",
+        "+ Recurring milestone... creates a milestone that repeats every week, every other week, every month or every 3 months (for maintenance, for example). Each occurrence is its own milestone that you can tick off. Open one of them to add more occurrences or delete the series.",
         "Hover a group row and click + to add a task to that group.",
         "Double-click an empty part of the timeline to create a task on that day.",
       ] },
@@ -49,6 +50,8 @@ export const enDict: Dict = {
     monthsFull: ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"],
     monthsShort: ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"],
     range: (a: string, b: string) => `${a} to ${b}`,
+    weekdays: ["M", "T", "W", "T", "F", "S", "S"],
+    picker: { open: "Open the calendar", dialog: "Pick a date", prevMonth: "Previous month", nextMonth: "Next month", prevYear: "Previous year", nextYear: "Next year", month: "Month", year: "Year", today: "Today", hint: "Type a date, e.g. 2026-12-31 or 31/12/2026", invalid: "The date was not understood. Type e.g. 2026-12-31 or 31/12/2026." },
   },
   newItem: { task: "New task", milestone: "New milestone", epic: "New group" },
   persist: {
@@ -149,6 +152,15 @@ export const enDict: Dict = {
     label: "Selected items", count: (n: number) => `${n} selected`, status: "Change status...", move: "Move to...", top: "Top level", remove: "Delete...", clear: "Clear selection",
     confirm: (n: number, inside: number) => (inside > 0 ? `Delete ${n} selected items and the ${inside} items under them?` : `Delete ${n} selected items?`), confirmYes: "Delete", cancel: "Cancel",
     partial: (done: number, failed: number, why: string) => `${done} changed, ${failed} could not be changed: ${why}`,
+  },
+  recur: {
+    button: "+ Recurring milestone...", dialog: "Recurring milestone", name: "Title", defaultTitle: "Maintenance", first: "First date", every: "Repeats", count: "Number of occurrences",
+    kinds: { weekly: "Every week", biweekly: "Every other week", monthly: "Every month", quarterly: "Every 3 months" },
+    summary: (n: number, first: string, last: string) => `${n} milestones, from ${first} to ${last}. Each occurrence is its own milestone that you can tick off separately.`,
+    max: (n: number) => `At most ${n} occurrences.`, create: "Create", cancel: "Cancel", badDate: "Choose a valid first date.", emptyTitle: "Enter a title.",
+    series: "Recurring", info: (kind: string, n: number) => `${kind}. ${n} occurrences in the series.`, extend: "Add more", extendCount: "Number to add",
+    removeLater: "Delete this and later...", removeAll: "Delete the whole series...", confirmLater: (n: number) => `Delete ${n} milestones (this one and all later)?`, confirmAll: (n: number) => `Delete all ${n} milestones in the series?`,
+    done: (n: number) => `Created ${n} milestones.`,
   },
   quick: { label: "Add task", placeholder: "Add task...  (Enter)" },
   today: "Today",

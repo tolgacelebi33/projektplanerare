@@ -26,11 +26,11 @@ const ZOOM = {
 
 import { GRID_MIN } from "../layout";
 import { COLUMN_WIDTH, type ColumnId } from "../columns";
-import { startRowDragFeedback } from "./rowDrag";
+import { setDragParent, startRowDragFeedback } from "./rowDrag";
 import { consumeFocusMedian, scrollCarry } from "../scrollCarry";
 /** Rutnätets fasta bredd är GRID_WIDTH (layout.ts). Panelen till höger tar plats från tidslinjen, aldrig från rutnätet. */
 
-interface TaskRow { color: string; id: string; text: string; start_date: Date; end_date: Date; type: string; kind: Item["type"]; parent: string | number; status: Status; priority: Item["priority"]; assignee: string; progress: number; open: boolean }
+interface TaskRow { rec: boolean; color: string; id: string; text: string; start_date: Date; end_date: Date; type: string; kind: Item["type"]; parent: string | number; status: Status; priority: Item["priority"]; assignee: string; progress: number; open: boolean }
 interface LinkRow { id: string; source: string; target: string; type: string }
 
 /** Förväntad ordning för träd i djupet först, syskon efter sort_order. Används för att avgöra om strukturen ändrats. */
@@ -106,7 +106,7 @@ export function DhtmlxGantt({ store, items, deps, zoom, onError, onPersisted, re
       type: TYPE[i.type],
       kind: i.type,
       parent: i.parent_id ?? 0,
-      status: i.status, priority: i.priority, assignee: i.assignee_id ?? "", progress: i.progress, color: colors.get(i.id) ?? "none",
+      status: i.status, priority: i.priority, assignee: i.assignee_id ?? "", progress: i.progress, color: colors.get(i.id) ?? "none", rec: !!i.series,
       open: true,
     }));
     const links: LinkRow[] = deps.map((d) => ({ id: d.id, source: d.from_item_id, target: d.to_item_id, type: "0" }));
@@ -123,7 +123,7 @@ export function DhtmlxGantt({ store, items, deps, zoom, onError, onPersisted, re
     gantt.config.drag_progress = false;
     gantt.config.drag_project = false;
     gantt.config.grid_width = gridWidthRef.current;
-    gantt.config.order_branch = true; // rader kan dras i rutnätet för att byta plats ...
+    gantt.config.order_branch = "marker"; // rader kan dras i rutnätet för att byta plats ...
     gantt.config.order_branch_free = true; // ... och förälder (släpps på en epic)
     gantt.config.row_height = 30;
     gantt.config.bar_height = 22;
@@ -141,7 +141,7 @@ export function DhtmlxGantt({ store, items, deps, zoom, onError, onPersisted, re
     gantt.locale.date.month_full = [...sv.dates.monthsFull] as typeof gantt.locale.date.month_full;
     gantt.locale.date.month_short = [...sv.dates.monthsShort] as typeof gantt.locale.date.month_short;
     gantt.templates.task_class = (_s, _e, t) => `st-${(t as unknown as { status: Status }).status}${(t as unknown as { kind: string }).kind === "epic" ? " epic" : ""}`;
-    gantt.templates.grid_row_class = (_s, _e, t) => `${(t as unknown as { kind: string }).kind === "epic" ? "epic-row" : ""} grp-${(t as unknown as TaskRow).color}${selectedRef.current.has(String(t.id)) ? " sel-row" : ""}`;
+    gantt.templates.grid_row_class = (_s, _e, t) => `${(t as unknown as { kind: string }).kind === "epic" ? "epic-row" : ""} grp-${(t as unknown as TaskRow).color}${(t as unknown as TaskRow).rec ? " has-series" : ""}${selectedRef.current.has(String(t.id)) ? " sel-row" : ""}`;
     gantt.templates.task_row_class = (_s, _e, t) => `${(t as unknown as { kind: string }).kind === "epic" ? "epic-row" : ""}${selectedRef.current.has(String(t.id)) ? " sel-row" : ""}`;
     gantt.templates.task_row_class = (_s, _e, t) => ((t as unknown as { kind: string }).kind === "epic" ? "epic-row" : "");
     // Texten i en stapel: ryms titeln flyttas den till höger om staplen (som i andra planeringsverktyg), annars visas den inuti.
@@ -241,15 +241,19 @@ export function DhtmlxGantt({ store, items, deps, zoom, onError, onPersisted, re
         stopDragFeedback?.(); stopDragFeedback = startRowDragFeedback(String(id));
         return true;
       }, {}),
-      gantt.attachEvent("onBeforeRowDragEnd", (id) => {
+      // Markörläge (order_branch "marker"): raden flyttas inte under dragningen, bara en markör visar var den hamnar. Vid släpp anger biblioteket målets
+      // förälder och plats bland dess barn. En uppgift kan inte innehålla något: släpp inne i en uppgift tolkas som "efter uppgiften, i dess grupp".
+      (gantt.attachEvent as unknown as (n: string, f: (id: string | number, parent: string | number | null) => void, c: object) => string)("onRowDragMove", (_id, parent) => { setDragParent(parent); }, {}),
+      gantt.attachEvent("onBeforeRowDragEnd", (id, parent, tindex) => {
         stopDragFeedback?.(); stopDragFeedback = null;
-        let parent = gantt.getParent(id);
         const norm = (p: unknown) => (!p || String(p) === String(gantt.config.root_id) ? null : String(p));
-        let after: string | null = null; // släpp på en uppgift: placeras efter den, bredvid den (en uppgift kan inte innehålla något)
-        if (norm(parent) && (gantt.getTask(parent) as unknown as { kind: string }).kind !== "epic") { after = String(parent); parent = gantt.getParent(parent); }
-        const kids = gantt.getChildren(norm(parent) ?? gantt.config.root_id).map((x) => String(x));
-        const order = after ? [...kids.slice(0, kids.indexOf(after) + 1), String(id), ...kids.slice(kids.indexOf(after) + 1)] : kids;
-        void latest.current.onMoveRow(String(id), norm(parent), order);
+        let target = norm(parent), at = Number(tindex);
+        let after: string | null = null;
+        if (target && (gantt.getTask(target) as unknown as { kind: string }).kind !== "epic") { after = target; target = norm(gantt.getParent(target)); }
+        const kids = gantt.getChildren(target ?? gantt.config.root_id).map((x) => String(x)).filter((x) => x !== String(id));
+        const pos = after ? kids.indexOf(after) + 1 : Math.max(0, Math.min(Number.isFinite(at) ? at : kids.length, kids.length));
+        const order = [...kids.slice(0, pos), String(id), ...kids.slice(pos)];
+        void latest.current.onMoveRow(String(id), target, order);
         return true;
       }, {}),
       gantt.attachEvent("onBeforeTaskDrag", (id) => (gantt.getTask(id) as unknown as { kind: string }).kind !== "epic", {}),

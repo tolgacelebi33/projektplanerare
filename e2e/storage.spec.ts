@@ -56,7 +56,7 @@ test("ST3 trasig data i IndexedDB skrivs inte över: den sparas undan, en varnin
   await page.reload(); await page.waitForSelector(".gantt_task_line");
   await expect(page.getByRole("alert").first()).toContainText("Sparad data var skadad");
   expect(await idbGet(page, "state.backup")).toEqual({ snapshot: { foo: "trasigt" } });
-  await expect(page.locator(".gantt_row")).toHaveCount(20);
+  await expect.poll(() => page.evaluate(() => { let n = 0; (window as any).__dhx?.eachTask(() => { n++; }); return n; })).toBe(20); // bibliotekets modell: DOM har bara de rader som ryms i fönstret
 });
 
 test("ST4 ångra-historiken finns kvar efter omladdning, och Ångra fungerar då", async ({ page }) => {

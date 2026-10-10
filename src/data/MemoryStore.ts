@@ -80,7 +80,10 @@ export class MemoryStore implements DataStore {
       const newStep = now - this.lastCommitAt > MemoryStore.GROUP_MS || this.undoStack.length === 0 || !this.stepBase;
       if (newStep) this.stepBase = this.current;
       const back = makePatch(after, this.stepBase!); // från läget nu tillbaka till stegets utgångsläge
-      if (newStep) this.undoStack.push(back); else this.undoStack[this.undoStack.length - 1] = back;
+      const empty = !back.projects.length && !back.items.length && !back.dependencies.length && !back.users.length;
+      // En skrivning som inte ändrar något (t.ex. samma status igen) ger inget ångra-steg, och ett steg som blivit tomt (ändringen gjordes ogjord inom samma handling) tas bort
+      if (empty) { if (!newStep) this.undoStack.pop(); this.stepBase = newStep ? null : this.stepBase; }
+      else if (newStep) this.undoStack.push(back); else this.undoStack[this.undoStack.length - 1] = back;
       if (this.undoStack.length > MemoryStore.MAX_STEPS) this.undoStack.shift();
       this.redoStack = [];
     }

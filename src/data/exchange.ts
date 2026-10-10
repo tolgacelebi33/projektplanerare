@@ -102,6 +102,8 @@ export function parseJson(text: string): ParsedProject {
       progress: typeof x.progress === "number" ? x.progress : 0, sort_order: typeof x.sort_order === "number" ? x.sort_order : n,
       ...(x.color !== undefined ? { color: x.color as ParsedItem["color"] } : {}),
       ...(typeof x.board_rank === "number" ? { board_rank: x.board_rank } : {}),
+      ...(typeof x.series === "string" && x.series ? { series: x.series } : {}),
+      ...(typeof x.recur === "string" ? { recur: x.recur as ParsedItem["recur"] } : {}),
     };
     if (!it.id) throw new ImportError(sv.ex.itemNoId(n));
     shapeCheck(it, n);

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { canMove, deleteSubtree, descendants, epicChoices, swapWithSibling } from "../data/actions";
+import { canMove, deleteSeries, deleteSubtree, descendants, epicChoices, extendSeries, MAX_SERIES, seriesMembers, swapWithSibling } from "../data/actions";
 import { effectiveColors } from "../data/colors";
 import { GROUP_COLORS, type GroupColor } from "../data/types";
 import type { DataStore } from "../data/DataStore";
@@ -9,6 +9,7 @@ import type { Dependency, Item, Priority, Status, User } from "../data/types";
 import { friendlyError } from "../i18n/errors";
 import { sv } from "../i18n/sv";
 import { STATUS_GLYPH } from "../proto/statusUi";
+import { DatePicker } from "./DatePicker";
 
 const STATUSES: Status[] = ["not_started", "in_progress", "done", "blocked"];
 const PRIORITIES: Priority[] = ["low", "normal", "high", "urgent"];
@@ -33,6 +34,8 @@ export function ItemPanel({ store, projectId, itemId, dataVersion, autoSelectTit
   const [save, setSave] = useState<SaveState>({ kind: "idle" });
   const [fieldError, setFieldError] = useState<{ field: string; message: string } | null>(null);
   const [title, setTitle] = useState("");
+  const [extendN, setExtendN] = useState("12");
+  const [seriesAsk, setSeriesAsk] = useState<null | "later" | "all">(null);
   const [description, setDescription] = useState("");
   const [progress, setProgress] = useState("0");
   const [start, setStart] = useState("");
@@ -84,11 +87,14 @@ export function ItemPanel({ store, projectId, itemId, dataVersion, autoSelectTit
       const item = all.find((i) => i.id === itemId);
       if (!item) { setLoadError(sv.panel.errors.not_found); return; }
       setLoadError(null);
+      const switched = dataRef.current?.item.id !== itemId; // en annan post än den panelen visade senast
       const loaded = { item, all, deps, users };
       dataRef.current = loaded;
       setData(loaded);
-      // Fältet man skriver i skrivs aldrig över av en omladdning
-      const typing = (document.activeElement as HTMLElement | null)?.closest?.("aside.panel") ? (document.activeElement as HTMLElement).getAttribute("name") : null;
+      // Fältet man skriver i skrivs aldrig över av en omladdning av samma post. Vid byte av post ska fälten alltid byta text, annars kan texten från
+      // förra posten sparas på den nya när fältet lämnas.
+      const typing = !switched && (document.activeElement as HTMLElement | null)?.closest?.("aside.panel") ? (document.activeElement as HTMLElement).getAttribute("name") : null;
+      if (switched) pendingDate.current = null;
       if (typing !== "title") setTitle(item.title);
       if (typing !== "description") setDescription(item.description);
       if (typing !== "progress") setProgress(String(item.progress));
@@ -98,7 +104,8 @@ export function ItemPanel({ store, projectId, itemId, dataVersion, autoSelectTit
     } catch (e) { if (currentItem.current === itemId) setLoadError(String(e)); }
   }, [store, projectId, itemId]);
 
-  useEffect(() => { setData(null); setFieldError(null); setConfirmDelete(false); setSave({ kind: "idle" }); void load(); }, [load]);
+  useEffect(() => { setData(null); setFieldError(null); setConfirmDelete(false); setSeriesAsk(null); setSave({ kind: "idle" }); void load(); }, [load]);
+  useEffect(() => { dataRef.current = dataRef.current?.item.id === itemId ? dataRef.current : null; }, [itemId]); // aldrig data för en annan post än den som visas
   // Data ändrade utanför panelen: ladda om utan att blanka panelen
   useEffect(() => { if (dataVersion !== undefined) void load(); }, [dataVersion]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => () => { window.clearTimeout(savedTimer.current); window.clearTimeout(dateTimer.current); }, []);
@@ -122,6 +129,7 @@ export function ItemPanel({ store, projectId, itemId, dataVersion, autoSelectTit
     // ska valideras mot varandra och inte mot ett gammalt värde.
     const cur = dataRef.current ?? data;
     if (!cur) return;
+    if (cur.item.id !== itemId) return; // fältets text hör till en annan post än den som visas nu: skrivs aldrig över på den nya
     const { item } = cur;
     const changed = Object.fromEntries(Object.entries(patch).filter(([k, v]) => (item as unknown as Record<string, unknown>)[k] !== v)) as Partial<Item>;
     if (!Object.keys(changed).length) { setFieldError(null); return; }
@@ -261,16 +269,16 @@ export function ItemPanel({ store, projectId, itemId, dataVersion, autoSelectTit
             <>
               <label className="panel-field">
                 <span>{milestone ? sv.panel.date : sv.panel.start}</span>
-                <DateField name="start" value={start}
-                  onValue={(v) => { setStart(v); if (isISODate(v)) planDate("start", v, milestone); }}
-                  onCommit={(v) => { if (isISODate(v)) planDate("start", v, milestone, true); else setStart(item.start); }} />
+                <DatePicker name="start" value={start}
+                  onValue={(v) => { setStart(v); planDate("start", v, milestone); }}
+                  onCommit={(v) => { if (v) planDate("start", v, milestone, true); else setStart(item.start); }} />
               </label>
               {!milestone && (
                 <label className="panel-field">
                   <span>{sv.panel.end}</span>
-                  <DateField name="end" value={end}
-                    onValue={(v) => { setEnd(v); if (isISODate(v)) planDate("end", v, false); }}
-                    onCommit={(v) => { if (isISODate(v)) planDate("end", v, false, true); else setEnd(item.end); }} />
+                  <DatePicker name="end" value={end}
+                    onValue={(v) => { setEnd(v); planDate("end", v, false); }}
+                    onCommit={(v) => { if (v) planDate("end", v, false, true); else setEnd(item.end); }} />
                 </label>
               )}
             </>
@@ -353,6 +361,42 @@ export function ItemPanel({ store, projectId, itemId, dataVersion, autoSelectTit
             )}
           </section>
         )}
+        {item.series && item.recur && (() => {
+          const mem = seriesMembers(all, item);
+          const later = mem.filter((i) => i.start >= item.start).length;
+          const room = MAX_SERIES - mem.length;
+          return (
+            <section className="panel-section" data-section="series">
+              <h3>{sv.recur.series}</h3>
+              <p className="panel-muted">{sv.recur.info(sv.recur.kinds[item.recur], mem.length)}</p>
+              {room > 0 && (
+                <div className="panel-row">
+                  <input type="number" name="series-more" min={1} max={room} step={1} value={extendN} aria-label={sv.recur.extendCount} onChange={(e) => setExtendN(e.target.value)} style={{ width: 80 }} />
+                  <button type="button" className="mini" onClick={() => void depAction("series", async () => { await extendSeries(store, all, item, Number(extendN) || 1); })}>{sv.recur.extend}</button>
+                </div>
+              )}
+              {!seriesAsk ? (
+                <div className="panel-row">
+                  <button type="button" className="mini" onClick={() => setSeriesAsk("later")}>{sv.recur.removeLater}</button>
+                  <button type="button" className="mini" onClick={() => setSeriesAsk("all")}>{sv.recur.removeAll}</button>
+                </div>
+              ) : (
+                <div className="panel-confirm" role="alert">
+                  <p>{seriesAsk === "later" ? sv.recur.confirmLater(later) : sv.recur.confirmAll(mem.length)}</p>
+                  <div className="panel-row">
+                    <button type="button" className="mini mini-danger" onClick={() => void (async () => {
+                      const scope = seriesAsk; setSeriesAsk(null); setSave({ kind: "saving" });
+                      try { await deleteSeries(store, all, item, scope); onChanged(); onClose(); }
+                      catch (e) { setFieldError({ field: "series", message: messageFor(e) }); setSave({ kind: "idle" }); }
+                    })()}>{sv.panel.removeYes}</button>
+                    <button type="button" className="mini" onClick={() => setSeriesAsk(null)}>{sv.panel.removeCancel}</button>
+                  </div>
+                </div>
+              )}
+              {err("series")}
+            </section>
+          );
+        })()}
         <section className="panel-section panel-danger" data-section="delete">
           {!confirmDelete ? (
             <button type="button" className="mini" onClick={() => setConfirmDelete(true)}>{sv.panel.remove}</button>
@@ -390,16 +434,3 @@ function PanelHead({ onClose, kind, crumbs = [], saveState }: { onClose: () => v
 
 const messageFor = friendlyError;
 
-/** Datum som text i formen ÅÅÅÅ-MM-DD (samma på båda språken, till skillnad från webbläsarens egna datumfält som följer webbläsarens språk), med kalendern som val. */
-function DateField({ name, value, onValue, onCommit }: { name: string; value: string; onValue: (v: string) => void; onCommit: (v: string) => void }) {
-  const native = useRef<HTMLInputElement>(null);
-  return (
-    <span className="date-field">
-      <input type="text" inputMode="numeric" name={name} value={value} placeholder={sv.panel.datePlaceholder} maxLength={10} autoComplete="off"
-        onChange={(e) => onValue(e.target.value)} onBlur={(e) => onCommit(e.target.value)} />
-      <button type="button" className="date-pick" aria-label={sv.panel.pickDate} onClick={() => native.current?.showPicker?.()}>{"\u25BE"}</button>
-      <input ref={native} type="date" className="date-native" tabIndex={-1} aria-hidden="true" value={isISODate(value) ? value : ""}
-        onChange={(e) => { if (e.target.value) { onValue(e.target.value); onCommit(e.target.value); } }} />
-    </span>
-  );
-}

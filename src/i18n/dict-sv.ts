@@ -10,6 +10,7 @@ export const svDict = {
       { h: "Skapa", items: [
         "Knapparna + Uppgift, + Milstolpe och + Grupp i verktygsfältet lägger till. Uppgifter och milstolpar hamnar i den grupp du senast valde eller skapade.",
         "Skriv i fältet längst ner i listan och tryck Enter för att lägga till en uppgift snabbt.",
+        "+ Återkommande milstolpe... skapar en milstolpe som upprepas varje vecka, varannan vecka, varje månad eller var 3:e månad (till exempel för underhåll). Varje tillfälle är en egen milstolpe som du kan bocka av. Öppna en av dem för att lägga till fler tillfällen eller ta bort serien.",
         "Håll pekaren över en grupprad och klicka + för att lägga till en uppgift i just den gruppen.",
         "Dubbelklicka på en tom del av tidslinjen för att skapa en uppgift på den dagen.",
       ] },
@@ -49,6 +50,8 @@ export const svDict = {
     monthsFull: ["januari", "februari", "mars", "april", "maj", "juni", "juli", "augusti", "september", "oktober", "november", "december"],
     monthsShort: ["jan", "feb", "mar", "apr", "maj", "jun", "jul", "aug", "sep", "okt", "nov", "dec"],
     range: (a: string, b: string) => `${a} till ${b}`,
+    weekdays: ["M", "T", "O", "T", "F", "L", "S"],
+    picker: { open: "Öppna kalendern", dialog: "Välj datum", prevMonth: "Föregående månad", nextMonth: "Nästa månad", prevYear: "Föregående år", nextYear: "Nästa år", month: "Månad", year: "År", today: "Idag", hint: "Skriv ett datum, t.ex. 2026-12-31 eller 31/12/2026", invalid: "Datumet förstods inte. Skriv t.ex. 2026-12-31 eller 31/12/2026." },
   },
   newItem: { task: "Ny uppgift", milestone: "Ny milstolpe", epic: "Ny grupp" },
   persist: {
@@ -154,6 +157,15 @@ export const svDict = {
     label: "Markerade poster", count: (n: number) => `${n} markerade`, status: "Ändra status...", move: "Flytta till...", top: "Översta nivån", remove: "Ta bort...", clear: "Avmarkera",
     confirm: (n: number, inside: number) => (inside > 0 ? `Ta bort ${n} markerade poster och de ${inside} posterna under dem?` : `Ta bort ${n} markerade poster?`), confirmYes: "Ta bort", cancel: "Avbryt",
     partial: (done: number, failed: number, why: string) => `${done} ändrades, ${failed} kunde inte ändras: ${why}`,
+  },
+  recur: {
+    button: "+ Återkommande milstolpe...", dialog: "Återkommande milstolpe", name: "Titel", defaultTitle: "Underhåll", first: "Första datum", every: "Återkommer", count: "Antal tillfällen",
+    kinds: { weekly: "Varje vecka", biweekly: "Varannan vecka", monthly: "Varje månad", quarterly: "Var 3:e månad" },
+    summary: (n: number, first: string, last: string) => `${n} milstolpar, från ${first} till ${last}. Varje tillfälle är en egen milstolpe som du kan bocka av för sig.`,
+    max: (n: number) => `Högst ${n} tillfällen.`, create: "Skapa", cancel: "Avbryt", badDate: "Välj ett giltigt första datum.", emptyTitle: "Skriv en titel.",
+    series: "Återkommande", info: (kind: string, n: number) => `${kind}. ${n} tillfällen i serien.`, extend: "Lägg till fler", extendCount: "Antal att lägga till",
+    removeLater: "Ta bort detta och senare...", removeAll: "Ta bort hela serien...", confirmLater: (n: number) => `Ta bort ${n} milstolpar (den här och alla senare)?`, confirmAll: (n: number) => `Ta bort alla ${n} milstolpar i serien?`,
+    done: (n: number) => `Skapade ${n} milstolpar.`,
   },
   quick: { label: "Lägg till uppgift", placeholder: "Lägg till uppgift...  (Enter)" },
   today: "Idag",

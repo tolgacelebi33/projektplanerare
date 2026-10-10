@@ -74,6 +74,7 @@ export function BoardView({ items, allItems, users, colors, openId, selected, on
                   {path(i) && <div className="board-path">{path(i)}</div>}
                   <div className="board-meta">
                     <span>{i.type === "milestone" ? i.end : `${i.start} – ${i.end}`}</span>
+                    {i.series && i.recur && <span className="board-series" title={sv.recur.series}>{"\u21BB"} {sv.recur.kinds[i.recur]}</span>}
                     {isOverdue(i, today) && <span className="board-over">{sv.overdue}</span>}
                     {i.priority !== "normal" && <span>{sv.panel.priorities[i.priority]}</span>}
                     {who && <span>{who}</span>}

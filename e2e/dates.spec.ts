@@ -1,25 +1,71 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 import { openApp } from "./helpers";
 
-test("DT datumfälten visar ÅÅÅÅ-MM-DD på båda språken, ogiltig text ställs tillbaka, och kalendern sätter datum", async ({ page, browser }) => {
+const endOf = (page: Page, id: string) => page.evaluate(async (i) => (await (window as any).__store.listItems("proj_1")).find((x: any) => x.id === i).end, id);
+
+test.beforeEach(async ({ page }) => {
   await page.setViewportSize({ width: 1500, height: 850 });
   await openApp(page, "dhtmlx");
   await page.locator('.gantt_row[data-task-id="i7"] .grid-title').click();
+});
+
+test("DT1 datum går att skriva i flera former och skrivs om till ÅÅÅÅ-MM-DD, ogiltigt ger ett meddelande och ställs tillbaka", async ({ page }) => {
   const end = page.locator('aside.panel input[name="end"]');
-  await expect(end).toHaveValue(/^\d{4}-\d{2}-\d{2}$/);
   await expect(end).toHaveAttribute("placeholder", "ÅÅÅÅ-MM-DD");
   const saved = await end.inputValue();
-  await end.fill("2026-3-1x"); await end.blur();
-  await expect(end).toHaveValue(saved); // ogiltigt: tillbaka till sparat
-  await end.fill("2026-04-30"); await end.blur();
-  await expect.poll(async () => (await page.evaluate(() => (window as any).__store.listItems("proj_1"))).find((i: any) => i.id === "i7").end).toBe("2026-04-30");
+  await end.fill("30/4/2026"); await end.blur();
+  await expect(end).toHaveValue("2026-04-30");
+  await expect.poll(() => endOf(page, "i7")).toBe("2026-04-30");
+  await end.fill("5.5.2026"); await end.blur();
+  await expect.poll(() => endOf(page, "i7")).toBe("2026-05-05");
+  await end.fill("20260512"); await end.press("Enter");
+  await expect.poll(() => endOf(page, "i7")).toBe("2026-05-12");
+  await end.fill("32/13/2026"); await end.blur();
+  await expect(page.getByRole("alert").filter({ hasText: "Datumet förstods inte" })).toBeVisible();
+  await expect(end).toHaveValue("2026-05-12");
+  expect(saved).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+});
+
+test("DT2 kalendern: bläddra månad och år, välj en dag, och Idag", async ({ page }) => {
+  await page.locator('aside.panel .datepick').nth(1).getByRole("button", { name: "Öppna kalendern" }).click();
+  const pop = page.getByRole("dialog", { name: "Välj datum" });
+  await expect(pop).toBeVisible();
+  await pop.getByLabel("År", { exact: true }).selectOption("2028");
+  await pop.getByLabel("Månad", { exact: true }).selectOption("2"); // februari
+  await expect(pop.locator('[data-date="2028-02-29"]')).toBeVisible(); // skottår
+  await pop.getByRole("button", { name: "Föregående år" }).click();
+  await pop.getByRole("button", { name: "Nästa månad" }).click();
+  await expect(pop.getByLabel("Månad", { exact: true })).toHaveValue("3");
+  await expect(pop.getByLabel("År", { exact: true })).toHaveValue("2027");
+  await pop.locator('[data-date="2027-03-15"]').click();
+  await expect(pop).toHaveCount(0);
+  await expect(page.locator('aside.panel input[name="end"]')).toHaveValue("2027-03-15");
+  await expect.poll(() => endOf(page, "i7")).toBe("2027-03-15");
+});
+
+test("DT3 kalendern går att styra med tangentbordet: pilar, PageDown, Enter och Esc", async ({ page }) => {
+  const end = page.locator('aside.panel input[name="end"]');
+  await end.fill("2026-03-31"); await end.blur();
+  await page.locator('aside.panel .datepick').nth(1).getByRole("button", { name: "Öppna kalendern" }).click();
+  const pop = page.getByRole("dialog", { name: "Välj datum" });
+  await expect(pop.locator('[data-date="2026-03-31"]')).toBeFocused();
+  await page.keyboard.press("ArrowRight"); await expect(pop.locator('[data-date="2026-04-01"]')).toBeFocused();
+  await page.keyboard.press("ArrowDown"); await expect(pop.locator('[data-date="2026-04-08"]')).toBeFocused();
+  await page.keyboard.press("PageDown"); await expect(pop.locator('[data-date="2026-05-08"]')).toBeFocused();
+  await page.keyboard.press("Shift+PageUp"); await expect(pop.locator('[data-date="2025-05-08"]')).toBeFocused();
+  await page.keyboard.press("Escape");
+  await expect(pop).toHaveCount(0);
+  await expect(end).toHaveValue("2026-03-31"); // Esc ändrar inget
+  await expect(page.locator("aside.panel")).toBeVisible(); // och stänger inte panelen
+  await page.locator('aside.panel .datepick').nth(1).getByRole("button", { name: "Öppna kalendern" }).click();
+  await page.keyboard.press("ArrowLeft"); await page.keyboard.press("Enter");
+  await expect(end).toHaveValue("2026-03-30");
+});
+
+test("DT4 samma format och placeholder på engelska", async ({ page }) => {
   await page.getByRole("group", { name: "Språk" }).getByRole("button", { name: "English" }).click();
   await page.locator('.gantt_row[data-task-id="i7"] .grid-title').click();
-  const end2 = page.locator('aside.panel input[name="end"]');
-  await expect(end2).toHaveValue("2026-04-30");
-  await expect(end2).toHaveAttribute("placeholder", "YYYY-MM-DD");
-  // Kalendern: det dolda datumfältet sätter samma värde
-  await page.locator('aside.panel input[type="date"]').nth(1).evaluate((el: HTMLInputElement) => { const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!; set.call(el, "2026-05-04"); el.dispatchEvent(new Event("input", { bubbles: true })); el.dispatchEvent(new Event("change", { bubbles: true })); });
-  await expect.poll(async () => (await page.evaluate(() => (window as any).__store.listItems("proj_1"))).find((i: any) => i.id === "i7").end).toBe("2026-05-04");
-  void browser;
+  await expect(page.locator('aside.panel input[name="end"]')).toHaveAttribute("placeholder", "YYYY-MM-DD");
+  await page.locator('aside.panel .datepick').nth(1).getByRole("button", { name: "Open the calendar" }).click();
+  await expect(page.getByRole("dialog", { name: "Pick a date" })).toBeVisible();
 });

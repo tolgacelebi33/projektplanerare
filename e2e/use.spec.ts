@@ -175,7 +175,7 @@ test.describe("projekt", () => {
     // Tillbaka till exempelprojektet: dess poster är orörda och panelen stängd
     await bar.getByRole("combobox", { name: "Projekt" }).selectOption("proj_1");
     await expect(panel(page)).toHaveCount(0);
-    await expect(page.locator(".gantt_row")).toHaveCount(20);
+    await expect.poll(() => page.evaluate(() => { let n = 0; (window as any).__dhx?.eachTask(() => { n++; }); return n; })).toBe(20); // bibliotekets modell: DOM har bara de rader som ryms i fönstret
     // Byt namn
     await bar.getByRole("button", { name: "Byt namn" }).click();
     await bar.getByRole("textbox").fill("Webbplats"); await bar.getByRole("textbox").press("Enter");
@@ -203,7 +203,7 @@ test.describe("sparande i webbläsaren (utan ?fixture)", () => {
   test("U11 exempelprojektet finns första gången, och ändringar, nya poster och projekt överlever omladdning", async ({ page }) => {
     await page.goto(url); await page.waitForSelector(".gantt_task_line");
     await expect(page.locator(".lib-tag")).toHaveText("Sparas i den här webbläsaren");
-    await expect(page.locator(".gantt_row")).toHaveCount(20);
+    await expect.poll(() => page.evaluate(() => { let n = 0; (window as any).__dhx?.eachTask(() => { n++; }); return n; })).toBe(20); // bibliotekets modell: DOM har bara de rader som ryms i fönstret
     await page.locator(SEL.dhtmlx.bar("i7")).click();
     await panel(page).locator('select[name="status"]').selectOption("done");
     const t = panel(page).locator('input[name="title"]'); await t.fill("Färg och typografi (klart)"); await t.press("Enter");
@@ -229,7 +229,7 @@ test.describe("sparande i webbläsaren (utan ?fixture)", () => {
     await page.goto(url); await page.waitForSelector(".gantt_task_line");
     await expect(page.getByRole("alert").first()).toContainText("Sparad data var skadad");
     expect(await page.evaluate(() => localStorage.getItem("projektplanerare.data.v1.backup"))).toBe("{trasig");
-    await expect(page.locator(".gantt_row")).toHaveCount(20); // exempeldata i stället
+    await expect.poll(() => page.evaluate(() => { let n = 0; (window as any).__dhx?.eachTask(() => { n++; }); return n; })).toBe(20); // bibliotekets modell: DOM har bara de rader som ryms i fönstret // exempeldata i stället
   });
 
   test("U13 misslyckad sparning visas för användaren", async ({ page }) => {

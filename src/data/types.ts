@@ -37,6 +37,10 @@ export interface Item {
   color?: GroupColor | "none" | null;
   /** Plats i kolumnen i boardvyn (lägre först). Saknas: efter de med plats, i listans ordning. */
   board_rank?: number | null;
+  /** Gemensamt id för posterna i en återkommande serie (en milstolpe som upprepas). Varje tillfälle är en egen post som kan göras klar för sig. */
+  series?: string | null;
+  /** Hur ofta serien upprepas. Samma på alla poster i serien. */
+  recur?: Recurrence | null;
   sort_order: number;
 }
 
@@ -55,3 +59,6 @@ export interface Fixture {
   dependencies: Dependency[];
   users: User[];
 }
+
+export const RECURRENCES = ["weekly", "biweekly", "monthly", "quarterly"] as const;
+export type Recurrence = (typeof RECURRENCES)[number];

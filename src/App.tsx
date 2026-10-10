@@ -2,8 +2,9 @@ import { Suspense, lazy, useEffect, useMemo, useRef, useState } from "react";
 import { downloadText } from "./download";
 import { MAX_IMPORT_BYTES, ImportError, parseUpload } from "./data/exchange";
 import { duplicateProject, exportProject, importParsed, type ExportFormat, type ImportResult } from "./data/importExport";
-import { bulkDelete, bulkMove, bulkStatus, canMove, deleteSubtree, descendants, epicChoices, filterActive, filterView, moveTargets, newItemDraft, planBoardDrop, planMove, rangeIds, selectionRoots, swapWithSibling, type BulkResult } from "./data/actions";
+import { bulkDelete, bulkMove, bulkStatus, canMove, createSeries, deleteSubtree, descendants, epicChoices, filterActive, filterView, moveTargets, newItemDraft, planBoardDrop, planMove, rangeIds, selectionRoots, swapWithSibling, type BulkResult } from "./data/actions";
 import { BulkBar } from "./views/BulkBar";
+import { RecurringDialog } from "./views/RecurringDialog";
 import { friendlyError } from "./i18n/errors";
 import { ContextMenu, type MenuItem } from "./views/ContextMenu";
 import { QuickAdd } from "./views/QuickAdd";
@@ -162,6 +163,21 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
       return created.id;
     } catch (e) { setWriteError(friendlyError(e)); throw e; }
   };
+  const [recurOpen, setRecurOpen] = useState(false);
+  /** Skapar en återkommande milstolpe (en serie) i den aktiva gruppen, som övriga nya poster. */
+  const addSeries = async (a: { title: string; first: ISODate; kind: import("./data/types").Recurrence; count: number }) => {
+    if (!projects.projectId || state.kind !== "ready") return;
+    setRecurOpen(false);
+    try {
+      const anchor = editId ?? activeGroup;
+      const selected = anchor ? state.items.find((i) => i.id === anchor) ?? null : null;
+      const draft = newItemDraft("milestone", state.items, selected, { projectId: projects.projectId, workspaceId }, todayISO(), a.first);
+      const made = await createSeries(store, draft, a.kind, a.count, a.title);
+      await refresh();
+      if (made[0]) setReveal(made[0].id);
+      setWriteError(sv.recur.done(made.length));
+    } catch (e) { setWriteError(friendlyError(e)); reload(); }
+  };
   /** Klar eller inte klar direkt i raden: klar blir ej påbörjad igen, allt annat blir klar. */
   const toggleDone = async (id: string) => {
     if (state.kind !== "ready") return;
@@ -212,7 +228,7 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
         return;
       }
       if (e.metaKey || e.ctrlKey || typing || state.kind !== "ready" || !projects.projectId) return;
-      if (menu || t?.closest("[role=dialog], [role=menu], aside.panel")) return; // en öppen meny äger tangenterna även innan den hunnit ta fokus
+      if (menu || recurOpen || t?.closest("[role=dialog], [role=menu], aside.panel")) return; // en öppen meny äger tangenterna även innan den hunnit ta fokus
       if (e.key === "Escape" && selected.size) { e.preventDefault(); selAnchor.current = null; setSelected(new Set()); return; }
       // Alt+pil upp eller ner: flytta den valda raden i sin grupp
       if (e.altKey) {
@@ -433,6 +449,7 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
           {(["task", "milestone", "epic"] as ItemType[]).map((k) => (
             <button key={k} type="button" className="mini" disabled={!projects.projectId || state.kind !== "ready"} onClick={() => void addItem(k, k === "epic" ? { anchorId: null } : {}).catch(() => undefined)}>+ {sv.add[k]}</button>
           ))}
+          <button type="button" className="mini" disabled={!projects.projectId || state.kind !== "ready"} onClick={() => setRecurOpen(true)}>{sv.recur.button}</button>
         </div>
         <span className="toolbar-sep" aria-hidden="true" />
         <div className="add-group" role="group" aria-label={sv.history.label}>
@@ -501,6 +518,7 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
           onClose={() => setEditId(null)} onChanged={() => void refresh()} onOpen={setEditId} />
       )}
       </div>
+      {recurOpen && <RecurringDialog today={todayISO()} onCreate={(a) => void addSeries(a)} onClose={() => setRecurOpen(false)} />}
       {menu && <ContextMenu x={menu.x} y={menu.y} items={menuItems} confirm={confirmRemove} onPick={(id) => void pickMenu(id)} onClose={() => setMenu(null)} />}
     </div>
   );
