@@ -440,3 +440,5 @@ body[data-overlay] .gantt_tooltip { display: none !important; }
 .dhx-host .gantt_row.has-series .grid-title::after { content: " \21BB"; color: var(--text-muted); }
 .board-series { white-space: nowrap; }
 .mini-primary { background: var(--text); color: var(--surface); border-color: var(--text); }
+.board-card { -webkit-touch-callout: none; user-select: none; }
+.board-ghost { position: fixed; z-index: 80; pointer-events: none; max-width: 220px; padding: 6px 10px; background: var(--text); color: var(--surface); border-radius: var(--radius-pill); font-size: 13px; font-weight: var(--weight-strong); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3); }

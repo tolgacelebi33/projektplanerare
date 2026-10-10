@@ -40,7 +40,10 @@ export class PersistentStore extends MemoryStore {
   private saving = false;
   private pending: Promise<void> = Promise.resolve();
 
-  constructor(seed: Fixture, private getBackend: () => Promise<Backend> | Backend, private legacy: Legacy | null = null) {
+  private timer: ReturnType<typeof setTimeout> | null = null;
+
+  /** `saveDelayMs`: väntan innan ändringar sparas, så att många skrivningar i följd (import, flerval) blir en sparning i stället för hundratals (varje sparning skriver hela projektet). */
+  constructor(seed: Fixture, private getBackend: () => Promise<Backend> | Backend, private legacy: Legacy | null = null, private saveDelayMs = 300) {
     super(seed);
     this.ready = this.init();
   }
@@ -151,7 +154,13 @@ export class PersistentStore extends MemoryStore {
   protected override afterWrite(): void {
     if (!this.loaded || this.readOnly) return;
     this.dirty = true;
-    if (this.saving) return; // en sparning pågår: den tar det senaste läget när den är klar
+    if (this.saving || this.timer) return; // en sparning pågår eller är på väg: den tar det senaste läget
+    if (this.saveDelayMs > 0) { this.timer = setTimeout(() => { this.timer = null; this.startSave(); }, this.saveDelayMs); return; }
+    this.startSave();
+  }
+
+  private startSave(): void {
+    if (this.saving || !this.dirty) return;
     this.saving = true;
     this.pending = (async () => {
       try {
@@ -174,7 +183,10 @@ export class PersistentStore extends MemoryStore {
   }
 
   /** Väntar tills allt som ändrats är sparat. */
-  flush(): Promise<void> { return this.pending; }
+  flush(): Promise<void> {
+    if (this.timer) { clearTimeout(this.timer); this.timer = null; this.startSave(); }
+    return this.pending;
+  }
 }
 
 export { LocalStorageBackend };

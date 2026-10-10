@@ -262,3 +262,35 @@ describe("hierarki och projekt", () => {
     expect(await s.listDependencies("proj_1")).toEqual([]);
   });
 });
+
+describe("sparningar samlas", () => {
+  it("många skrivningar i följd blir få sparningar, och allt är sparat efter flush", async () => {
+    const be = new MemoryBackend();
+    const s = await open(be);
+    await s.flush();
+    const before = be.saves;
+    for (let i = 0; i < 300; i++) await s.createItem(base({ title: `Post ${i}`, sort_order: 1000 + i }));
+    await s.flush();
+    expect(be.saves - before).toBeLessThanOrEqual(3);
+    expect(((be.data as { snapshot: { items: unknown[] } }).snapshot.items).length).toBe(20 + 300);
+  });
+  it("en ändring som väntar på att sparas finns i reservkopian när sidan stängs, och sparas ändå", async () => {
+    const be = new MemoryBackend();
+    const s = await open(be);
+    await s.flush();
+    await s.createItem(base({ title: "Väntar" }));
+    expect(((be.data as { snapshot: { items: { title: string }[] } }).snapshot.items).some((i) => i.title === "Väntar")).toBe(false); // ännu inte sparad: sparningen väntar en stund
+    s.rescueSync();
+    expect(JSON.stringify(be.rescue)).toContain("Väntar");
+    await s.flush();
+    expect(JSON.stringify(be.data)).toContain("Väntar");
+  });
+  it("ingen väntan när fördröjningen är 0", async () => {
+    const be = new MemoryBackend();
+    const s = new PersistentStore(smallFixture(), () => be, null, 0);
+    await s.ready; await s.flush();
+    await s.createItem(base({ title: "Direkt" }));
+    await s.flush();
+    expect(JSON.stringify(be.data)).toContain("Direkt");
+  });
+});

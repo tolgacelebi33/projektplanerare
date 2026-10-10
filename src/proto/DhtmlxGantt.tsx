@@ -227,6 +227,9 @@ export function DhtmlxGantt({ store, items, deps, zoom, onError, onPersisted, re
     const cellClass = (d: Date) => `${weekend(d)} ${isToday(d) ? "wk-today" : ""}`.trim();
     gantt.templates.timeline_cell_class = (_t, d) => cellClass(d);
     gantt.templates.scale_cell_class = (d) => cellClass(d);
+    // Biblioteket slår på pekläget bara på enheter med mobil användaragent. En platta eller dator med enbart pekskärm ska också kunna dras med finger.
+    // Pekläget stänger av tooltips vid hovring, så en dator som också har mus eller pekplatta (finns det en "fine" pekare) behåller det vanliga läget.
+    if (window.matchMedia?.("(any-pointer: coarse)").matches && !window.matchMedia("(any-pointer: fine)").matches) gantt.config.touch = "force" as never;
     gantt.init(host.current!);
     scrollCarry.read = () => gantt.getScrollState();
     void document.fonts.ready.then(() => gantt.render()); // textmåtten beror på att typsnittet är laddat
@@ -460,7 +463,10 @@ export function DhtmlxGantt({ store, items, deps, zoom, onError, onPersisted, re
   useEffect(() => {
     if (!collapse || collapse.n === collapseSeen.current) return;
     collapseSeen.current = collapse.n;
-    gantt.eachTask((t) => { if (gantt.hasChild(t.id)) { if (collapse.open) gantt.open(t.id); else gantt.close(t.id); openState.current.set(String(t.id), collapse.open); } });
+    // En enda ritning i stället för en per grupp: med tusentals poster var varje öppna eller stäng en egen omritning
+    gantt.silent(() => {
+      gantt.eachTask((t) => { if (gantt.hasChild(t.id)) { t.$open = collapse.open; openState.current.set(String(t.id), collapse.open); } });
+    });
     gantt.render();
   }, [collapse]);
 

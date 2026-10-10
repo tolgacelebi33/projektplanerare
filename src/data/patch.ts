@@ -15,7 +15,7 @@ export interface Patch {
 
 // Poster i lagret byts ut och ändras aldrig på plats, så texten för en post kan sparas per objekt. Annars blir varje skrivning en omskrivning av hela projektet.
 const text = new WeakMap<object, string>();
-const json = (x: object) => { let s = text.get(x); if (s === undefined) { s = JSON.stringify(x); text.set(x, s); } return s; };
+export const json = (x: object) => { let s = text.get(x); if (s === undefined) { s = JSON.stringify(x); text.set(x, s); } return s; };
 
 function diffList<T extends { id: string }>(from: T[], to: T[]): Entry<T>[] {
   const before = new Map(from.map((x) => [x.id, json(x)]));

@@ -91,8 +91,8 @@ export function derivedSpan(children: Item[]): { start: string; end: string } | 
   if (!children.length) return null;
   let start = children[0].start, end = children[0].end;
   for (const c of children) {
-    if (dayNumber(c.start) < dayNumber(start)) start = c.start;
-    if (dayNumber(c.end) > dayNumber(end)) end = c.end;
+    if (c.start < start) start = c.start; // datum som ÅÅÅÅ-MM-DD sorteras rätt som text, och det går mycket fortare än att räkna om varje datum
+    if (c.end > end) end = c.end;
   }
   return { start, end };
 }

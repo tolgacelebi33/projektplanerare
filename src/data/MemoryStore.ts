@@ -1,7 +1,7 @@
 import type { DataStore } from "./DataStore";
 import { RuleError, rederiveEpics, shiftSuccessors, validateDependency, validateItemShape, validateParent } from "./rules";
 import { addDays } from "./dates";
-import { applyPatch, isPatchList, makePatch, type Patch } from "./patch";
+import { applyPatch, isPatchList, json, makePatch, type Entry, type Patch } from "./patch";
 import type { Dependency, DependencyMode, Fixture, Item, Project, User } from "./types";
 
 /** Allt lagret håller, för att kunna sparas och återställas. */
@@ -15,10 +15,21 @@ export interface MemoryStoreOptions {
   failOnCall?: (n: number, method: string) => boolean;
 }
 
+/** En Map som anmäler varje ändring (med det gamla värdet) innan den görs, så att ångra-historiken bara behöver titta på det som ändrats. */
+class TrackedMap<V> extends Map<string, V> {
+  onTouch: (key: string, old: V | undefined) => void = () => {};
+  override set(k: string, v: V) { this.onTouch(k, super.get(k)); return super.set(k, v); }
+  override delete(k: string) { if (super.has(k)) this.onTouch(k, super.get(k)); return super.delete(k); }
+  override clear() { for (const [k, v] of this) this.onTouch(k, v); super.clear(); }
+}
+type Kind = "projects" | "items" | "deps";
+const KINDS: Kind[] = ["projects", "items", "deps"];
+
 export class MemoryStore implements DataStore {
-  protected projects = new Map<string, Project>();
-  protected items = new Map<string, Item>();
-  protected deps = new Map<string, Dependency>();
+  private suppress = true; // ändringar under uppbyggnad och inläsning ger ingen historik
+  protected projects = this.track<Project>("projects");
+  protected items = this.track<Item>("items");
+  protected deps = this.track<Dependency>("deps");
   protected users: User[] = [];
   protected seq = 0;
   private calls = 0;
@@ -32,7 +43,13 @@ export class MemoryStore implements DataStore {
       fixture.dependencies.forEach((d) => this.deps.set(d.id, { ...d }));
       this.users = fixture.users.map((u) => ({ ...u }));
     }
-    this.current = this.snapshot();
+    this.suppress = false;
+  }
+
+  private track<V>(kind: Kind): TrackedMap<V> {
+    const m = new TrackedMap<V>();
+    m.onTouch = (key, old) => this.touch(kind, key, old);
+    return m;
   }
 
   private async tick(method: string): Promise<void> {
@@ -61,39 +78,79 @@ export class MemoryStore implements DataStore {
   // Ångra och gör om. Varje skrivning sparar en ändringspost (bara det som skilde, se patch.ts) tillbaka till läget före den. Skrivningar som
   // kommer tätt efter varandra (en handling i UI kan bli flera anrop, t.ex. skapa + döpa om, eller ta bort ett helt innehåll) räknas som ett steg.
   // Projekt skapas och tas bort utan att kunna ångras: historiken nollställs då, så att ett steg aldrig pekar på ett projekt som UI inte känner till.
-  private current: Snapshot | null = null;
+  // Posterna som ändras anmäls av `TrackedMap` med sitt gamla värde, så en skrivning kostar tid i förhållande till det som ändrades, inte till projektets storlek.
   private undoStack: Patch[] = [];
   private redoStack: Patch[] = [];
   private lastCommitAt = 0;
-  private stepBase: Snapshot | null = null;
   private listeners = new Set<() => void>();
+  /** Det öppna stegets utgångsläge: postens värde före första ändringen i steget (undefined = fanns inte), och posternas ordning vid stegets start. */
+  private stepOld: Record<Kind, Map<string, unknown>> = { projects: new Map(), items: new Map(), deps: new Map() };
+  private stepKeys: Record<Kind, string[]> | null = null;
+  private stepIndex: Partial<Record<Kind, Map<string, number>>> = {};
+  private stepOpen = false;
+  private stepPushed = false;
+  private touched = false;
   static readonly GROUP_MS = 250;
   static readonly MAX_STEPS = 100;
 
+  private closeStep() { this.stepOpen = false; this.stepPushed = false; this.touched = false; this.stepKeys = null; this.stepIndex = {}; this.stepOld = { projects: new Map(), items: new Map(), deps: new Map() }; }
+
+  private touch(kind: Kind, key: string, old: unknown): void {
+    if (this.suppress) return;
+    if (!this.touched) { // första ändringen sedan senaste skrivningen: hör den till samma steg eller börjar ett nytt?
+      this.touched = true;
+      const continuing = this.stepOpen && this.stepPushed && this.undoStack.length > 0 && performance.now() - this.lastCommitAt <= MemoryStore.GROUP_MS;
+      if (!continuing) {
+        this.stepOld = { projects: new Map(), items: new Map(), deps: new Map() };
+        this.stepKeys = { projects: [...this.projects.keys()], items: [...this.items.keys()], deps: [...this.deps.keys()] };
+        this.stepIndex = {};
+        this.stepOpen = true; this.stepPushed = false;
+      }
+    }
+    if (!this.stepOld[kind].has(key)) this.stepOld[kind].set(key, old);
+  }
+
+  /** Ändringsposten från läget nu tillbaka till stegets utgångsläge. */
+  private stepPatch(): Patch {
+    const maps: Record<Kind, Map<string, { id: string }>> = { projects: this.projects as never, items: this.items as never, deps: this.deps as never };
+    const out: Record<Kind, Entry<never>[]> = { projects: [], items: [], deps: [] };
+    for (const kind of KINDS) {
+      const readd: { e: Entry<never>; at: number }[] = [];
+      for (const [id, prev] of this.stepOld[kind] as Map<string, { id: string } | undefined>) {
+        const cur = maps[kind].get(id);
+        if (prev === undefined) { if (cur !== undefined) out[kind].push([id, null]); }
+        else if (cur === undefined) {
+          const idx = (this.stepIndex[kind] ??= new Map(this.stepKeys![kind].map((k, i) => [k, i] as const)));
+          readd.push({ e: [id, { ...prev } as never, idx.get(id)], at: idx.get(id) ?? Infinity });
+        } else if (json(prev) !== json(cur)) out[kind].push([id, { ...prev } as never]);
+      }
+      readd.sort((a, b) => a.at - b.at); // poster som ska tillbaka läggs in i ordning, så att varje plats stämmer
+      out[kind].unshift(...readd.map((r) => r.e));
+    }
+    return { projects: out.projects, items: out.items, dependencies: out.deps, users: [] };
+  }
+
   private commit(resetHistory = false): void {
     const now = performance.now();
-    const after = this.snapshot();
-    if (resetHistory) { this.undoStack = []; this.redoStack = []; }
-    else if (this.current) {
-      // Nytt steg: utgångsläget är läget före skrivningen. Tätt följande skrivningar hör till samma steg och räknas mot samma utgångsläge,
-      // så att ordningen av återställda poster blir exakt som den var.
-      const newStep = now - this.lastCommitAt > MemoryStore.GROUP_MS || this.undoStack.length === 0 || !this.stepBase;
-      if (newStep) this.stepBase = this.current;
-      const back = makePatch(after, this.stepBase!); // från läget nu tillbaka till stegets utgångsläge
-      const empty = !back.projects.length && !back.items.length && !back.dependencies.length && !back.users.length;
+    if (resetHistory) { this.undoStack = []; this.redoStack = []; this.closeStep(); }
+    else if (this.touched) {
+      const back = this.stepPatch();
+      const empty = !back.projects.length && !back.items.length && !back.dependencies.length;
       // En skrivning som inte ändrar något (t.ex. samma status igen) ger inget ångra-steg, och ett steg som blivit tomt (ändringen gjordes ogjord inom samma handling) tas bort
-      if (empty) { if (!newStep) this.undoStack.pop(); this.stepBase = newStep ? null : this.stepBase; }
-      else if (newStep) this.undoStack.push(back); else this.undoStack[this.undoStack.length - 1] = back;
-      if (this.undoStack.length > MemoryStore.MAX_STEPS) this.undoStack.shift();
-      this.redoStack = [];
+      if (empty) { if (this.stepPushed) this.undoStack.pop(); this.closeStep(); }
+      else {
+        if (this.stepPushed) this.undoStack[this.undoStack.length - 1] = back; else { this.undoStack.push(back); this.stepPushed = true; }
+        if (this.undoStack.length > MemoryStore.MAX_STEPS) this.undoStack.shift();
+        this.redoStack = [];
+        this.touched = false;
+      }
     }
     this.lastCommitAt = now;
-    this.current = after;
     this.afterWrite();
     this.listeners.forEach((l) => l());
   }
   /** Nollställer historiken (efter en import, som annars skulle ångras post för post). */
-  clearHistory(): void { this.undoStack = []; this.redoStack = []; this.stepBase = null; this.afterWrite(); this.listeners.forEach((l) => l()); }
+  clearHistory(): void { this.undoStack = []; this.redoStack = []; this.closeStep(); this.afterWrite(); this.listeners.forEach((l) => l()); }
   /** Historiken som data, för att sparas tillsammans med innehållet. */
   getHistory(): { undo: Patch[]; redo: Patch[] } { return { undo: this.undoStack, redo: this.redoStack }; }
   /** Läser tillbaka en sparad historik. Ogiltig form ignoreras (ingen historik). */
@@ -109,14 +166,14 @@ export class MemoryStore implements DataStore {
 
   private async travel(from: Patch[], to: Patch[]): Promise<boolean> {
     const patch = from.pop();
-    if (!patch || !this.current) return false;
-    const target = applyPatch(this.current, patch);
-    to.push(makePatch(target, this.current)); // från målläget tillbaka till nuläget, för att kunna gå åt andra hållet
+    if (!patch) return false;
+    const now = this.snapshot();
+    const target = applyPatch(now, patch);
+    to.push(makePatch(target, now)); // från målläget tillbaka till nuläget, för att kunna gå åt andra hållet
     const seq = this.seq;
     this.restore(target);
     this.seq = Math.max(seq, target.seq); // id återanvänds aldrig
-    this.current = this.snapshot();
-    this.lastCommitAt = 0; this.stepBase = null;
+    this.lastCommitAt = 0; this.closeStep();
     this.afterWrite();
     this.listeners.forEach((l) => l());
     return true;
@@ -136,12 +193,14 @@ export class MemoryStore implements DataStore {
   }
 
   restore(snap: Snapshot): void {
-    this.projects = new Map(snap.projects.map((p) => [p.id, { ...p }]));
-    this.items = new Map(snap.items.map((i) => [i.id, { ...i }]));
-    this.deps = new Map(snap.dependencies.map((d) => [d.id, { ...d }]));
+    this.suppress = true;
+    this.projects = this.track<Project>("projects"); snap.projects.forEach((p) => this.projects.set(p.id, { ...p }));
+    this.items = this.track<Item>("items"); snap.items.forEach((i) => this.items.set(i.id, { ...i }));
+    this.deps = this.track<Dependency>("deps"); snap.dependencies.forEach((d) => this.deps.set(d.id, { ...d }));
     this.users = snap.users.map((u) => ({ ...u }));
     this.seq = snap.seq;
-    this.current = this.snapshot();
+    this.suppress = false;
+    this.closeStep();
   }
 
   private checkAssignee(item: Item) {

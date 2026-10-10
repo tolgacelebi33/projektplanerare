@@ -8,7 +8,7 @@ function rng(seed: number) { return () => { seed |= 0; seed = (seed + 0x6d2b79f5
 const state = async (s: MemoryStore) => JSON.stringify((await s.listItems("proj_1")).sort((a, b) => a.id.localeCompare(b.id)));
 
 describe("ångra och gör om är exakta efter slumpade skrivningar", () => {
-  for (const seed of Array.from({ length: 40 }, (_, i) => i + 1)) {
+  for (const seed of Array.from({ length: 60 }, (_, i) => i + 1)) {
     it(`frö ${seed}`, async () => {
       let clock = 0;
       const spy = vi.spyOn(performance, "now").mockImplementation(() => clock); // tiden står still inom en handling (flera skrivningar = ett steg) och hoppar mellan handlingar
@@ -17,18 +17,20 @@ describe("ångra och gör om är exakta efter slumpade skrivningar", () => {
         const states = [await state(s)];
         for (let n = 0; n < 60; n++) {
           clock += 400;
+          for (let rep = 0, reps = 1 + Math.floor(rand() * 4); rep < reps; rep++) { // flera skrivningar i samma handling (ett steg), inklusive skapa och ta bort
           const items = await s.listItems("proj_1");
           const pick = items[Math.floor(rand() * items.length)];
           const r = rand();
           try {
             if (r < 0.3) await s.updateItem(pick.id, { title: `T${seed}-${n}` });
             else if (r < 0.5) await s.updateItem(pick.id, { status: (["not_started", "in_progress", "done", "blocked"] as const)[Math.floor(rand() * 4)] });
-            else if (r < 0.75) {
+            else if (r < 0.6) {
               const target = items.filter((i) => i.type === "epic" && i.id !== pick.id)[Math.floor(rand() * 5)];
               for (const u of planMove(items, pick.id, target ? target.id : null, [])) await s.updateItem(u.id, u.patch);
-            } else if (r < 0.9) await s.createItem({ workspace_id: pick.workspace_id, project_id: "proj_1", parent_id: pick.type === "epic" ? pick.id : pick.parent_id, type: "task", title: `Ny ${n}`, start: "2026-05-01", end: "2026-05-02", status: "not_started", assignee_id: null, description: "", priority: "normal", progress: 0, sort_order: 1000 + n });
+            } else if (r < 0.78) await s.createItem({ workspace_id: pick.workspace_id, project_id: "proj_1", parent_id: pick.type === "epic" ? pick.id : pick.parent_id, type: "task", title: `Ny ${n}`, start: "2026-05-01", end: "2026-05-02", status: "not_started", assignee_id: null, description: "", priority: "normal", progress: 0, sort_order: 1000 + n });
             else if (!items.some((i) => i.parent_id === pick.id)) await s.deleteItem(pick.id);
           } catch { /* regelbrott avvisas: ingen ändring */ }
+          }
           const st = await state(s);
           if (st !== states.at(-1)) states.push(st);
         }
