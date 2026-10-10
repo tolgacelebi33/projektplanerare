@@ -173,7 +173,8 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
         return;
       }
       if (e.metaKey || e.ctrlKey || typing || state.kind !== "ready" || !projects.projectId) return;
-      if (t?.closest("[role=dialog], [role=menu], aside.panel")) return; // inne i en ruta, meny eller panel hör tangenterna dit
+      if (menu || t?.closest("[role=dialog], [role=menu], aside.panel")) return; // en öppen meny äger tangenterna även innan den hunnit ta fokus
+      if (false) return; // inne i en ruta, meny eller panel hör tangenterna dit
       // Alt+pil upp eller ner: flytta den valda raden i sin grupp
       if (e.altKey) {
         if (editId && !e.shiftKey && (e.key === "ArrowUp" || e.key === "ArrowDown")) { e.preventDefault(); void moveSibling(editId, e.key === "ArrowUp" ? "up" : "down"); }

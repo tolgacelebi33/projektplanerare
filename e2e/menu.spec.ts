@@ -180,6 +180,7 @@ test.describe("högerklick", () => {
     }
     await page.keyboard.press("Escape");
     await page.locator('.gantt_row[data-task-id="i7"] .grid-title').click({ button: "right" });
+    await page.waitForTimeout(450); // menyn tar fokus efter en stund (som ovan)
     await page.keyboard.press("Enter"); // Öppna
     await expect(panel(page).locator('input[name="title"]')).toHaveValue("Färg och typografi");
   });
