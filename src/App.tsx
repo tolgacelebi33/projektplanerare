@@ -2,7 +2,8 @@ import { Suspense, lazy, useEffect, useMemo, useRef, useState } from "react";
 import { downloadText } from "./download";
 import { MAX_IMPORT_BYTES, ImportError, parseFile } from "./data/exchange";
 import { duplicateProject, exportProject, importParsed, type ExportFormat, type ImportResult } from "./data/importExport";
-import { canMove, deleteSubtree, descendants, filterActive, filterView, newItemDraft, planMove, swapWithSibling } from "./data/actions";
+import { bulkDelete, bulkMove, bulkStatus, canMove, deleteSubtree, descendants, epicChoices, filterActive, filterView, moveTargets, newItemDraft, planMove, rangeIds, selectionRoots, swapWithSibling, type BulkResult } from "./data/actions";
+import { BulkBar } from "./views/BulkBar";
 import { friendlyError } from "./i18n/errors";
 import { ContextMenu, type MenuItem } from "./views/ContextMenu";
 import { QuickAdd } from "./views/QuickAdd";
@@ -92,6 +93,7 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
     const onUp = (e: PointerEvent) => {
       const d = down.current; down.current = null;
       if (!d || e.button !== 0 || !d.id) return;
+      if (e.metaKey || e.ctrlKey || e.shiftKey) return; // markering av flera rader, inte öppna
       if (Math.hypot(e.clientX - d.x, e.clientY - d.y) > 4) return; // drag, inte klick
       if (itemsRef.current.has(d.id)) setEditId(d.id);
     };
@@ -106,7 +108,35 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
   const [reveal, setReveal] = useState<string | null>(null); // post som vyn ska bläddra fram, med eller utan att panelen öppnas
   useEffect(() => { if (editId !== justCreated) setJustCreated(null); }, [editId, justCreated]);
   // Byte av projekt: stäng panelen, den hör till ett annat projekt
-  useEffect(() => { setEditId(null); }, [projects.projectId]);
+  useEffect(() => { setEditId(null); setSelected(new Set()); }, [projects.projectId]);
+  // Flerval: markerade rader (bara i Gantt). Poster som tagits bort (t.ex. av ångra) tas ur markeringen.
+  const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
+  const selAnchor = useRef<string | null>(null);
+  useEffect(() => {
+    if (state.kind !== "ready") return;
+    setSelected((cur) => { const keep = [...cur].filter((id) => itemsRef.current.has(id)); return keep.length === cur.size ? cur : new Set(keep); });
+  }, [state]);
+  const selectRow = ({ id, mode, visible }: { id: string; mode: "toggle" | "range" | "clear"; visible: string[] }) => {
+    if (mode === "clear") { selAnchor.current = null; setSelected(new Set()); return; }
+    if (mode === "toggle") {
+      const n = new Set(selected);
+      if (n.has(id)) n.delete(id); else n.add(id);
+      selAnchor.current = id; setSelected(n); return;
+    }
+    const from = selAnchor.current ?? editId ?? id;
+    if (!selAnchor.current) selAnchor.current = from;
+    setSelected(new Set(rangeIds(visible, from, id)));
+  };
+  const runBulk = async (fn: (projectId: string) => Promise<BulkResult>) => {
+    if (!projects.projectId) return;
+    try {
+      const r = await fn(projects.projectId);
+      await refresh();
+      if (editId && !(await store.listItems(projects.projectId)).some((i) => i.id === editId)) setEditId(null);
+      if (r.failed) setWriteError(sv.bulk.partial(r.done, r.failed, friendlyError(r.firstError)));
+      else setSelected(new Set());
+    } catch (e) { setWriteError(friendlyError(e)); reload(); }
+  };
 
   /** Skapar en post. `anchorId` styr var den hamnar (inuti en epic, annars bredvid), `start` ger datum, annars den valda postens eller dagens. */
   const addItem = async (kind: ItemType, opts: { anchorId?: string | null; start?: ISODate | null; title?: string; open?: boolean } = {}) => {
@@ -174,6 +204,7 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
       }
       if (e.metaKey || e.ctrlKey || typing || state.kind !== "ready" || !projects.projectId) return;
       if (menu || t?.closest("[role=dialog], [role=menu], aside.panel")) return; // en öppen meny äger tangenterna även innan den hunnit ta fokus
+      if (e.key === "Escape" && selected.size) { e.preventDefault(); selAnchor.current = null; setSelected(new Set()); return; }
       // Alt+pil upp eller ner: flytta den valda raden i sin grupp
       if (e.altKey) {
         if (editId && !e.shiftKey && (e.key === "ArrowUp" || e.key === "ArrowDown")) { e.preventDefault(); void moveSibling(editId, e.key === "ArrowUp" ? "up" : "down"); }
@@ -414,6 +445,14 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
           <button type="button" className="mini" onClick={() => setCollapse((c) => ({ n: c.n + 1, open: true }))}>{sv.filter.expandAll}</button>
         </>)}
       </div>
+      {view === "gantt" && selected.size > 0 && state.kind === "ready" && (
+        <BulkBar count={selected.size} inside={selectionRoots(state.items, selected).reduce((n, id) => n + descendants(state.items, id).length, 0)}
+          targets={(() => { const ok = new Set(moveTargets(state.items, selected).map((i) => i.id)); return epicChoices(state.items, "").filter((c) => ok.has(c.id)); })()}
+          onStatus={(s) => void runBulk((pid) => bulkStatus(store, [...selected], s))}
+          onMove={(g) => void runBulk((pid) => bulkMove(store, pid, [...selected], g))}
+          onDelete={() => void runBulk((pid) => bulkDelete(store, pid, [...selected]))}
+          onClear={() => { selAnchor.current = null; setSelected(new Set()); }} />
+      )}
       {persistent?.loadWarning && <div role="alert" className="notice">{persistent.loadWarning}</div>}
       {notice && <div role="alert" className="notice">{notice}{writeError && <button type="button" className="notice-x" aria-label={sv.dismiss} onClick={() => setWriteError(null)}>×</button>}</div>}
       {projects.error && <div role="alert" className="notice">{projects.error}</div>}
@@ -433,7 +472,7 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
         {state.kind === "ready" && projects.projectId && view === "gantt" && (
           <div className="gantt-wrap">
           <div className="gantt-main">
-          <DhtmlxGantt key={theme} colors={colors} collapse={collapse} gridWidth={gridWidth} columns={columns} users={users} onEditField={editField} revealId={reveal} todayToken={todayToken} onPersisted={() => void refresh()}
+          <DhtmlxGantt key={theme} selected={selected} onSelect={selectRow} colors={colors} collapse={collapse} gridWidth={gridWidth} columns={columns} users={users} onEditField={editField} revealId={reveal} todayToken={todayToken} onPersisted={() => void refresh()}
             onNotice={setWriteError}
             onCreateAt={({ rowId, date }) => void addItem("task", { anchorId: rowId, start: date }).catch(() => undefined)}
             onRename={(id) => { setJustCreated(id); setEditId(id); }}

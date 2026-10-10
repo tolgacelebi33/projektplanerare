@@ -141,3 +141,61 @@ export function planMove(items: Item[], id: string, parentId: string | null, vis
   });
   return out;
 }
+
+/** De markerade poster som saknar en markerad förfader. Ändringar av en grupp gäller redan allt i den, så bara dessa flyttas eller tas bort. */
+export function selectionRoots(items: Item[], ids: Iterable<string>): string[] {
+  const sel = new Set(ids), byId = new Map(items.map((i) => [i.id, i]));
+  const out: string[] = [];
+  for (const id of sel) {
+    if (!byId.has(id)) continue;
+    let covered = false;
+    for (let c = byId.get(id)!.parent_id ? byId.get(byId.get(id)!.parent_id!) : undefined; c; c = c.parent_id ? byId.get(c.parent_id) : undefined) if (sel.has(c.id)) { covered = true; break; }
+    if (!covered) out.push(id);
+  }
+  return out;
+}
+
+/** Alla rader mellan `a` och `b` (inklusive) i den ordning de visas. Saknas en av dem returneras bara den som finns. */
+export function rangeIds(visible: string[], a: string, b: string): string[] {
+  const i = visible.indexOf(a), j = visible.indexOf(b);
+  if (i < 0 || j < 0) return [i >= 0 ? a : b].filter((x) => visible.includes(x));
+  return visible.slice(Math.min(i, j), Math.max(i, j) + 1);
+}
+
+/** Grupper som markerade poster kan flyttas till: inte en markerad post och inte något inuti en markerad post. */
+export function moveTargets(items: Item[], ids: Iterable<string>): Item[] {
+  const roots = selectionRoots(items, ids);
+  const blocked = new Set<string>(roots);
+  for (const r of roots) for (const d of descendants(items, r)) blocked.add(d.id);
+  return items.filter((i) => i.type === "epic" && !blocked.has(i.id));
+}
+
+export interface BulkResult { done: number; failed: number; firstError: unknown }
+
+async function eachId(ids: string[], fn: (id: string) => Promise<unknown>): Promise<BulkResult> {
+  const r: BulkResult = { done: 0, failed: 0, firstError: null };
+  for (const id of ids) {
+    try { await fn(id); r.done++; } catch (e) { r.failed++; if (r.firstError === null) r.firstError = e; }
+  }
+  return r;
+}
+
+/** Ändrar status på alla markerade poster. En post som lagret avvisar hoppas över och räknas som misslyckad, resten ändras ändå. */
+export function bulkStatus(store: DataStore, ids: string[], status: Status): Promise<BulkResult> {
+  return eachId(ids, (id) => store.updateItem(id, { status }));
+}
+
+/** Flyttar markerade poster (utan markerad förfader) sist i en grupp (`null` = översta nivån), i den ordning de visas nu. */
+export async function bulkMove(store: DataStore, projectId: string, ids: string[], parentId: string | null): Promise<BulkResult> {
+  const roots = selectionRoots(await store.listItems(projectId), ids);
+  const order = (await store.listItems(projectId)).filter((i) => roots.includes(i.id)).sort((a, b) => a.sort_order - b.sort_order).map((i) => i.id);
+  return eachId(order, async (id) => {
+    for (const u of planMove(await store.listItems(projectId), id, parentId, [])) await store.updateItem(u.id, u.patch);
+  });
+}
+
+/** Tar bort markerade poster och allt under dem. */
+export async function bulkDelete(store: DataStore, projectId: string, ids: string[]): Promise<BulkResult> {
+  const roots = selectionRoots(await store.listItems(projectId), ids);
+  return eachId(roots, async (id) => { await deleteSubtree(store, await store.listItems(projectId), id); });
+}

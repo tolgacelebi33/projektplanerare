@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { canMove, deleteSubtree, descendants, epicChoices, newItemDraft, planMove, swapWithSibling } from "../src/data/actions";
+import { bulkDelete, bulkMove, bulkStatus, canMove, deleteSubtree, descendants, epicChoices, moveTargets, newItemDraft, planMove, rangeIds, selectionRoots, swapWithSibling } from "../src/data/actions";
 import { smallFixture } from "../src/data/fixtures";
 import { MemoryStore } from "../src/data/MemoryStore";
 
@@ -111,5 +111,59 @@ describe("planMove: dra en rad till ny plats", () => {
     for (const p of planMove(dup, "c", "E", ["c", "a", "b"])) Object.assign(m.get(p.id)!, p.patch);
     const v = [...m.values()].filter((i) => i.parent_id === "E") as unknown as { id: string; sort_order: number }[];
     expect(v.sort((a, b) => a.sort_order - b.sort_order).map((i) => i.id)).toEqual(["c", "a", "b"]);
+  });
+});
+
+describe("flerval", () => {
+  const items = () => smallFixture().items;
+  const kinds = new Map(items().map((i) => [i.id, i]));
+
+  it("selectionRoots hoppar över poster vars grupp också är markerad", () => {
+    expect(selectionRoots(items(), ["i4", "i5", "i6"])).toEqual(["i4"]);
+    expect(selectionRoots(items(), ["i5", "i6"])).toEqual(["i5"]); // i6 ligger i i5
+    expect(selectionRoots(items(), ["i6", "i7"]).sort()).toEqual(["i6", "i7"]);
+    expect(selectionRoots(items(), ["finns_inte"])).toEqual([]);
+  });
+  it("rangeIds ger raderna mellan två rader åt båda håll, och bara den som finns om en saknas", () => {
+    const v = ["a", "b", "c", "d"];
+    expect(rangeIds(v, "b", "d")).toEqual(["b", "c", "d"]);
+    expect(rangeIds(v, "d", "b")).toEqual(["b", "c", "d"]);
+    expect(rangeIds(v, "c", "c")).toEqual(["c"]);
+    expect(rangeIds(v, "c", "x")).toEqual(["c"]);
+    expect(rangeIds(v, "x", "y")).toEqual([]);
+  });
+  it("moveTargets utesluter markerade grupper och allt inuti dem", () => {
+    const t = moveTargets(items(), ["i4"]).map((i) => i.id);
+    expect(t).not.toContain("i4");
+    for (const d of descendants(items(), "i4")) expect(t).not.toContain(d.id);
+    expect(t.every((id) => kinds.get(id)!.type === "epic")).toBe(true);
+    expect(t.length).toBeGreaterThan(0);
+  });
+  it("bulkStatus ändrar alla, och räknar de som lagret avvisar utan att stoppa resten", async () => {
+    const s = new MemoryStore(smallFixture());
+    const r = await bulkStatus(s, ["i5", "i6", "saknas"], "done");
+    expect([r.done, r.failed]).toEqual([2, 1]);
+    const all = await s.listItems("proj_1");
+    expect(all.find((i) => i.id === "i5")!.status).toBe("done");
+    expect(all.find((i) => i.id === "i6")!.status).toBe("done");
+  });
+  it("bulkMove lägger posterna sist i gruppen i visad ordning, och ångras som ett steg", async () => {
+    const s = new MemoryStore(smallFixture());
+    const target = (await s.listItems("proj_1")).find((i) => i.type === "epic" && i.id !== "i4" && !descendants(items(), "i4").some((d) => d.id === i.id))!.id;
+    const before = (await s.listItems("proj_1")).filter((i) => i.parent_id === target).length;
+    const r = await bulkMove(s, "proj_1", ["i7", "i6"], target);
+    expect([r.done, r.failed]).toEqual([2, 0]);
+    const after = (await s.listItems("proj_1")).filter((i) => i.parent_id === target).sort((a, b) => a.sort_order - b.sort_order);
+    expect(after.length).toBe(before + 2);
+    expect(after.slice(-2).map((i) => i.id)).toEqual(["i6", "i7"]);
+    expect(await s.undo()).toBe(true);
+    expect((await s.listItems("proj_1")).find((i) => i.id === "i6")!.parent_id).toBe("i5");
+  });
+  it("bulkDelete tar bort markerade och deras innehåll, en gång även om båda är markerade", async () => {
+    const s = new MemoryStore(smallFixture());
+    const n0 = (await s.listItems("proj_1")).length;
+    const r = await bulkDelete(s, "proj_1", ["i4", "i5", "i14"]);
+    expect([r.done, r.failed]).toEqual([2, 0]);
+    expect((await s.listItems("proj_1")).length).toBe(n0 - (1 + descendants(items(), "i4").length) - 1);
   });
 });

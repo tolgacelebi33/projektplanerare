@@ -27,6 +27,7 @@ export const svDict = {
         "Kolumner väljer vad som visas. Status, ansvarig och prioritet ändras direkt i raden.",
         "Dra i kanten mellan listan och tidslinjen för att ändra bredden. Dubbelklicka på kanten för att passa texten.",
         "Sök och Dölj klara döljer rader i vyn utan att ändra något.",
+        "Ctrl- eller Cmd-klick på en rad markerar flera, och Shift-klick markerar en följd. Då visas ett fält där du ändrar status, flyttar eller tar bort alla markerade. Esc avmarkerar.",
       ] },
       { h: "Genvägar", items: [
         "N lägger till en uppgift, M en milstolpe och G en grupp. T hoppar till idag, och 1, 2 och 3 byter zoom till dag, vecka och månad.",
@@ -144,6 +145,11 @@ export const svDict = {
     confirm: (title: string, n: number) => n > 0 ? `Ta bort "${title}" och de ${n} posterna under den?` : `Ta bort "${title}"?`,
     confirmYes: "Ta bort",
     cancel: "Avbryt",
+  },
+  bulk: {
+    label: "Markerade poster", count: (n: number) => `${n} markerade`, status: "Ändra status...", move: "Flytta till...", top: "Översta nivån", remove: "Ta bort...", clear: "Avmarkera",
+    confirm: (n: number, inside: number) => (inside > 0 ? `Ta bort ${n} markerade poster och de ${inside} posterna under dem?` : `Ta bort ${n} markerade poster?`), confirmYes: "Ta bort", cancel: "Avbryt",
+    partial: (done: number, failed: number, why: string) => `${done} ändrades, ${failed} kunde inte ändras: ${why}`,
   },
   quick: { label: "Lägg till uppgift", placeholder: "Lägg till uppgift...  (Enter)" },
   today: "Idag",

@@ -45,7 +45,10 @@ function treeOrder(items: Item[]): string[] {
 
 export interface ContextArgs { id: string | null; x: number; y: number; date: ISODate | null }
 
-export function DhtmlxGantt({ store, items, deps, zoom, onError, onPersisted, revealId, onNotice, onCreateAt, onRename, onContext, onToggleDone, onMoveRow, onAddInGroup, onEditField, gridWidth, columns, users, collapse, colors, todayToken }: {
+export function DhtmlxGantt({ store, items, deps, zoom, onError, onPersisted, revealId, onNotice, onCreateAt, onRename, onContext, onToggleDone, onMoveRow, onAddInGroup, onEditField, onSelect, selected, gridWidth, columns, users, collapse, colors, todayToken }: {
+  /** Markerade rader (flerval). Klick med Ctrl/Cmd växlar, Shift markerar en följd, ett vanligt klick avmarkerar. */
+  selected?: ReadonlySet<string>;
+  onSelect?: (a: { id: string; mode: "toggle" | "range" | "clear"; visible: string[] }) => void;
   store: DataStore; items: Item[]; deps: Dependency[]; zoom: Zoom; onError: (e: unknown) => void; onPersisted?: () => void;
   /** Post som ska bläddras fram och markeras (t.ex. en nyskapad). */
   revealId?: string | null;
@@ -81,8 +84,10 @@ export function DhtmlxGantt({ store, items, deps, zoom, onError, onPersisted, re
   const zoomRef = useRef(zoom);
   zoomRef.current = zoom;
   const workspaceId = items[0]?.workspace_id ?? "";
-  const latest = useRef({ store, onError, workspaceId, onPersisted, onNotice, onCreateAt, onRename, onContext, onToggleDone, onMoveRow, onAddInGroup, onEditField, users });
-  latest.current = { store, onError, workspaceId, onPersisted, onNotice, onCreateAt, onRename, onContext, onToggleDone, onMoveRow, onAddInGroup, onEditField, users };
+  const latest = useRef({ store, onError, workspaceId, onPersisted, onNotice, onCreateAt, onRename, onContext, onToggleDone, onMoveRow, onAddInGroup, onEditField, onSelect, users });
+  latest.current = { store, onError, workspaceId, onPersisted, onNotice, onCreateAt, onRename, onContext, onToggleDone, onMoveRow, onAddInGroup, onEditField, onSelect, users };
+  const selectedRef = useRef<ReadonlySet<string>>(selected ?? new Set());
+  selectedRef.current = selected ?? selectedRef.current;
   const gridWidthRef = useRef(gridWidth);
   const columnsRef = useRef(columns);
   const buildColumnsRef = useRef<(() => unknown[]) | null>(null);
@@ -136,7 +141,8 @@ export function DhtmlxGantt({ store, items, deps, zoom, onError, onPersisted, re
     gantt.locale.date.month_full = [...sv.dates.monthsFull] as typeof gantt.locale.date.month_full;
     gantt.locale.date.month_short = [...sv.dates.monthsShort] as typeof gantt.locale.date.month_short;
     gantt.templates.task_class = (_s, _e, t) => `st-${(t as unknown as { status: Status }).status}${(t as unknown as { kind: string }).kind === "epic" ? " epic" : ""}`;
-    gantt.templates.grid_row_class = (_s, _e, t) => `${(t as unknown as { kind: string }).kind === "epic" ? "epic-row" : ""} grp-${(t as unknown as TaskRow).color}`;
+    gantt.templates.grid_row_class = (_s, _e, t) => `${(t as unknown as { kind: string }).kind === "epic" ? "epic-row" : ""} grp-${(t as unknown as TaskRow).color}${selectedRef.current.has(String(t.id)) ? " sel-row" : ""}`;
+    gantt.templates.task_row_class = (_s, _e, t) => `${(t as unknown as { kind: string }).kind === "epic" ? "epic-row" : ""}${selectedRef.current.has(String(t.id)) ? " sel-row" : ""}`;
     gantt.templates.task_row_class = (_s, _e, t) => ((t as unknown as { kind: string }).kind === "epic" ? "epic-row" : "");
     // Texten i en stapel: ryms titeln flyttas den till höger om staplen (som i andra planeringsverktyg), annars visas den inuti.
     // Bredden mäts med typsnittet och storleken staplarna faktiskt har. Titeln finns alltid kvar som tooltip.
@@ -303,6 +309,19 @@ export function DhtmlxGantt({ store, items, deps, zoom, onError, onPersisted, re
     document.addEventListener("pointermove", onAnyMove, true);
     document.addEventListener("pointerleave", hideTip, true);
     window.addEventListener("blur", hideTip);
+    // Flerval: Ctrl/Cmd-klick växlar en rad, Shift-klick markerar en följd från senast klickade, ett vanligt klick avmarkerar
+    const onSelectClick = (e: MouseEvent) => {
+      const t = e.target as Element;
+      if (t.closest(".row-check, .row-add, .cell-select, .gantt_tree_icon, .gantt_task_line, .gantt_link_control, .gantt_task_drag")) return;
+      const id = t.closest(".gantt_grid_data") ? rowId(t) : null;
+      const mode = id && (e.metaKey || e.ctrlKey) ? "toggle" : id && e.shiftKey ? "range" : "clear";
+      if (mode === "clear") { if (selectedRef.current.size) latest.current.onSelect?.({ id: "", mode, visible: [] }); return; }
+      e.stopPropagation(); e.preventDefault();
+      window.getSelection()?.removeAllRanges();
+      const visible: string[] = [];
+      for (let i = 0, n = gantt.getVisibleTaskCount(); i < n; i++) visible.push(String(gantt.getTaskByIndex(i).id));
+      latest.current.onSelect?.({ id: id!, mode, visible });
+    };
     const onCheck = (e: MouseEvent) => {
       const add = (e.target as Element).closest<HTMLElement>("[data-add-in]");
       if (add) { e.stopPropagation(); e.preventDefault(); latest.current.onAddInGroup?.(add.getAttribute("data-add-in")!); return; }
@@ -342,13 +361,14 @@ export function DhtmlxGantt({ store, items, deps, zoom, onError, onPersisted, re
     hostEl.addEventListener("change", onCellChange, true);
     hostEl.addEventListener("keydown", onCheckKey, true);
     hostEl.addEventListener("keyup", onCheckKey, true);
+    hostEl.addEventListener("click", onSelectClick, true);
     hostEl.addEventListener("click", onCheck, true);
     hostEl.addEventListener("dblclick", onDblClick, true);
     hostEl.addEventListener("contextmenu", onContextMenu, true);
     // Panelen till höger tar plats: DHTMLX måste få veta när behållaren ändrar storlek
     const ro = new ResizeObserver(() => gantt.setSizes());
     ro.observe(host.current!);
-    return () => { scrollCarry.read = null; hostEl.removeEventListener("change", onCellChange, true); hostEl.removeEventListener("keydown", onCheckKey, true); hostEl.removeEventListener("keyup", onCheckKey, true); hostEl.removeEventListener("click", onCheck, true); document.removeEventListener("pointermove", onAnyMove, true); document.removeEventListener("pointerleave", hideTip, true); window.removeEventListener("blur", hideTip); hostEl.removeEventListener("dblclick", onDblClick, true); hostEl.removeEventListener("contextmenu", onContextMenu, true); ro.disconnect(); ids.forEach((id) => gantt.detachEvent(id)); stopDragFeedback?.(); gantt.clearAll(); };
+    return () => { scrollCarry.read = null; hostEl.removeEventListener("change", onCellChange, true); hostEl.removeEventListener("keydown", onCheckKey, true); hostEl.removeEventListener("keyup", onCheckKey, true); hostEl.removeEventListener("click", onSelectClick, true); hostEl.removeEventListener("click", onCheck, true); document.removeEventListener("pointermove", onAnyMove, true); document.removeEventListener("pointerleave", hideTip, true); window.removeEventListener("blur", hideTip); hostEl.removeEventListener("dblclick", onDblClick, true); hostEl.removeEventListener("contextmenu", onContextMenu, true); ro.disconnect(); ids.forEach((id) => gantt.detachEvent(id)); stopDragFeedback?.(); gantt.clearAll(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -439,6 +459,14 @@ export function DhtmlxGantt({ store, items, deps, zoom, onError, onPersisted, re
     gantt.eachTask((t) => { if (gantt.hasChild(t.id)) { if (collapse.open) gantt.open(t.id); else gantt.close(t.id); openState.current.set(String(t.id), collapse.open); } });
     gantt.render();
   }, [collapse]);
+
+  // Markerade rader ritas om när markeringen ändras
+  const drawnSel = useRef<ReadonlySet<string>>(new Set());
+  useEffect(() => {
+    const now = selected ?? new Set<string>(), was = drawnSel.current;
+    for (const id of new Set([...now, ...was])) if (now.has(id) !== was.has(id) && gantt.isTaskExists(id)) gantt.refreshTask(id);
+    drawnSel.current = new Set(now);
+  }, [selected, mapped]);
 
   // Idag-knappen
   useEffect(() => { if (todayToken) gantt.showDate(new Date()); }, [todayToken]);

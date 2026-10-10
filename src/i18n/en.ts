@@ -27,6 +27,7 @@ export const enDict: Dict = {
         "Columns chooses what is shown. Status, assignee and priority are changed right in the row.",
         "Drag the edge between the list and the timeline to change the width. Double-click the edge to fit the text.",
         "Search and Hide done hide rows in the view without changing anything.",
+        "Ctrl- or Cmd-click on a row selects several, and Shift-click selects a range. A bar then lets you change the status of, move or delete everything selected. Esc clears the selection.",
       ] },
       { h: "Shortcuts", items: [
         "N adds a task, M a milestone and G a group. T jumps to today, and 1, 2 and 3 switch the zoom to day, week and month.",
@@ -139,6 +140,11 @@ export const enDict: Dict = {
     confirm: (title: string, n: number) => n > 0 ? `Delete "${title}" and the ${n} items under it?` : `Delete "${title}"?`,
     confirmYes: "Delete",
     cancel: "Cancel",
+  },
+  bulk: {
+    label: "Selected items", count: (n: number) => `${n} selected`, status: "Change status...", move: "Move to...", top: "Top level", remove: "Delete...", clear: "Clear selection",
+    confirm: (n: number, inside: number) => (inside > 0 ? `Delete ${n} selected items and the ${inside} items under them?` : `Delete ${n} selected items?`), confirmYes: "Delete", cancel: "Cancel",
+    partial: (done: number, failed: number, why: string) => `${done} changed, ${failed} could not be changed: ${why}`,
   },
   quick: { label: "Add task", placeholder: "Add task...  (Enter)" },
   today: "Today",
