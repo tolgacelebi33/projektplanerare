@@ -30,7 +30,7 @@ import { startRowDragFeedback } from "./rowDrag";
 import { consumeFocusMedian, scrollCarry } from "../scrollCarry";
 /** Rutnätets fasta bredd är GRID_WIDTH (layout.ts). Panelen till höger tar plats från tidslinjen, aldrig från rutnätet. */
 
-interface TaskRow { id: string; text: string; start_date: Date; end_date: Date; type: string; kind: Item["type"]; parent: string | number; status: Status; priority: Item["priority"]; assignee: string; progress: number; open: boolean }
+interface TaskRow { color: string; id: string; text: string; start_date: Date; end_date: Date; type: string; kind: Item["type"]; parent: string | number; status: Status; priority: Item["priority"]; assignee: string; progress: number; open: boolean }
 interface LinkRow { id: string; source: string; target: string; type: string }
 
 /** Förväntad ordning för träd i djupet först, syskon efter sort_order. Används för att avgöra om strukturen ändrats. */
@@ -45,7 +45,7 @@ function treeOrder(items: Item[]): string[] {
 
 export interface ContextArgs { id: string | null; x: number; y: number; date: ISODate | null }
 
-export function DhtmlxGantt({ store, items, deps, zoom, onError, onPersisted, revealId, onNotice, onCreateAt, onRename, onContext, onToggleDone, onMoveRow, onAddInGroup, onEditField, gridWidth, columns, users, collapse, todayToken }: {
+export function DhtmlxGantt({ store, items, deps, zoom, onError, onPersisted, revealId, onNotice, onCreateAt, onRename, onContext, onToggleDone, onMoveRow, onAddInGroup, onEditField, gridWidth, columns, users, collapse, colors, todayToken }: {
   store: DataStore; items: Item[]; deps: Dependency[]; zoom: Zoom; onError: (e: unknown) => void; onPersisted?: () => void;
   /** Post som ska bläddras fram och markeras (t.ex. en nyskapad). */
   revealId?: string | null;
@@ -67,6 +67,8 @@ export function DhtmlxGantt({ store, items, deps, zoom, onError, onPersisted, re
   gridWidth: number;
   /** Fäll ihop eller öppna alla grupper (n ökas för varje klick). */
   collapse?: { n: number; open: boolean };
+  /** Färg per post (efter gruppen), räknad på alla poster så att filter inte flyttar färgerna. */
+  colors: Map<string, string>;
   /** Valda kolumner (titeln visas alltid) och personer att välja bland som ansvarig. */
   columns: ColumnId[]; users: User[];
   /** En ruta i en rad ändrades (status, prioritet eller ansvarig). Ska spara, och returnera efter att det är gjort. */
@@ -85,6 +87,8 @@ export function DhtmlxGantt({ store, items, deps, zoom, onError, onPersisted, re
   const columnsRef = useRef(columns);
   const buildColumnsRef = useRef<(() => unknown[]) | null>(null);
   const openState = useRef(new Map<string, boolean>());
+  const pendingSelect = useRef<{ id: string; field: string; until: number } | null>(null); // ruta i en rad som ändrats: fokus ska följa med när raden ritats om
+  const restoreFocusRef = useRef<(() => void) | null>(null);
   const pendingFocus = useRef<string | null>(null); // bock som växlats med tangentbord: fokus ska ligga kvar när raden ritats om
 
   const mapped = useMemo(() => {
@@ -97,12 +101,12 @@ export function DhtmlxGantt({ store, items, deps, zoom, onError, onPersisted, re
       type: TYPE[i.type],
       kind: i.type,
       parent: i.parent_id ?? 0,
-      status: i.status, priority: i.priority, assignee: i.assignee_id ?? "", progress: i.progress,
+      status: i.status, priority: i.priority, assignee: i.assignee_id ?? "", progress: i.progress, color: colors.get(i.id) ?? "none",
       open: true,
     }));
     const links: LinkRow[] = deps.map((d) => ({ id: d.id, source: d.from_item_id, target: d.to_item_id, type: "0" }));
     return { tasks, links, order: treeOrder(items) };
-  }, [items, deps]);
+  }, [items, deps, colors]);
 
   // Engångsinställning och initiering
   useEffect(() => {
@@ -132,7 +136,7 @@ export function DhtmlxGantt({ store, items, deps, zoom, onError, onPersisted, re
     gantt.locale.date.month_full = [...sv.dates.monthsFull] as typeof gantt.locale.date.month_full;
     gantt.locale.date.month_short = [...sv.dates.monthsShort] as typeof gantt.locale.date.month_short;
     gantt.templates.task_class = (_s, _e, t) => `st-${(t as unknown as { status: Status }).status}${(t as unknown as { kind: string }).kind === "epic" ? " epic" : ""}`;
-    gantt.templates.grid_row_class = (_s, _e, t) => ((t as unknown as { kind: string }).kind === "epic" ? "epic-row" : "");
+    gantt.templates.grid_row_class = (_s, _e, t) => `${(t as unknown as { kind: string }).kind === "epic" ? "epic-row" : ""} grp-${(t as unknown as TaskRow).color}`;
     gantt.templates.task_row_class = (_s, _e, t) => ((t as unknown as { kind: string }).kind === "epic" ? "epic-row" : "");
     // Texten i en stapel: ryms titeln flyttas den till höger om staplen (som i andra planeringsverktyg), annars visas den inuti.
     // Bredden mäts med typsnittet och storleken staplarna faktiskt har. Titeln finns alltid kvar som tooltip.
@@ -322,8 +326,19 @@ export function DhtmlxGantt({ store, items, deps, zoom, onError, onPersisted, re
       const el = (e.target as Element).closest?.<HTMLSelectElement>("select.cell-select");
       if (!el) return;
       const id = el.dataset.id!, field = el.dataset.field as "status" | "priority" | "assignee", value = el.value;
-      void Promise.resolve(latest.current.onEditField?.(id, field, value)).catch(() => undefined).finally(() => { if (gantt.isTaskExists(id)) gantt.refreshTask(id); });
+      // Med tangentbordet (pilar i Windows och Linux) ändras värdet direkt och raden ritas om. Fokus ska då stanna kvar i rutan så att man kan fortsätta.
+      pendingSelect.current = { id, field, until: Date.now() + 2500 };
+      void Promise.resolve(latest.current.onEditField?.(id, field, value)).catch(() => undefined).finally(() => { if (gantt.isTaskExists(id)) gantt.refreshTask(id); restoreSelectFocus(); });
     };
+    // Återställer fokus till rutan som just ändrats, om fokus tappades vid omritningen (inte om användaren har flyttat det själv)
+    const restoreSelectFocus = () => requestAnimationFrame(() => {
+      const p = pendingSelect.current;
+      if (!p || Date.now() > p.until) return;
+      const a = document.activeElement;
+      if (a && a !== document.body && a.isConnected) return;
+      hostEl.querySelector<HTMLElement>(`select.cell-select[data-id="${CSS.escape(p.id)}"][data-field="${p.field}"]`)?.focus({ preventScroll: true });
+    });
+    restoreFocusRef.current = restoreSelectFocus;
     hostEl.addEventListener("change", onCellChange, true);
     hostEl.addEventListener("keydown", onCheckKey, true);
     hostEl.addEventListener("keyup", onCheckKey, true);
@@ -377,9 +392,9 @@ export function DhtmlxGantt({ store, items, deps, zoom, onError, onPersisted, re
           // Bara det som ändrats ritas om. Ritas alla staplar om vid varje sparning byts staplen man är på väg att klicka på ut under klicket.
           for (const t of tasks) {
             const g = gantt.getTask(t.id) as unknown as Record<string, unknown>;
-            const same = g.text === t.text && g.status === t.status && g.priority === t.priority && g.assignee === t.assignee && g.progress === t.progress && (g.start_date as Date).getTime() === t.start_date.getTime() && (g.end_date as Date).getTime() === t.end_date.getTime();
+            const same = g.text === t.text && g.status === t.status && g.priority === t.priority && g.assignee === t.assignee && g.progress === t.progress && g.color === t.color && (g.start_date as Date).getTime() === t.start_date.getTime() && (g.end_date as Date).getTime() === t.end_date.getTime();
             if (same) continue;
-            g.text = t.text; g.start_date = t.start_date; g.end_date = t.end_date; g.status = t.status; g.priority = t.priority; g.assignee = t.assignee; g.progress = t.progress;
+            g.text = t.text; g.start_date = t.start_date; g.end_date = t.end_date; g.status = t.status; g.priority = t.priority; g.assignee = t.assignee; g.progress = t.progress; g.color = t.color;
             gantt.updateTask(t.id);
           }
         });
@@ -405,6 +420,7 @@ export function DhtmlxGantt({ store, items, deps, zoom, onError, onPersisted, re
       }
     });
     // Bocken ritas om när statusen ändras. Har den växlats med tangentbord ska fokus ligga kvar på den nya knappen.
+    restoreFocusRef.current?.();
     const id = pendingFocus.current;
     if (id) requestAnimationFrame(() => { host.current?.querySelector<HTMLElement>(`[data-check="${CSS.escape(id)}"]`)?.focus(); });
   }, [mapped]);

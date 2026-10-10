@@ -100,6 +100,7 @@ export function parseJson(text: string): ParsedProject {
       id: str("id"), parent_id: parent, type: x.type as ItemType, title: str("title"), start: str("start"), end: str("end"),
       status: str("status", "not_started") as Status, assignee, description: str("description", ""), priority: str("priority", "normal") as Priority,
       progress: typeof x.progress === "number" ? x.progress : 0, sort_order: typeof x.sort_order === "number" ? x.sort_order : n,
+      ...(x.color !== undefined ? { color: x.color as ParsedItem["color"] } : {}),
     };
     if (!it.id) throw new ImportError(sv.ex.itemNoId(n));
     shapeCheck(it, n);

@@ -94,7 +94,7 @@ test("X6 efter import går Ångra inte att använda för att rulla tillbaka post
   await expect(page.getByRole("button", { name: "Ångra" })).toBeDisabled();
   await page.reload();
   await expect(projectSelect(page).locator("option:checked")).toHaveText("ark");
-  await expect.poll(async () => (await titles(page)).join("|")).toBe("Ett|Två");
+  await expect.poll(async () => (await titles(page)).join("|"), { timeout: 20_000 }).toBe("Ett|Två"); // första laddningen av Gantt-koden kan ta tid i en kall miljö
 });
 
 const HEAD = "ID,ParentID,ProjectID,Project,Domain,Area,RecordType,Name,Description,Status,OriginalStatus,StatusAsOf,Assignee,Contacts,Priority,StartDate,DueDate,CompletedDate,TargetPeriod,ProgressPercent,EffortHoursMin,EffortHoursMax,Basis,SourceIDs,SourceLocator,ReviewRequired,ImportRecommended,NextStep";

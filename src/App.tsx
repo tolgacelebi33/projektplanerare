@@ -19,6 +19,7 @@ import { clampGrid, loadGridWidth, saveGridWidth } from "./layout";
 import { COLUMN_WIDTH, loadColumns, saveColumns, type ColumnId } from "./columns";
 import { ColumnPicker } from "./views/ColumnPicker";
 import { HelpDialog } from "./views/HelpDialog";
+import { effectiveColors } from "./data/colors";
 import { FilterPicker, noAttrFilter, type AttrFilter } from "./views/FilterPicker";
 import { GridResizer } from "./views/GridResizer";
 import { useProjectData } from "./proto/useProjectData";
@@ -60,6 +61,7 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
     [state, query, hideDone, attrFilter],
   );
   const filtering = filterActive({ query, hideDone, ...attrFilter });
+  const colors = useMemo(() => (state.kind === "ready" ? effectiveColors(state.items) : new Map<string, never>()), [state]);
   const [view, setView] = useState<"gantt" | "wheel">(uiCarry.view ?? VIEW0);
   const [year, setYear] = useState<number | null>(uiCarry.year ?? null);
   uiCarry.zoom = zoom; uiCarry.view = view; uiCarry.year = year;
@@ -397,7 +399,7 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
         {state.kind === "ready" && projects.projectId && view === "gantt" && (
           <div className="gantt-wrap">
           <div className="gantt-main">
-          <DhtmlxGantt key={theme} collapse={collapse} gridWidth={gridWidth} columns={columns} users={users} onEditField={editField} revealId={reveal} todayToken={todayToken} onPersisted={() => void refresh()}
+          <DhtmlxGantt key={theme} colors={colors} collapse={collapse} gridWidth={gridWidth} columns={columns} users={users} onEditField={editField} revealId={reveal} todayToken={todayToken} onPersisted={() => void refresh()}
             onNotice={setWriteError}
             onCreateAt={({ rowId, date }) => void addItem("task", { anchorId: rowId, start: date }).catch(() => undefined)}
             onRename={(id) => { setJustCreated(id); setEditId(id); }}

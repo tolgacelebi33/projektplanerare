@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { canMove, deleteSubtree, descendants, epicChoices, swapWithSibling } from "../data/actions";
+import { effectiveColors } from "../data/colors";
+import { GROUP_COLORS, type GroupColor } from "../data/types";
 import type { DataStore } from "../data/DataStore";
 import { isISODate, todayISO } from "../data/dates";
 import { MAX_DESCRIPTION, MAX_TITLE, RuleError, isOverdue, validateItemShape } from "../data/rules";
@@ -296,6 +298,26 @@ export function ItemPanel({ store, projectId, itemId, dataVersion, autoSelectTit
             onChange={(e) => setDescription(e.target.value)} onBlur={() => void commit("description", { description })} />
         </label>
         {err("description")}
+
+        {epic && (
+          <section className="panel-section" data-section="color">
+            <h3>{sv.colors.label}</h3>
+            <div className="swatch-row" role="radiogroup" aria-label={sv.colors.label}>
+              {([null, ...GROUP_COLORS, "none"] as (GroupColor | "none" | null)[]).map((v) => {
+                // "Automatisk" visar färgen som automatiken skulle ge, inte den som just nu är vald
+                const effective = effectiveColors(all.map((i) => (i.id === item.id ? { ...i, color: null } : i))).get(item.id);
+                const label = v === null ? `${sv.colors.auto}${effective && effective !== "none" ? ` (${sv.colors.names[effective]})` : ""}` : v === "none" ? sv.colors.none : sv.colors.names[v];
+                return (
+                  <button key={String(v)} type="button" role="radio" aria-checked={(item.color ?? null) === v} aria-label={label} title={label}
+                    className={`color-swatch${v === null ? " auto" : v === "none" ? " none" : ""}`} data-color={String(v)}
+                    style={v && v !== "none" ? { background: `var(--grp-${v})` } : v === null && effective && effective !== "none" ? { color: `var(--grp-${effective})` } : undefined}
+                    onClick={() => void commit("color", { color: v })} />
+                );
+              })}
+            </div>
+            {err("color")}
+          </section>
+        )}
 
         <section className="panel-section" data-section="placement">
           <h3>{sv.panel.placement}</h3>

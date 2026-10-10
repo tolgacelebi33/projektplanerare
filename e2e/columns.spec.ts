@@ -93,3 +93,19 @@ test("K7 tangentbord: bibliotekets tangentbordsstöd tar inte tangenter från en
   expect(await page.evaluate(() => document.activeElement?.matches('select.cell-select[data-field="status"]'))).toBe(true);
   await expect(page.locator("aside.panel")).toHaveCount(0);
 });
+
+test("K8 ändras värdet med tangentbordet (pilar i Windows och Linux ger en ändring direkt) stannar fokus kvar i rutan så att man kan fortsätta", async ({ page }) => {
+  await enable(page, "Status");
+  const sel = 'select[data-field="status"]';
+  const status = () => page.evaluate(() => (window as any).__store.listItems("proj_1").then((l: { id: string; status: string }[]) => l.find((x) => x.id === "i7")!.status));
+  await page.locator(`.gantt_row[data-task-id="i7"] ${sel}`).focus();
+  // Samma händelse som en piltangent ger i Windows och Linux (macOS öppnar en lista i stället): värdet ändras och en change-händelse skickas
+  const change = (v: string) => page.evaluate(([s, value]) => { const el = document.querySelector(`.gantt_row[data-task-id="i7"] ${s}`) as HTMLSelectElement; el.value = value; el.dispatchEvent(new Event("change", { bubbles: true })); }, [sel, v]);
+  await change("done");
+  await expect.poll(status).toBe("done");
+  await expect.poll(() => page.evaluate((s) => document.activeElement?.matches(`.gantt_row[data-task-id="i7"] ${s}`), sel)).toBe(true);
+  await change("blocked"); // en andra ändring direkt efter fungerar också, utan att man måste klicka om
+  await expect.poll(status).toBe("blocked");
+  await expect.poll(() => page.evaluate((s) => document.activeElement?.matches(`.gantt_row[data-task-id="i7"] ${s}`), sel)).toBe(true);
+  await expect(page.locator("aside.panel")).toHaveCount(0);
+});

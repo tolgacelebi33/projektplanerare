@@ -340,3 +340,20 @@ body[data-overlay] .gantt_tooltip { display: none !important; }
 /* Dragning av rad: gruppen som raden hamnar i markeras, och en etikett vid pekaren säger vart den läggs */
 .dhx-host .gantt_row.drop-group, .dhx-host .gantt_task_row.drop-group { background: color-mix(in srgb, var(--accent) 24%, transparent) !important; box-shadow: inset 0 0 0 1px var(--accent); }
 .drag-hint { position: fixed; z-index: 120; pointer-events: none; max-width: 320px; padding: 3px 9px; border-radius: 6px; font-size: var(--fs-sm); background: var(--text); color: var(--surface); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* Gruppfärg: ett band längst till vänster på gruppens rader */
+.dhx-host .gantt_row.grp-gron > .gantt_cell:first-child { box-shadow: inset 4px 0 0 var(--grp-gron); }
+.dhx-host .gantt_row.grp-rod > .gantt_cell:first-child { box-shadow: inset 4px 0 0 var(--grp-rod); }
+.dhx-host .gantt_row.grp-koppar > .gantt_cell:first-child { box-shadow: inset 4px 0 0 var(--grp-koppar); }
+.dhx-host .gantt_row.grp-brons > .gantt_cell:first-child { box-shadow: inset 4px 0 0 var(--grp-brons); }
+.dhx-host .gantt_row.grp-guld > .gantt_cell:first-child { box-shadow: inset 4px 0 0 var(--grp-guld); }
+.dhx-host .gantt_row.grp-bla > .gantt_cell:first-child { box-shadow: inset 4px 0 0 var(--grp-bla); }
+.dhx-host .gantt_row.grp-stal > .gantt_cell:first-child { box-shadow: inset 4px 0 0 var(--grp-stal); }
+
+/* Färgval för en grupp i panelen */
+.swatch-row { display: flex; flex-wrap: wrap; gap: 8px; }
+.color-swatch { width: 24px; height: 24px; padding: 0; border-radius: 50%; border: var(--line-width) solid var(--line); cursor: pointer; background: transparent; }
+.color-swatch[aria-checked="true"] { outline: 2px solid var(--text); outline-offset: 2px; }
+.color-swatch:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.color-swatch.auto { background: repeating-linear-gradient(45deg, currentColor 0 4px, transparent 4px 8px); color: var(--text-muted); }
+.color-swatch.none { background: linear-gradient(135deg, transparent 45%, var(--text-muted) 45% 55%, transparent 55%); }

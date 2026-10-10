@@ -1,5 +1,5 @@
 import { isISODate, dayNumber, addDays, diffDays } from "./dates";
-import type { Dependency, Item, Status } from "./types";
+import { GROUP_COLORS, type Dependency, type Item, type Status } from "./types";
 
 export class RuleError extends Error {
   constructor(public code: string, message: string, public data?: Record<string, string>) {
@@ -30,6 +30,7 @@ export function validateItemShape(item: Item): void {
   if (!PRIORITIES.includes(item.priority)) throw new RuleError("bad_priority", `Ogiltig prioritet: ${item.priority}`);
   if (!Number.isInteger(item.progress) || item.progress < 0 || item.progress > 100)
     throw new RuleError("bad_progress", `Framsteg måste vara ett heltal 0-100: ${item.progress}`);
+  if (item.color !== undefined && item.color !== null && item.color !== "none" && !GROUP_COLORS.includes(item.color)) throw new RuleError("bad_color", `Ogiltig färg: ${String(item.color)}`);
   if (item.description.length > MAX_DESCRIPTION) throw new RuleError("description_too_long", `Beskrivningen är längre än ${MAX_DESCRIPTION} tecken`);
 }
 

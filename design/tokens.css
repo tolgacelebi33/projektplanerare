@@ -38,6 +38,15 @@
   --sv-glasbla: #D3EDEE;
   --sv-stalgra: #7E7C80;
 
+  /* Gruppfärger (band längst till vänster på en grupps rader). Dekorativa, inte statusfärger. Standard och Ljust: */
+  --grp-gron: var(--sv-marmorgron);
+  --grp-rod: var(--sv-rubinrod);
+  --grp-koppar: var(--sv-kopparrod);
+  --grp-brons: var(--sv-bronsbrun);
+  --grp-guld: color-mix(in srgb, var(--sv-guld) 75%, var(--sv-svart));
+  --grp-bla: color-mix(in srgb, var(--sv-glasbla) 40%, var(--sv-svart));
+  --grp-stal: var(--sv-stalgra);
+
   /* Semantiska val: status. All text i staplar är vit (samma färg överallt), så fyllningarna är valda för att bära den: kontrast mot vit text
      Marmorgrön 9,1, Rubinröd 7,7, Bronsbrun 10,7 och Ockra (Guld blandad 55 % mot Svart) 4,6. Alla beräknade. Samma i alla teman. */
   --status-not-started-bg: var(--sv-bronsbrun);
@@ -82,6 +91,10 @@ body {
    Markering och hover går mot mörkare, aldrig mot vitt. */
 :root,
 [data-theme="standard"] {
+  /* Gruppfärger i Standard: den mellangrå ytan kräver mörkare färger än i Ljust för att banden ska synas (uppmätt, se docs/beslut.md) */
+  --grp-koppar: color-mix(in srgb, var(--sv-kopparrod) 55%, var(--sv-svart));
+  --grp-guld: color-mix(in srgb, var(--sv-guld) 38%, var(--sv-svart));
+  --grp-stal: color-mix(in srgb, var(--sv-stalgra) 50%, var(--sv-svart));
   color-scheme: light;
   --bg-base: var(--sv-aluminiumgra);
   --surface: var(--sv-aluminiumgra);
@@ -101,6 +114,10 @@ body {
 }
 
 [data-theme="ljust"] {
+  /* Gruppfärger i Ljust: paletten som den är (Standard har mörkare varianter, se ovan) */
+  --grp-koppar: var(--sv-kopparrod);
+  --grp-guld: color-mix(in srgb, var(--sv-guld) 75%, var(--sv-svart));
+  --grp-stal: var(--sv-stalgra);
   color-scheme: light;
   --bg-base: var(--sv-vit);
   --surface: var(--sv-vit);
@@ -120,7 +137,15 @@ body {
 }
 
 [data-theme="morkt"] {
+  --grp-koppar: var(--sv-kopparrod);
+  --grp-guld: var(--sv-guld);
+  --grp-stal: var(--sv-stalgra);
   color-scheme: dark;
+  /* Mörkt: de mörka färgerna ljusas så att bandet syns mot den mörka ytan */
+  --grp-gron: color-mix(in srgb, var(--sv-marmorgron) 55%, var(--sv-vit));
+  --grp-rod: color-mix(in srgb, var(--sv-rubinrod) 60%, var(--sv-vit));
+  --grp-brons: color-mix(in srgb, var(--sv-bronsbrun) 45%, var(--sv-vit));
+  --grp-bla: var(--sv-glasbla);
   --bg-base: var(--sv-svart);
   --surface: color-mix(in srgb, var(--sv-svart) 90%, var(--sv-vit));
   --surface-alt: color-mix(in srgb, var(--sv-svart) 82%, var(--sv-vit));

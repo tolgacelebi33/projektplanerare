@@ -14,6 +14,10 @@ export interface Membership { workspace_id: string; user_id: string; role: Role 
 export type DependencyMode = "shift" | "none";
 export interface Project { id: string; workspace_id: string; name: string; created_at: string; dependency_mode?: DependencyMode }
 
+/** Gruppens färg (Svedbergs palett). Okänd/saknad = automatisk (efter gruppens plats), "none" = ingen. */
+export type GroupColor = "gron" | "rod" | "koppar" | "brons" | "guld" | "bla" | "stal";
+export const GROUP_COLORS: GroupColor[] = ["gron", "rod", "koppar", "brons", "guld", "bla", "stal"];
+
 export interface Item {
   id: string;
   workspace_id: string;
@@ -29,6 +33,8 @@ export interface Item {
   priority: Priority;
   /** Framsteg i hela procent, 0-100. Fristående från status. */
   progress: number;
+  /** Gruppens färg, bara meningsfull för en grupp (epic). Saknas eller null: automatisk färg efter plats. "none": ingen färg. */
+  color?: GroupColor | "none" | null;
   sort_order: number;
 }
 
