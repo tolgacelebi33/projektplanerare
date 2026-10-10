@@ -20,4 +20,4 @@ export function rememberScroll(): void {
 }
 
 /** Vy, zoom och år som ska överleva en ommontering (språkbyte), så att man hamnar där man var. */
-export const uiCarry: { zoom?: "day" | "week" | "month"; view?: "gantt" | "wheel"; year?: number | null } = {};
+export const uiCarry: { zoom?: "day" | "week" | "month"; view?: "gantt" | "wheel" | "board"; year?: number | null } = {};

@@ -363,3 +363,24 @@ body[data-overlay] .gantt_tooltip { display: none !important; }
 .bulk-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 6px 16px; border-bottom: var(--line-width) solid var(--line); background: var(--surface-alt); }
 .bulk-bar .bulk-count { font-family: var(--font-title); font-size: 13px; }
 .bulk-bar select { font: inherit; font-size: 12px; color: var(--text); background: var(--surface); border: var(--line-width) solid var(--line); border-radius: var(--radius-pill); padding: 3px 12px; max-width: 260px; }
+
+/* Board: poster per status */
+.board { display: grid; grid-template-columns: repeat(4, minmax(220px, 1fr)); gap: 12px; padding: 12px 16px; overflow: auto; height: 100%; box-sizing: border-box; align-items: start; }
+.board-col { background: var(--surface-alt); border: var(--line-width) solid var(--line); border-radius: 8px; padding: 8px; min-height: 120px; display: flex; flex-direction: column; gap: 8px; }
+.board-col.drop-on { outline: 2px solid var(--accent); outline-offset: -2px; }
+.board-head { margin: 0; font-family: var(--font-title); font-size: 13px; font-weight: var(--weight-strong); display: flex; align-items: center; gap: 6px; }
+.board-col.st-not_started .board-head { box-shadow: inset 0 -3px 0 var(--status-not-started-bg); }
+.board-col.st-in_progress .board-head { box-shadow: inset 0 -3px 0 var(--status-in-progress-bg); }
+.board-col.st-done .board-head { box-shadow: inset 0 -3px 0 var(--status-done-bg); }
+.board-col.st-blocked .board-head { box-shadow: inset 0 -3px 0 var(--status-blocked-bg); }
+.board-count { margin-left: auto; font-size: 12px; color: var(--text-muted); }
+.board-empty { margin: 0; font-size: 12px; color: var(--text-muted); }
+.board-card { background: var(--surface); border: var(--line-width) solid var(--line); border-radius: 6px; padding: 8px; cursor: grab; display: flex; flex-direction: column; gap: 4px; }
+.board-card:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.board-card.selected { box-shadow: inset 0 0 0 2px var(--accent); }
+.board-card.dragging { opacity: 0.5; }
+.board-title { font-size: var(--fs-md); font-weight: var(--weight-strong); }
+.board-path, .board-meta { font-size: 12px; color: var(--text-muted); }
+.board-meta { display: flex; flex-wrap: wrap; gap: 4px 10px; }
+.board-over { color: var(--text); font-weight: var(--weight-strong); text-decoration: underline; }
+.board-status { align-self: flex-start; font: inherit; font-size: 12px; color: var(--text); background: var(--surface); border: var(--line-width) solid var(--line); border-radius: var(--radius-pill); padding: 2px 8px; }

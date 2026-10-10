@@ -27,6 +27,7 @@ export const enDict: Dict = {
         "Columns chooses what is shown. Status, assignee and priority are changed right in the row.",
         "Drag the edge between the list and the timeline to change the width. Double-click the edge to fit the text.",
         "Search and Hide done hide rows in the view without changing anything.",
+        "The Board view shows tasks and milestones as cards in one column per status. Drag a card to another column to change its status, or use the choice on the card.",
         "Ctrl- or Cmd-click on a row selects several, and Shift-click selects a range. A bar then lets you change the status of, move or delete everything selected. Esc clears the selection.",
       ] },
       { h: "Shortcuts", items: [
@@ -164,7 +165,8 @@ export const enDict: Dict = {
     confirmYes: "Delete the project", none: "There is no project yet.", createFirst: "Create project",
     persisted: "Saved in this browser", persistYes: "The browser has promised not to clear the data on its own.", persistNo: "The browser may clear the data if it runs low on space. Export now and then as a backup.", demo: "Sample data, not saved",
   },
-  view: { label: "View", gantt: "Gantt", wheel: "Year wheel" },
+  view: { label: "View", gantt: "Gantt", wheel: "Year wheel", board: "Board" },
+  board: { label: "Board, items by status", empty: "No items", dragHint: "Drag a card to another column to change its status", cardStatus: (t: string) => `Status of ${t}` },
   year: { label: "Year", prev: "Previous year", next: "Next year" },
   wheel: {
     months: ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"],

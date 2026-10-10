@@ -94,7 +94,7 @@ test("T2 zoomkontrollen är en segmentkontroll skild från temaväljaren", async
   await page.goto("/?fixture=small&latency=0");
   await page.waitForSelector(SEL.dhtmlx.ready);
   await expect(page.locator('.toolbar .seg[aria-label="Zoom"] button')).toHaveCount(3);
-  await expect(page.locator('.toolbar .seg[aria-label="Vy"] button')).toHaveCount(2);
+  await expect(page.locator('.toolbar .seg[aria-label="Vy"] button')).toHaveCount(3);
   await expect(page.locator(".app-header .theme-switch .swatch")).toHaveCount(3);
   await expect(page.locator(".app-header .seg")).toHaveCount(0);
 });

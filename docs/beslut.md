@@ -221,3 +221,10 @@ Format: datum, beslut, skäl, vad som är overifierat.
 - **Ctrl/Cmd-klick** på en rad växlar markering, **Shift-klick** markerar en följd (från senast klickade, i visad ordning, hopfällda rader räknas inte), vanligt klick eller Esc avmarkerar. Markering öppnar inte panelen. Ett fält ("Markerade poster") visar antalet och låter dig ändra status, flytta till en grupp (eller översta nivån) och ta bort (med bekräftelse), eller avmarkera.
 - Poster vars grupp också är markerad flyttas och tas bort bara via gruppen (`selectionRoots`), och en markerad grupp eller något i den erbjuds inte som mål. Poster som lagret avvisar hoppas över och räknas, resten ändras ändå, och användaren får veta hur många som misslyckades. Alla ändringar i en bulkåtgärd blir ett ångra-steg (testat för status och flytt).
 - Markeringen är bara i Gantt och rensas när projektet byts. Verifierat: enhetstester (155) och 8 e2e-tester (MS1 till MS8). Overifierat: Ctrl-klick på Windows/Linux i en riktig webbläsare (testet använder Ctrl där), och dragning av flera rader samtidigt (finns inte: bara en rad dras).
+
+## 2026-10-10: Boardvy
+
+- Tredje vyn "Board" bredvid Gantt och Årshjul: en kolumn per status (Ej påbörjad, Pågår, Blockerad, Klar), kort för uppgifter och milstolpar. **Grupper visas inte som kort** (deras status är inte en arbetsstatus) utan som sökväg på korten ("Design / Visuell identitet"). Ordningen i en kolumn följer ordningen i listan.
+- **Dra ett kort till en annan kolumn** ändrar status (via samma `updateItem` som övriga ändringar, alltså med regler och ångra). Varje kort har också ett statusval, som är sättet för tangentbord och pekskärm (HTML5-dragning fungerar oftast inte på pekskärm: overifierat). Klick på ett kort öppnar posten, högerklick ger samma meny som i listan. Sök, Dölj klara och Filtrera gäller även här.
+- **Inte med:** att ordna kort inom en kolumn (ordningen sparas inte per kolumn), flerval i boarden, och gruppfärger på korten. Zoom och årsverktyg visas inte i boarden.
+- Verifierat: 5 e2e-tester (B1 till B5, inklusive dragning med musen och ångra). Overifierat: dragning i Safari och på pekskärm.

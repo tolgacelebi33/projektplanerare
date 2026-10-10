@@ -27,13 +27,14 @@ import { useProjectData } from "./proto/useProjectData";
 import type { Zoom } from "./proto/zoom";
 import { ItemPanel } from "./views/ItemPanel";
 import { YearWheel } from "./views/YearWheel";
+import { BoardView } from "./views/BoardView";
 import { THEMES, applyTheme, getTheme, type Theme } from "./theme";
 
 // Gantt-biblioteket laddas först när vyn visas.
 const DhtmlxGantt = lazy(() => import("./proto/DhtmlxGantt").then((m) => ({ default: m.DhtmlxGantt })));
 
 const params = new URLSearchParams(location.search);
-const VIEW0 = params.get("view") === "wheel" ? "wheel" : "gantt";
+const VIEW0 = params.get("view") === "wheel" ? "wheel" : params.get("view") === "board" ? "board" : "gantt";
 
 /** Byter man språk monteras appen om (nyckeln), men lagret är kvar, så ingen data försvinner. */
 export function App() {
@@ -63,7 +64,7 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
   );
   const filtering = filterActive({ query, hideDone, ...attrFilter });
   const colors = useMemo(() => (state.kind === "ready" ? effectiveColors(state.items) : new Map<string, never>()), [state]);
-  const [view, setView] = useState<"gantt" | "wheel">(uiCarry.view ?? VIEW0);
+  const [view, setView] = useState<"gantt" | "wheel" | "board">(uiCarry.view ?? VIEW0);
   const [year, setYear] = useState<number | null>(uiCarry.year ?? null);
   uiCarry.zoom = zoom; uiCarry.view = view; uiCarry.year = year;
   const [theme, setTheme] = useState<Theme>(getTheme);
@@ -392,7 +393,7 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
       <div className="toolbar">
         <span className="toolbar-label">{sv.view.label}</span>
         <div className="seg" role="group" aria-label={sv.view.label}>
-          {(["gantt", "wheel"] as const).map((v) => (
+          {(["gantt", "wheel", "board"] as const).map((v) => (
             <button key={v} aria-pressed={view === v} onClick={() => setView(v)}>{sv.view[v]}</button>
           ))}
         </div>
@@ -407,7 +408,7 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
             </div>
             <button type="button" className="mini" onClick={() => setTodayToken((n) => n + 1)}>{sv.today}</button>
           </>
-        ) : (
+        ) : view === "wheel" ? (
           <>
             <span className="toolbar-sep" aria-hidden="true" />
             <span className="toolbar-label">{sv.year.label}</span>
@@ -417,7 +418,7 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
               <button aria-label={sv.year.next} onClick={() => setYear((effectiveYear) + 1)}>{"\u203A"}</button>
             </div>
           </>
-        )}
+        ) : null}
         <span className="toolbar-sep" aria-hidden="true" />
         <div className="add-group" role="group" aria-label={sv.add.label} title={sv.add.hint}>
           <span className="toolbar-label">{sv.add.label}</span>
@@ -468,6 +469,7 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
         {projects.projects && projects.projects.length === 0 && (
           <div className="empty-state"><p>{sv.project.none}</p><button type="button" className="btn btn-primary" onClick={() => void projects.create(sv.project.defaultName)}>{sv.project.createFirst}</button></div>
         )}
+        {state.kind === "ready" && projects.projectId && view === "board" && <BoardView items={shown.items} allItems={state.items} users={users} selectedId={editId} onOpen={setEditId} onStatus={(id, s) => void editField(id, "status", s)} onContext={openMenu} />}
         {state.kind === "ready" && projects.projectId && view === "wheel" && <YearWheel items={shown.items} year={effectiveYear} selectedId={editId} onOpen={setEditId} onContext={openMenu} />}
         {state.kind === "ready" && projects.projectId && view === "gantt" && (
           <div className="gantt-wrap">

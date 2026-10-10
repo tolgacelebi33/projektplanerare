@@ -27,6 +27,7 @@ export const svDict = {
         "Kolumner väljer vad som visas. Status, ansvarig och prioritet ändras direkt i raden.",
         "Dra i kanten mellan listan och tidslinjen för att ändra bredden. Dubbelklicka på kanten för att passa texten.",
         "Sök och Dölj klara döljer rader i vyn utan att ändra något.",
+        "Vyn Board visar uppgifter och milstolpar som kort i en kolumn per status. Dra ett kort till en annan kolumn för att ändra status, eller använd valet på kortet.",
         "Ctrl- eller Cmd-klick på en rad markerar flera, och Shift-klick markerar en följd. Då visas ett fält där du ändrar status, flyttar eller tar bort alla markerade. Esc avmarkerar.",
       ] },
       { h: "Genvägar", items: [
@@ -169,7 +170,8 @@ export const svDict = {
     confirmYes: "Ta bort projektet", none: "Det finns inget projekt än.", createFirst: "Skapa projekt",
     persisted: "Sparas i den här webbläsaren", persistYes: "Webbläsaren har lovat att inte rensa datan av sig själv.", persistNo: "Webbläsaren kan rensa datan om utrymmet tar slut. Exportera då och då som säkerhetskopia.", demo: "Provdata, sparas inte",
   },
-  view: { label: "Vy", gantt: "Gantt", wheel: "Årshjul" },
+  view: { label: "Vy", gantt: "Gantt", wheel: "Årshjul", board: "Board" },
+  board: { label: "Board, poster per status", empty: "Inga poster", dragHint: "Dra ett kort till en annan kolumn för att ändra status", cardStatus: (t: string) => `Status för ${t}` },
   year: { label: "År", prev: "Föregående år", next: "Nästa år" },
   wheel: {
     months: ["jan", "feb", "mar", "apr", "maj", "jun", "jul", "aug", "sep", "okt", "nov", "dec"],
