@@ -1,9 +1,9 @@
-import { addDays, isISODate, todayISO } from "./dates";
+import { addDays, isISODate, recurringDates, todayISO } from "./dates";
 import { RuleError, validateItemShape } from "./rules";
 import { sv } from "../i18n/sv";
 import { enDict, svDict } from "../i18n/sv";
 import { friendlyError } from "../i18n/errors";
-import type { Dependency, DependencyMode, Item, ItemType, Priority, Project, Status, User } from "./types";
+import type { Dependency, DependencyMode, Item, ItemType, Priority, Project, Recurrence, Status, User } from "./types";
 
 /**
  * Export och import av projekt, utan beroende av lagring. JSON ger full återgivning (används också för att kopiera ett projekt).
@@ -197,6 +197,9 @@ const ALIASES: Record<string, string[]> = {
   completed: ["completeddate", "klardatum", "doneat", "closedat", "resolved", "completedat"],
   target: ["targetperiod", "målperiod", "period"],
   // Följande har ingen egen plats i modellen och läggs som rader i beskrivningen
+  recur: ["återkommer", "aterkommer", "upprepning", "upprepas", "recurrence", "repeat", "repeats", "frekvens", "intervall", "återkommande"],
+  repeatcount: ["antaltillfällen", "tillfällen", "occurrences", "repeatcount", "antalupprepningar", "antalgånger"],
+  category: ["kategori", "category", "grupp", "group", "avdelning"],
   area: ["area", "område"], contacts: ["contacts", "kontakter", "contact"], origstatus: ["originalstatus", "ursprungligstatus"],
   basis: ["basis", "underlag", "grund"], asof: ["statusasof", "statusper"], effmin: ["efforthoursmin"], effmax: ["efforthoursmax"],
 };
@@ -222,6 +225,18 @@ function lookup<T extends string>(kind: "type" | "status" | "priority", raw: str
   }
   return null;
 }
+
+/** Upprepning som text: svenska och engelska former (jämförs normaliserat). */
+const RECUR_SYN: Record<Recurrence, string[]> = {
+  weekly: ["varjevecka", "veckovis", "veckovist", "varjeveckan", "weekly", "everyweek", "vecka"],
+  biweekly: ["varannanvecka", "varjeandravecka", "varjetvåveckor", "varjevecka2", "var2avecka", "var2:avecka", "14dagar", "biweekly", "fortnightly", "everyotherweek", "everytwoweeks"],
+  monthly: ["varjemånad", "månadsvis", "månatlig", "månatligen", "monthly", "everymonth", "månad"],
+  quarterly: ["var3emånad", "var3:emånad", "vartredjemånad", "varjetredjemånad", "var3månad", "kvartalsvis", "varjekvartal", "kvartal", "quarterly", "every3months", "every3rdmonth", "everyquarter"],
+};
+const lookupRecur = (raw: string): Recurrence | null => {
+  const v = norm(raw);
+  return (Object.keys(RECUR_SYN) as Recurrence[]).find((k) => RECUR_SYN[k].some((s) => norm(s) === v)) ?? null;
+};
 
 const pad = (n: number) => String(n).padStart(2, "0");
 const lastDay = (y: number, m: number) => new Date(Date.UTC(y, m, 0)).getUTCDate();
@@ -284,7 +299,11 @@ export function parseRows(rows: string[][], name: string, today: string = todayI
   const note = (kind: string, value: string) => unknown.set(`${kind}|${value}`, (unknown.get(`${kind}|${value}`) ?? 0) + 1);
   const undatedIds: string[] = [];
   let shortened = 0, dayFirst = 0;
-  const parentRef: (string | null)[] = []; const predRef: string[][] = [];
+  const parentRef: (string | null)[] = []; const predRef: string[][] = []; const catRef: string[] = [];
+  const recurRef: ({ kind: Recurrence; count: number } | null)[] = []; let recurIgnored = 0;
+  // Kolumner som inte känns igen sparas i beskrivningen i stället för att försvinna
+  const knownCols = new Set(Object.values(col).filter((i) => i >= 0));
+  const extraCols = rows[0].map((h, i) => ({ h: h.trim(), i })).filter((x) => x.h && !knownCols.has(x.i));
   const TYPES_: ItemType[] = ["epic", "milestone", "task"];
   const items: ParsedItem[] = rows.slice(1).map((r, idx) => {
     const line = idx + 2; const err = (m: string) => new ImportError(sv.ex.row(line, m));
@@ -294,6 +313,16 @@ export function parseRows(rows: string[][], name: string, today: string = todayI
     const typeRaw = get(r, "type");
     let type: ItemType = "task";
     if (typeRaw) { const t = lookup("type", typeRaw, TYPES_); if (t) type = t; else note("type", typeRaw); }
+    // Återkommande: en rad med upprepning blir en serie milstolpar (om inte typen uttryckligen är något annat)
+    let recur: { kind: Recurrence; count: number } | null = null;
+    const recRaw = get(r, "recur");
+    if (recRaw) {
+      const k = lookupRecur(recRaw);
+      if (!k) note("recur", recRaw);
+      else if (typeRaw && type !== "milestone") recurIgnored++;
+      else { const c = Number(get(r, "repeatcount").replace(",", ".")); recur = { kind: k, count: Number.isFinite(c) && c >= 1 ? Math.min(120, Math.floor(c)) : 12 }; type = "milestone"; }
+    }
+    recurRef.push(recur);
     const statusRaw = get(r, "status");
     let status: Status = "not_started";
     if (statusRaw) { const t = lookup("status", statusRaw, STATUSES); if (t) status = t; else note("status", statusRaw); }
@@ -322,13 +351,14 @@ export function parseRows(rows: string[][], name: string, today: string = todayI
     add(sv.ex.meta.area, get(r, "area")); add(sv.ex.meta.contacts, get(r, "contacts")); add(sv.ex.meta.origStatus, get(r, "origstatus"));
     add(sv.ex.meta.basis, get(r, "basis")); add(sv.ex.meta.asOf, get(r, "asof")); add(sv.ex.meta.target, targetRaw);
     add(sv.ex.meta.completed, cd ?? ""); if (/^\d+$/.test(prioRaw)) add(sv.ex.meta.priorityInFile, prioRaw);
+    for (const x of extraCols) add(x.h, uncell(r[x.i] ?? "").trim());
     const emin = get(r, "effmin"), emax = get(r, "effmax"); if (emin || emax) add(sv.ex.meta.effort, emin === emax || !emax ? emin : `${emin}-${emax}`);
     let description = getRaw(r, "description");
     if (title.length > MAX_TITLE_LEN) { shortened++; description = description ? `${title}\n\n${description}` : title; title = `${title.slice(0, MAX_TITLE_LEN - 1).trimEnd()}…`; }
     if (meta.length) description = [description.trimEnd(), meta.join("\n")].filter(Boolean).join("\n\n");
     description = description.slice(0, MAX_DESC_LEN);
 
-    parentRef.push(get(r, "parent") || null);
+    parentRef.push(get(r, "parent") || null); catRef.push(get(r, "category"));
     predRef.push(get(r, "preds").split(/[,|;\n]/).map((x) => x.trim()).filter(Boolean));
     const it: ParsedItem = {
       id: get(r, "id") || `rad${line}`, parent_id: null, type, title, start, end, status,
@@ -354,6 +384,46 @@ export function parseRows(rows: string[][], name: string, today: string = todayI
     if (parentRef[idx]) it.parent_id = resolve(parentRef[idx]!, idx + 2, sv.ex.whatParent);
     for (const p of predRef[idx]) deps.push({ from: resolve(p, idx + 2, sv.ex.whatPred), to: it.id });
   });
+  // Återkommande rader blir en serie: ett tillfälle per datum, direkt efter raden, med samma serie och egenskaper
+  const catById = new Map(items.map((it, i) => [it.id, catRef[i]] as const));
+  if (recurRef.some(Boolean)) {
+    const out: ParsedItem[] = []; let series = 0, total = 0;
+    items.forEach((it, idx) => {
+      out.push(it);
+      const rc = recurRef[idx];
+      if (!rc) return;
+      const dates = recurringDates(it.start, rc.kind, rc.count);
+      it.series = `s_${it.id}`; it.recur = rc.kind;
+      dates.slice(1).forEach((d, k) => { const copy = { ...it, id: `${it.id}~${k + 2}`, start: d, end: d }; out.push(copy); catById.set(copy.id, catById.get(it.id) ?? ""); });
+      series++; total += dates.length;
+    });
+    items.length = 0; items.push(...out);
+    items.forEach((it, i) => { it.sort_order = i + 1; }); // tillfällena ligger direkt efter sin rad, i datumordning
+    warnings.push(sv.ex.recurMade(series, total));
+  }
+  if (recurIgnored) warnings.push(sv.ex.recurIgnored(recurIgnored));
+  // Kategori (eller Grupp) blir grupper: varje kategori en grupp, och raderna läggs i sin grupp om de inte redan har en förälder
+  if (col.category >= 0) {
+    const groups = new Map<string, ParsedItem>();
+    items.forEach((it, idx) => {
+      const c = catById.get(it.id);
+      if (!c || it.parent_id) return;
+      let g = groups.get(c);
+      if (!g) { g = { id: `__kategori_${groups.size + 1}`, parent_id: null, type: "epic", title: c.slice(0, MAX_TITLE_LEN), start: it.start, end: it.end, status: "not_started", assignee: null, description: "", priority: "normal", progress: 0, sort_order: it.sort_order }; groups.set(c, g); }
+      it.parent_id = g.id;
+    });
+    for (const g of groups.values()) {
+      const kids = items.filter((i) => i.parent_id === g.id);
+      g.start = kids.reduce((m, k) => (k.start < m ? k.start : m), kids[0].start); g.end = kids.reduce((m, k) => (k.end > m ? k.end : m), kids[0].end);
+      g.status = kids.every((k) => k.status === "done") ? "done" : kids.some((k) => k.status !== "not_started") ? "in_progress" : "not_started";
+    }
+    if (groups.size) {
+      items.push(...groups.values());
+      const top = items.filter((i) => !i.parent_id).sort((a, b) => a.sort_order - b.sort_order);
+      top.forEach((i, n) => { i.sort_order = n + 1; }); // gruppernas plats är den första radens, så ordningen i filen bevaras
+      warnings.push(sv.ex.categoryGroups(groups.size, rows[0][col.category].trim()));
+    }
+  }
   // Allt som har innehåll är en epic (bara en epic kan innehålla andra poster), oavsett vad filen kallar det
   const hasKids = new Set(items.map((i) => i.parent_id).filter((x): x is string => !!x));
   let promoted = 0;
@@ -365,9 +435,9 @@ export function parseRows(rows: string[][], name: string, today: string = todayI
   if (promoted) warnings.push(sv.ex.promoted(promoted));
   if (shortened) warnings.push(sv.ex.shortened(shortened, MAX_TITLE_LEN));
   if (dayFirst) warnings.push(sv.ex.dayFirst(dayFirst));
-  const fallback = { type: sv.panel.type.task, status: sv.status.not_started, priority: sv.panel.priorities.normal };
-  const kindName = { type: sv.ex.kindType, status: sv.ex.kindStatus, priority: sv.ex.kindPriority };
-  for (const [key, n] of unknown) { const [kind, value] = key.split("|") as ["type" | "status" | "priority", string]; warnings.push(sv.ex.unknownValue(kindName[kind], value, n, fallback[kind])); }
+  const fallback = { type: sv.panel.type.task, status: sv.status.not_started, priority: sv.panel.priorities.normal, recur: sv.ex.noRecur };
+  const kindName = { type: sv.ex.kindType, status: sv.ex.kindStatus, priority: sv.ex.kindPriority, recur: sv.ex.kindRecur };
+  for (const [key, n] of unknown) { const [kind, value] = key.split("|") as ["type" | "status" | "priority" | "recur", string]; warnings.push(sv.ex.unknownValue(kindName[kind], value, n, fallback[kind])); }
   const out: ParsedProject = { name: name.replace(/\.[^.]+$/, "").replace(/_/g, " ").trim().slice(0, 100) || sv.ex.defaultName, dependency_mode: "shift", items, deps, warnings };
   structureCheck(out);
   return out;

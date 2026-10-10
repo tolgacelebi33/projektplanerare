@@ -445,3 +445,41 @@ body[data-overlay] .gantt_tooltip { display: none !important; }
 .board-card { -webkit-touch-callout: none; user-select: none; }
 .board-ghost { position: fixed; z-index: 80; pointer-events: none; max-width: 220px; padding: 6px 10px; background: var(--text); color: var(--surface); border-radius: var(--radius-pill); font-size: 13px; font-weight: var(--weight-strong); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3); }
 .datepick-pop.flip { left: auto; right: 0; }
+
+/* Mellanbredd: etiketten och dess val hålls ihop, och statusen bryts inte ensam */
+.project-deps { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.lib-tag { white-space: nowrap; }
+.narrow-only { display: none; }
+
+/* Smalt fönster (telefon): rubriken är liten, verktygsfälten är hopfällda bakom "Verktyg", panelen fyller skärmen, och boardens kolumner bläddras i sidled */
+@media (max-width: 700px) {
+  .app-header { padding: 8px 12px; gap: 8px; }
+  .logo-slot { display: none; }
+  .app-title { font-size: 16px; }
+  .theme-label { display: none; }
+  .header-controls { gap: 2px; }
+  .header-top { gap: 8px; }
+  .narrow-only { display: inline-block; }
+  .toolbar { padding: 6px 12px; gap: 6px 8px; }
+  .project-row { display: none; }
+  .toolbar > *:not(.keep-narrow) { display: none; }
+  .toolbar .add-group { flex-wrap: wrap; }
+  .toolbar .add-group .btn-series { display: none; } /* återkommande milstolpe finns bland verktygen */
+  .tools-open .project-row { display: flex; }
+  .tools-open .toolbar > *:not(.keep-narrow) { display: revert; }
+  .tools-open .toolbar > .toolbar-sep { display: none; }
+  .tools-open .toolbar .add-group .mini, .tools-open .toolbar .add-group .btn-series { display: inline-block; }
+  .tools-open .app-header ~ * { max-height: none; }
+  .project-bar { gap: 6px; }
+  .lib-tag { margin-left: 0; }
+  .panel { position: fixed; inset: 0; width: 100%; flex: 1 1 100%; z-index: 60; border-left: 0; box-shadow: none; }
+  .quick-add { width: auto !important; margin: 0 8px; }
+  .board { grid-template-columns: repeat(4, 84vw); scroll-snap-type: x mandatory; padding: 8px 12px; gap: 10px; }
+  .board-col { scroll-snap-align: start; }
+  .help-pop { top: 48px; right: 8px; left: 8px; width: auto; }
+  .bulk-bar { padding: 6px 12px; }
+  .notice { padding: 6px 12px; font-size: 13px; }
+}
+/* Kompaktare verktygsfält: knapparna "+ Uppgift" och så vidare förklarar sig själva, så etiketten "Lägg till" behövs inte */
+.add-group > .toolbar-label:first-child { display: none; }
+.toolbar { gap: 6px 10px; }

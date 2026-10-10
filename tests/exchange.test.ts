@@ -329,3 +329,90 @@ describe("importera till ett befintligt projekt", () => {
     expect(await snap(s)).toBe(before);
   });
 });
+
+describe("kategori blir grupper, och okända kolumner försvinner inte", () => {
+  const csv = 'Kategori,Namn,Beskrivning,Team\nUnderhåll,M3 Community,"Förvaltning, prioritering",Affär\nUnderhåll,BI Community,Qlik-behov,Data\nProjekt,Konfigurator,Förstudie,\nProjekt,ERP Förstudie,Kartläggning,Affär\n,Fristående,Ingen kategori,\n';
+  it("varje kategori blir en grupp med sina rader, i filens ordning, och rader utan kategori ligger kvar överst", () => {
+    const p = parseCsv(csv, "real.csv", "2026-10-11");
+    const groups = p.items.filter((i) => i.type === "epic");
+    expect(groups.map((g) => g.title)).toEqual(["Underhåll", "Projekt"]);
+    const kids = (t: string) => p.items.filter((i) => i.parent_id === groups.find((g) => g.title === t)!.id).map((i) => i.title);
+    expect(kids("Underhåll")).toEqual(["M3 Community", "BI Community"]);
+    expect(kids("Projekt")).toEqual(["Konfigurator", "ERP Förstudie"]);
+    const top = p.items.filter((i) => !i.parent_id).sort((a, b) => a.sort_order - b.sort_order).map((i) => i.title);
+    expect(top).toEqual(["Underhåll", "Projekt", "Fristående"]);
+    expect(new Set(p.items.map((i) => i.sort_order)).size).toBeLessThanOrEqual(p.items.length);
+    expect(p.warnings.some((w) => w.includes('"Kategori"') && w.includes("2 grupper"))).toBe(true);
+  });
+  it("gruppernas datum följer innehållet och beskrivningen finns kvar", () => {
+    const p = parseCsv(csv, "real.csv", "2026-10-11");
+    const g = p.items.find((i) => i.title === "Underhåll")!;
+    expect([g.start, g.end]).toEqual(["2026-10-11", "2026-10-17"]);
+    expect(p.items.find((i) => i.title === "M3 Community")!.description).toContain("Förvaltning, prioritering");
+  });
+  it("en kolumn som inte känns igen (Team) läggs i beskrivningen i stället för att tappas, och tomma värden ger ingen rad", () => {
+    const p = parseCsv(csv, "real.csv", "2026-10-11");
+    expect(p.items.find((i) => i.title === "M3 Community")!.description).toContain("Team: Affär");
+    expect(p.items.find((i) => i.title === "Konfigurator")!.description).not.toContain("Team");
+  });
+  it("en rad med egen förälder läggs inte i kategorins grupp", () => {
+    const p = parseCsv("Kategori,Namn,Förälder\nA,Överst,\nA,Under,Överst\n", "x.csv", "2026-10-11");
+    expect(p.items.find((i) => i.title === "Under")!.parent_id).toBe(p.items.find((i) => i.title === "Överst")!.id);
+  });
+});
+
+describe("återkommande milstolpar i CSV", () => {
+  const csv = "Kategori;Namn;Start;Återkommer;Antal tillfällen\nStyrgrupper;Styrgrupp M3;2026-11-02;Var 3:e månad;4\nStyrgrupper;Styrgrupp Qlik;2026-11-09;var tredje månad;4\nForum;Utvecklingsforum M3;2026-10-19;Varannan vecka;26\nForum;Utvecklingsforum Qlik;2026-10-26;varannan vecka;3\nForum;Veckomöte;2026-10-12;Varje vecka;\nÖvrigt;Vanlig uppgift;2026-10-12;;\n";
+  const p = () => parseCsv(csv, "moten.csv", "2026-10-11");
+  const of = (t: string) => p().items.filter((i) => i.title === t);
+  it("en rad blir en serie milstolpar med rätt datum och antal", () => {
+    expect(of("Styrgrupp M3").map((i) => i.start)).toEqual(["2026-11-02", "2027-02-02", "2027-05-02", "2027-08-02"]);
+    expect(of("Utvecklingsforum M3").length).toBe(26);
+    expect(of("Utvecklingsforum M3").slice(0, 3).map((i) => i.start)).toEqual(["2026-10-19", "2026-11-02", "2026-11-16"]);
+    expect(of("Utvecklingsforum Qlik").map((i) => i.start)).toEqual(["2026-10-26", "2026-11-09", "2026-11-23"]);
+    expect(of("Veckomöte").length).toBe(12); // antal saknas: 12
+    expect(of("Veckomöte")[11].start).toBe("2026-12-28");
+  });
+  it("tillfällena är milstolpar med samma serie och upprepning, och en vanlig rad påverkas inte", () => {
+    for (const t of ["Styrgrupp M3", "Styrgrupp Qlik", "Utvecklingsforum M3"]) {
+      const s = of(t);
+      expect(s.every((i) => i.type === "milestone" && i.start === i.end)).toBe(true);
+      expect(new Set(s.map((i) => i.series)).size).toBe(1);
+    }
+    expect(of("Styrgrupp M3")[0].recur).toBe("quarterly"); expect(of("Styrgrupp Qlik")[0].recur).toBe("quarterly");
+    expect(of("Utvecklingsforum M3")[0].recur).toBe("biweekly"); expect(of("Veckomöte")[0].recur).toBe("weekly");
+    expect(of("Vanlig uppgift")[0]).toMatchObject({ type: "task" });
+    expect(of("Vanlig uppgift")[0].series).toBeUndefined();
+    expect(new Set(p().items.map((i) => i.id)).size).toBe(p().items.length); // unika id
+  });
+  it("allt ligger i rätt ordning: grupperna i filens ordning, och varje serie samlad i datumordning i sin grupp", () => {
+    const items = p().items;
+    const groups = items.filter((i) => i.type === "epic" && !i.parent_id).sort((a, b) => a.sort_order - b.sort_order).map((g) => g.title);
+    expect(groups).toEqual(["Styrgrupper", "Forum", "Övrigt"]);
+    const forum = items.find((i) => i.title === "Forum")!;
+    const kids = items.filter((i) => i.parent_id === forum.id).sort((a, b) => a.sort_order - b.sort_order);
+    const titles = kids.map((k) => k.title);
+    expect(titles.slice(0, 26).every((t) => t === "Utvecklingsforum M3")).toBe(true); // serien samlad
+    expect(titles.slice(26, 29).every((t) => t === "Utvecklingsforum Qlik")).toBe(true);
+    for (const t of ["Utvecklingsforum M3", "Styrgrupp M3"]) {
+      const d = items.filter((i) => i.title === t).sort((a, b) => a.sort_order - b.sort_order).map((i) => i.start);
+      expect(d).toEqual([...d].sort());
+    }
+    const g = items.find((i) => i.title === "Styrgrupper")!;
+    expect([g.start, g.end]).toEqual(["2026-11-02", "2027-08-09"]); // gruppens datum följer innehållet
+  });
+  it("engelska värden och okända värden, och upprepning på en uppgift som uttryckligen är en uppgift", () => {
+    const e = parseCsv("Title;Start;Repeat;Occurrences\nA;2026-10-12;every other week;3\nB;2026-10-12;sometimes;3\n", "e.csv", "2026-10-11");
+    expect(e.items.filter((i) => i.title === "A").map((i) => i.start)).toEqual(["2026-10-12", "2026-10-26", "2026-11-09"]);
+    expect(e.items.filter((i) => i.title === "B").length).toBe(1);
+    expect(e.warnings.some((w) => w.includes("sometimes"))).toBe(true);
+    const t = parseCsv("Titel;Typ;Start;Återkommer\nUppgift;Uppgift;2026-10-12;Varje vecka\n", "t.csv", "2026-10-11");
+    expect(t.items.length).toBe(1);
+    expect(t.warnings.some((w) => w.includes("inte milstolpar"))).toBe(true);
+  });
+  it("antalet begränsas till 120, och en milstolpe utan datum börjar idag", () => {
+    const m = parseCsv("Titel;Återkommer;Antal tillfällen\nX;Varje vecka;9999\nY;Varje vecka;2\n", "m.csv", "2026-10-11");
+    expect(m.items.filter((i) => i.title === "X").length).toBe(120);
+    expect(m.items.filter((i) => i.title === "Y").map((i) => i.start)).toEqual(["2026-10-11", "2026-10-18"]);
+  });
+});

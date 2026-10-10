@@ -164,6 +164,7 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
     } catch (e) { setWriteError(friendlyError(e)); throw e; }
   };
   const [recurOpen, setRecurOpen] = useState(false);
+  const [toolsOpen, setToolsOpen] = useState(false); // smalt fönster: verktygsfälten är hopfällda tills man öppnar dem
   /** Skapar en återkommande milstolpe (en serie) i den aktiva gruppen, som övriga nya poster. */
   const addSeries = async (a: { title: string; first: ISODate; kind: import("./data/types").Recurrence; count: number }) => {
     if (!projects.projectId || state.kind !== "ready") return;
@@ -292,7 +293,7 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
     } catch (e) { setWriteError(friendlyError(e)); reload(); }
   };
   // Vänstra kolumnens bredd: användarens val, sparas i webbläsaren. Begränsas av utrymmet så att tidslinjen alltid syns.
-  const [gridWidth, setGridWidth] = useState(loadGridWidth);
+  const [gridWidth, setGridWidth] = useState(() => (typeof window !== "undefined" && window.innerWidth < 700 ? 200 : loadGridWidth())); // på en telefon ska tidslinjen synas bredvid listan
   const gridRef = useRef(gridWidth);
   const changeGrid = (w: number) => { const next = clampGrid(w, mainRef.current?.clientWidth ?? Infinity); gridRef.current = next; setGridWidth(next); };
   const commitGrid = () => saveGridWidth(gridRef.current);
@@ -303,7 +304,7 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
     if (extra > 0) { changeGrid(gridRef.current + extra + 8); commitGrid(); }
   };
   // Valbara kolumner i rutnätet. Rutnätet blir lika mycket bredare (eller smalare) som kolumnen, så att titeln inte trängs ihop.
-  const [columns, setColumns] = useState<ColumnId[]>(loadColumns);
+  const [columns, setColumns] = useState<ColumnId[]>(() => (typeof window !== "undefined" && window.innerWidth < 700 ? loadColumns().filter((c) => c !== "end") : loadColumns())); // telefon: bara titeln i listan, så att den går att läsa
   const toggleColumn = (c: ColumnId) => {
     const on = columns.includes(c);
     const next = (["status", "assignee", "priority", "start", "end", "progress"] as ColumnId[]).filter((x) => (x === c ? !on : columns.includes(x)));
@@ -384,7 +385,7 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
   const notice = writeError ?? persistent?.saveError ?? null;
 
   return (
-    <div className="app">
+    <div className={`app${toolsOpen ? " tools-open" : ""}`}>
       <header className="app-header">
         <div className="logo-slot" aria-label={sv.logoSlot} />
         <h1 className="app-title">{sv.title}</h1>
@@ -415,12 +416,13 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
         <span className="lib-tag" title={persistent?.persistGranted === true ? sv.project.persistYes : persistent?.persistGranted === false ? sv.project.persistNo : undefined}>{app.persistent ? sv.project.persisted : sv.project.demo}</span>
       </div>
       <div className="toolbar">
-        <span className="toolbar-label">{sv.view.label}</span>
-        <div className="seg" role="group" aria-label={sv.view.label}>
+        <span className="toolbar-label keep-narrow">{sv.view.label}</span>
+        <div className="seg keep-narrow" role="group" aria-label={sv.view.label}>
           {(["gantt", "wheel", "board"] as const).map((v) => (
             <button key={v} aria-pressed={view === v} onClick={() => setView(v)}>{sv.view[v]}</button>
           ))}
         </div>
+        <button type="button" className="mini narrow-only keep-narrow" aria-expanded={toolsOpen} onClick={() => setToolsOpen((o) => !o)}>{toolsOpen ? sv.narrow.hideTools : sv.narrow.tools}</button>
         {view === "gantt" ? (
           <>
             <span className="toolbar-sep" aria-hidden="true" />
@@ -444,12 +446,12 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
           </>
         ) : null}
         <span className="toolbar-sep" aria-hidden="true" />
-        <div className="add-group" role="group" aria-label={sv.add.label} title={sv.add.hint}>
+        <div className="add-group keep-narrow" role="group" aria-label={sv.add.label} title={sv.add.hint}>
           <span className="toolbar-label">{sv.add.label}</span>
           {(["task", "milestone", "epic"] as ItemType[]).map((k) => (
             <button key={k} type="button" className="mini" disabled={!projects.projectId || state.kind !== "ready"} onClick={() => void addItem(k, k === "epic" ? { anchorId: null } : {}).catch(() => undefined)}>+ {sv.add[k]}</button>
           ))}
-          <button type="button" className="mini" disabled={!projects.projectId || state.kind !== "ready"} onClick={() => setRecurOpen(true)}>{sv.recur.button}</button>
+          <button type="button" className="mini btn-series" disabled={!projects.projectId || state.kind !== "ready"} aria-label={sv.recur.button} title={sv.recur.button} onClick={() => setRecurOpen(true)}>{sv.recur.buttonShort}</button>
         </div>
         <span className="toolbar-sep" aria-hidden="true" />
         <div className="add-group" role="group" aria-label={sv.history.label}>

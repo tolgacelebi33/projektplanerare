@@ -8,8 +8,9 @@ const KEY = "projektplanerare.gridwidth";
 
 /** Håller en bredd inom gränserna. `available` är utrymmet i vyn, så att tidslinjen aldrig trycks ihop helt. */
 export function clampGrid(w: number, available = Infinity): number {
-  const max = Math.max(GRID_MIN, Math.min(GRID_MAX, available - TIMELINE_MIN));
-  return Math.round(Math.min(max, Math.max(GRID_MIN, w)));
+  const min = available < 700 ? 110 : GRID_MIN; // smalt fönster: listan får vara smalare så att tidslinjen syns
+  const max = Math.max(min, Math.min(GRID_MAX, available - (available < 700 ? 150 : TIMELINE_MIN)));
+  return Math.round(Math.min(max, Math.max(min, w)));
 }
 export function loadGridWidth(): number {
   try { const v = Number(localStorage.getItem(KEY)); if (Number.isFinite(v) && v > 0) return clampGrid(v); } catch { /* lagring kan vara blockerad */ }
