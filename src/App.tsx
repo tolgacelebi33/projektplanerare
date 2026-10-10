@@ -163,29 +163,58 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
   };
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (!(e.metaKey || e.ctrlKey) || e.altKey) return;
       const t = e.target as HTMLElement | null;
-      if (t && (t.closest("input, textarea, select, [contenteditable=true]"))) return; // fält har sin egen ångra
-      const k = e.key.toLowerCase();
-      if (k === "z") { e.preventDefault(); void travel(e.shiftKey ? "redo" : "undo"); }
-      else if (k === "y" && !e.shiftKey) { e.preventDefault(); void travel("redo"); }
+      const typing = !!t && !!t.closest("input, textarea, select, [contenteditable=true]"); // fält har sina egna tangenter (och sin egen ångra)
+      if ((e.metaKey || e.ctrlKey) && !e.altKey) {
+        if (typing) return;
+        const k = e.key.toLowerCase();
+        if (k === "z") { e.preventDefault(); void travel(e.shiftKey ? "redo" : "undo"); }
+        else if (k === "y" && !e.shiftKey) { e.preventDefault(); void travel("redo"); }
+        return;
+      }
+      if (e.metaKey || e.ctrlKey || typing || state.kind !== "ready" || !projects.projectId) return;
+      if (t?.closest("[role=dialog], [role=menu], aside.panel")) return; // inne i en ruta, meny eller panel hör tangenterna dit
+      // Alt+pil upp eller ner: flytta den valda raden i sin grupp
+      if (e.altKey) {
+        if (editId && !e.shiftKey && (e.key === "ArrowUp" || e.key === "ArrowDown")) { e.preventDefault(); void moveSibling(editId, e.key === "ArrowUp" ? "up" : "down"); }
+        return;
+      }
+      const key = e.key;
+      const run = (fn: () => unknown) => { e.preventDefault(); void fn(); };
+      if (key === "n") run(() => addItem("task").catch(() => undefined));
+      else if (key === "m") run(() => addItem("milestone").catch(() => undefined));
+      else if (key === "g") run(() => addItem("epic", { anchorId: null }).catch(() => undefined));
+      else if (key === "/") run(() => document.querySelector<HTMLInputElement>("input.search")?.focus());
+      else if (key === "?") run(() => window.dispatchEvent(new CustomEvent("pp:help")));
+      else if (view === "gantt" && key === "t") run(() => setTodayToken((n) => n + 1));
+      else if (view === "gantt" && (key === "1" || key === "2" || key === "3")) run(() => setZoom((["day", "week", "month"] as Zoom[])[Number(key) - 1]));
     };
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
+    // Capture-fasen: appens genvägar går före bibliotekens egna tangenthanterare (Gantt-biblioteket tog t.ex. Alt+pil)
+    document.addEventListener("keydown", onKey, true);
+    return () => document.removeEventListener("keydown", onKey, true);
   });
   // Export, import och kopiering av projekt. Fel kastas vidare till projektraden, som visar dem. Lyckade resultat visas som meddelande.
   const report = (r: ImportResult) => {
     const extra = [...r.warnings, ...(r.skippedDeps.length ? [sv.ex.skippedDeps(r.skippedDeps.length, r.skippedDeps.slice(0, 3).join(", "), r.skippedDeps.length > 3)] : [])];
-    setWriteError([sv.project.importedAs(r.project.name, r.created), ...extra].join(" "));
+    setWriteError([(r.merged ? sv.project.importedInto : sv.project.importedAs)(r.project.name, r.created), ...extra].join(" "));
   };
   const doExport = async (format: ExportFormat) => {
     if (!projects.projectId) return;
     const out = await exportProject(store, projects.projectId, format);
     downloadText(out.filename, out.mime, out.text);
   };
-  const doImport = async (file: File) => {
+  const doImport = async (file: File, into = false) => {
     if (file.size > MAX_IMPORT_BYTES) throw new ImportError(sv.ex.fileTooBig);
-    const res = await importParsed(store, workspaceId, parseFile(file.name, await file.text()));
+    const parsed = parseFile(file.name, await file.text());
+    if (into && projects.projectId) {
+      // In i det här projektet: inget nytt projekt, vyn hämtas om och den första nya raden visas
+      const res = await importParsed(store, workspaceId, parsed, undefined, projects.projectId);
+      await refresh();
+      if (res.firstItemId) setReveal(res.firstItemId);
+      report(res);
+      return;
+    }
+    const res = await importParsed(store, workspaceId, parsed);
     focusMedianOnNextProject();
     await projects.reload(res.project.id);
     report(res);
@@ -265,6 +294,14 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
       { id: "remove", label: sv.menu.remove, danger: true },
     ];
   })();
+  /** Flytta en post upp eller ner bland sina syskon (menyn och Alt+pil). */
+  const moveSibling = async (id: string, dir: "up" | "down") => {
+    if (state.kind !== "ready") return;
+    try {
+      for (const u of swapWithSibling(state.items, id, dir) ?? []) await store.updateItem(u.id, { sort_order: u.sort_order });
+      await refresh();
+    } catch (e) { setWriteError(friendlyError(e)); }
+  };
   const pickMenu = async (choice: string) => {
     if (!menu || state.kind !== "ready") return;
     const m = menu, target = menuItem;
@@ -276,10 +313,7 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
       else if (choice === "task" || choice === "milestone") await addItem(choice, { anchorId: target?.id ?? null, start: m.date });
       else if (choice === "epic-in") await addItem("epic", { anchorId: target?.id ?? null, start: m.date });
       else if (choice === "epic") await addItem("epic", { anchorId: null, start: m.date });
-      else if ((choice === "up" || choice === "down") && target) {
-        for (const u of swapWithSibling(state.items, target.id, choice) ?? []) await store.updateItem(u.id, { sort_order: u.sort_order });
-        await refresh();
-      }
+      else if ((choice === "up" || choice === "down") && target) await moveSibling(target.id, choice);
     } catch (e) { setWriteError(friendlyError(e)); }
   };
   const confirmRemove = menu?.confirm && menuItem && state.kind === "ready"

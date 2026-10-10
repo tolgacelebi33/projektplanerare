@@ -28,8 +28,13 @@ export const svDict = {
         "Dra i kanten mellan listan och tidslinjen för att ändra bredden. Dubbelklicka på kanten för att passa texten.",
         "Sök och Dölj klara döljer rader i vyn utan att ändra något.",
       ] },
+      { h: "Genvägar", items: [
+        "N lägger till en uppgift, M en milstolpe och G en grupp. T hoppar till idag, och 1, 2 och 3 byter zoom till dag, vecka och månad.",
+        "/ går till sökrutan och ? öppnar den här hjälpen. Alt+pil upp eller ner flyttar den valda raden bland sina syskon.",
+        "Genvägarna är avstängda medan du skriver i ett fält, så att bokstäverna hamnar i fältet.",
+      ] },
       { h: "Spara, ångra och flytta data", items: [
-        "Allt sparas i den här webbläsaren. Exportera (JSON eller CSV) ger en säkerhetskopia, och Importera... läser in en fil som ett nytt projekt.",
+        "Allt sparas i den här webbläsaren. Exportera (JSON eller CSV) ger en säkerhetskopia, och Importera... läser in en fil som ett nytt projekt. Importera hit... lägger i stället in filens poster sist i det här projektet, och kan ångras.",
         "Ångra och Gör om finns i verktygsfältet, och som Cmd eller Ctrl+Z (med Skift för att göra om).",
       ] },
     ],
@@ -151,6 +156,7 @@ export const svDict = {
   project: {
     duplicate: "Kopiera", import: "Importera...", importFile: "Importfil", export: "Exportera", exportJson: "JSON (hela projektet)", exportCsv: "CSV (för Excel)", exportTemplate: "Importmall (CSV)",
     importedAs: (name: string, n: number) => `Importerade ${n} poster som nytt projekt "${name}".`,
+    importInto: "Importera hit...", importIntoHint: "Lägg in filens poster sist i det här projektet i stället för i ett nytt (kan ångras).", importedInto: (name: string, n: number) => `Lade in ${n} poster sist i projektet "${name}". Du kan ångra det.`,
     label: "Projekt", new: "Nytt", rename: "Byt namn", remove: "Ta bort", create: "Skapa", cancel: "Avbryt", save: "Spara",
     namePlaceholder: "Projektnamn", newName: "Namn på nytt projekt", defaultName: "Nytt projekt",
     confirm: (name: string, n: number) => `Ta bort projektet "${name}" med ${n} poster? Det går inte att ångra.`,

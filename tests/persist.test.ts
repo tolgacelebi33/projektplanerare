@@ -130,6 +130,51 @@ describe("PersistentStore", () => {
   });
 });
 
+describe("reservkopia vid omladdning mitt i en sparning", () => {
+  class Hang extends MemoryBackend { hang = false; override async save(s: Parameters<MemoryBackend["save"]>[0]) { if (this.hang) await new Promise(() => undefined); await super.save(s); } }
+  const title = async (s: PersistentStore) => (await s.listItems("proj_1")).find((i) => i.id === "i2")!.title;
+
+  it("ändringar som inte hann sparas finns kvar efter omladdning, via reservkopian, och reservkopian rensas när allt sparats", async () => {
+    const be = new Hang();
+    const a = await open(be); await a.flush();
+    be.hang = true; // sparningen blir aldrig klar, som när sidan laddas om mitt i
+    await a.updateItem("i2", { title: "Hann inte sparas" });
+    a.rescueSync();
+    expect((be.data as { snapshot: { items: { id: string; title: string }[] } }).snapshot.items.find((i) => i.id === "i2")!.title).not.toBe("Hann inte sparas"); // det sparade är äldre
+    be.hang = false;
+    const b = await open(be); // omladdning
+    expect(await title(b)).toBe("Hann inte sparas");
+    await b.flush();
+    expect(be.rescue).toBeNull(); // städat
+    expect((be.data as { snapshot: { items: { id: string; title: string }[] } }).snapshot.items.find((i) => i.id === "i2")!.title).toBe("Hann inte sparas"); // nu även i den vanliga lagringen
+  });
+  it("en äldre reservkopia än det sparade ignoreras och rensas", async () => {
+    const be = new Hang();
+    const a = await open(be); await a.flush();
+    be.hang = true; await a.updateItem("i2", { title: "Gammal" }); a.rescueSync(); be.hang = false;
+    const old = be.rescue;
+    const c = await open(new MemoryBackend(structuredClone(be.data))); // oberoende lagring med det sparade
+    void c;
+    // ett nyare sparat läge än reservkopian
+    const b = await open(be); await b.updateItem("i2", { title: "Nyare sparat" }); await b.flush();
+    be.rescue = old; // lägg tillbaka den gamla reservkopian
+    const d = await open(be);
+    expect(await title(d)).toBe("Nyare sparat");
+    expect(be.rescue).toBeNull();
+  });
+  it("ingen reservkopia skrivs när inget är osparat, och en trasig reservkopia ignoreras", async () => {
+    const be = new MemoryBackend();
+    const a = await open(be); await a.flush();
+    a.rescueSync();
+    expect(be.rescue).toBeNull();
+    be.rescue = { snapshot: { trasigt: true }, saved_at: "9999" };
+    const b = await open(be);
+    expect((await b.listItems("proj_1")).length).toBe(20);
+    expect(b.loadWarning).toBeNull();
+    expect(be.rescue).toBeNull();
+  });
+});
+
 describe("flytt från den första versionens lagring (localStorage)", () => {
   const mkLegacy = (raw: string | null) => {
     const state = { backedUp: null as string | null, migrated: false, fallbackBackend: new MemoryBackend() };

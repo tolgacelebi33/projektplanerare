@@ -168,3 +168,31 @@ test("X10 att importera ett projekt hoppar till dess mediandag, men en vanlig ä
   const x3 = await page.evaluate(() => (window as any).__dhx.getScrollState().x as number);
   expect(x3).not.toBe(x1);
 });
+
+test("X11 Importera hit lägger filens poster sist i det här projektet (inget nytt projekt), och hela importen går att ångra", async ({ page }) => {
+  await openApp(page, "dhtmlx");
+  const count = () => page.evaluate(() => (window as any).__store.listItems("proj_1").then((l: unknown[]) => l.length));
+  const n0 = await count();
+  const before = JSON.stringify(await page.evaluate(() => (window as any).__store.listItems("proj_1")));
+  const csv = "Titel;Typ;Förälder;Start;Slut\nTillagd grupp;Grupp;;2026-10-05;2026-10-16\nTillagd uppgift ett;;Tillagd grupp;2026-10-05;2026-10-09\nTillagd uppgift två;;Tillagd grupp;2026-10-12;2026-10-16\n";
+  await bar(page).getByRole("button", { name: "Importera hit..." }).click();
+  await bar(page).getByLabel("Importfil").setInputFiles({ name: "tillägg.csv", mimeType: "text/csv", buffer: Buffer.from(csv, "utf8") });
+  await expect(page.getByRole("alert").filter({ hasText: /Lade in 3 poster sist i projektet/ })).toBeVisible();
+  await expect(projectSelect(page).locator("option")).toHaveCount(1); // inget nytt projekt
+  await expect.poll(count).toBe(n0 + 3);
+  const all = await page.evaluate(() => (window as any).__store.listItems("proj_1")) as { title: string; parent_id: string | null; id: string }[];
+  const g = all.find((i) => i.title === "Tillagd grupp")!;
+  expect(all.filter((i) => i.parent_id === g.id).map((i) => i.title).sort()).toEqual(["Tillagd uppgift två", "Tillagd uppgift ett"].sort());
+  await expect(page.locator(".gantt_row .grid-title", { hasText: "Tillagd grupp" })).toHaveCount(1); // visas (bläddrat fram)
+  // en ångra tar bort allt
+  await page.getByRole("button", { name: "Ångra" }).click();
+  await expect.poll(count).toBe(n0);
+  expect(JSON.stringify(await page.evaluate(() => (window as any).__store.listItems("proj_1")))).toBe(before);
+});
+
+test("X12 Importera... skapar fortfarande ett nytt projekt och Importera hit finns bara när det finns ett projekt att lägga i", async ({ page }) => {
+  await openApp(page, "dhtmlx");
+  await expect(bar(page).getByRole("button", { name: "Importera hit..." })).toBeVisible();
+  await bar(page).getByLabel("Importfil").setInputFiles({ name: "ny.csv", mimeType: "text/csv", buffer: Buffer.from("Titel;Start\nEtt;2026-10-05\n", "utf8") });
+  await expect(projectSelect(page).locator("option")).toHaveCount(2);
+});

@@ -272,3 +272,60 @@ describe("smart import: en fil som inte följer appens egen mall", () => {
     expect((await s.listItems(res.project.id)).filter((i) => i.parent_id).length).toBe(3);
   });
 });
+
+describe("importera till ett befintligt projekt", () => {
+  const csv = "ID;Titel;Typ;Förälder;Start;Slut;Föregångare\ng;Ny grupp;Grupp;;2026-02-02;2026-02-13;\na;A i gruppen;;g;2026-02-02;2026-02-06;\nb;B efter A;;g;2026-02-09;2026-02-13;a\nc;Lös uppgift;;;2026-02-16;2026-02-20;\n";
+  const snap = async (s: MemoryStore) => JSON.stringify([await s.listItems("proj_1"), await s.listDependencies("proj_1")]);
+
+  it("posterna läggs sist i projektet, och inget befintligt ändras", async () => {
+    const s = newStore();
+    const before = (await s.listItems("proj_1")).map((i) => JSON.stringify(i));
+    const res = await importParsed(s, WS, parseCsv(csv, "x.csv", "2026-10-10"), undefined, "proj_1");
+    expect(res.merged).toBe(true); expect(res.project.id).toBe("proj_1"); expect(res.created).toBe(4);
+    const after = await s.listItems("proj_1");
+    expect(after.length).toBe(before.length + 4);
+    for (const b of before) expect(after.map((i) => JSON.stringify(i))).toContain(b); // alla gamla poster är oförändrade
+    const max = Math.max(...JSON.parse(`[${before.map((b) => JSON.parse(b).sort_order)}]`));
+    for (const i of after.slice(-4)) expect(i.sort_order).toBeGreaterThan(max);
+    expect((await s.listProjects()).length).toBe(1); // inget nytt projekt
+  });
+  it("hierarki och beroenden följer med, och projektets beroendeläge är återställt och flyttar ingenting", async () => {
+    const s = newStore();
+    expect((await s.listProjects())[0].dependency_mode ?? "shift").toBe("shift");
+    const res = await importParsed(s, WS, parseCsv(csv, "x.csv", "2026-10-10"), undefined, "proj_1");
+    const after = await s.listItems("proj_1");
+    const g = after.find((i) => i.title === "Ny grupp")!, a = after.find((i) => i.title === "A i gruppen")!, b = after.find((i) => i.title === "B efter A")!;
+    expect([a.parent_id, b.parent_id]).toEqual([g.id, g.id]);
+    expect((await s.listDependencies("proj_1")).some((d) => d.from_item_id === a.id && d.to_item_id === b.id)).toBe(true);
+    expect([b.start, b.end]).toEqual(["2026-02-09", "2026-02-13"]); // beroendet har inte flyttat något
+    expect((await s.listProjects())[0].dependency_mode ?? "shift").toBe("shift");
+    expect(res.firstItemId).toBe(g.id);
+  });
+  it("hela importen är ett steg att ångra, och gör om tar tillbaka den", async () => {
+    const s = newStore();
+    const before = await snap(s);
+    await importParsed(s, WS, parseCsv(csv, "x.csv", "2026-10-10"), undefined, "proj_1");
+    const merged = await snap(s);
+    expect(merged).not.toBe(before);
+    expect(s.canUndo).toBe(true);
+    await s.undo();
+    expect(await snap(s)).toBe(before);
+    expect((await s.listProjects())[0].dependency_mode ?? "shift").toBe("shift");
+    await s.redo();
+    expect(await snap(s)).toBe(merged);
+  });
+  it("misslyckas importen rullas allt tillbaka, även beroendeläget", async () => {
+    const s = newStore();
+    const before = await snap(s);
+    const real = s.createItem.bind(s); let n = 0;
+    s.createItem = (async (...a: Parameters<typeof real>) => { if (++n === 3) throw new Error("simulerat fel"); return real(...a); }) as typeof s.createItem;
+    await expect(importParsed(s, WS, parseCsv(csv, "x.csv", "2026-10-10"), undefined, "proj_1")).rejects.toThrow("simulerat fel");
+    expect(await snap(s)).toBe(before);
+    expect((await s.listProjects())[0].dependency_mode ?? "shift").toBe("shift");
+  });
+  it("ett projekt som inte finns ger ett tydligt fel och ändrar inget", async () => {
+    const s = newStore(); const before = await snap(s);
+    await expect(importParsed(s, WS, parseCsv(csv, "x.csv", "2026-10-10"), undefined, "finns-inte")).rejects.toThrow(/finns inte/);
+    expect(await snap(s)).toBe(before);
+  });
+});

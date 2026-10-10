@@ -46,7 +46,8 @@ export function createStore(params: URLSearchParams): AppStore {
     (store as unknown as { notify(): void }).notify();
   });
   if (typeof window !== "undefined") {
-    const flush = () => void store.flush();
+    // Gömd eller stängd flik: skriv det osparade läget synkront till reservplatsen (en asynkron sparning kan avbrytas av en omladdning)
+    const flush = () => { store.rescueSync(); void store.flush(); };
     window.addEventListener("pagehide", flush);
     document.addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden") flush(); });
   }

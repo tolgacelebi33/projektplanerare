@@ -184,7 +184,11 @@ class Sim {
       await this.page.keyboard.press("Escape");
       return `filter: status ${label}`;
     }
-    if (k === "collapse") { const open = this.chance(0.5); await this.page.getByRole("button", { name: open ? "Öppna alla" : "Fäll ihop alla" }).click(); return open ? "öppna alla" : "fäll ihop alla"; }
+    if (k === "collapse") {
+      const open = this.chance(0.5); const btn = this.page.getByRole("button", { name: open ? "Öppna alla" : "Fäll ihop alla" });
+      if (!(await btn.count())) return "fäll ihop/öppna: finns bara i tidslinjen"; // knapparna visas inte i årshjulet
+      await btn.click(); return open ? "öppna alla" : "fäll ihop alla";
+    }
     if (k === "done") { await this.page.getByRole("button", { name: "Dölj klara" }).click(); return "filter: dölj klara"; }
     const q = this.page.getByRole("searchbox", { name: "Sök" });
     if (k === "clear") { await q.fill(""); return "filter: rensa"; }

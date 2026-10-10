@@ -12,7 +12,7 @@ test("HJ1 Hjälp öppnas och stängs med knapp, Esc och klick utanför, och foku
   await btn.click();
   const dlg = page.getByRole("dialog", { name: "Så gör du" });
   await expect(dlg).toBeVisible();
-  await expect(dlg.getByRole("heading", { level: 3 })).toHaveText(["Skapa", "Flytta och ordna", "Beroenden", "Listan", "Spara, ångra och flytta data"]);
+  await expect(dlg.getByRole("heading", { level: 3 })).toHaveText(["Skapa", "Flytta och ordna", "Beroenden", "Listan", "Genvägar", "Spara, ångra och flytta data"]);
   await page.keyboard.press("Escape");
   await expect(dlg).toHaveCount(0);
   await expect(btn).toBeFocused();
@@ -42,7 +42,7 @@ test("HJ2 hjälpen på engelska, och varje knapp den nämner finns i gränssnitt
   await page.getByRole("button", { name: "Help" }).click();
   const en = page.getByRole("dialog", { name: "How to" });
   await expect(en).toBeVisible();
-  await expect(en.getByRole("heading", { level: 3 })).toHaveText(["Create", "Move and arrange", "Dependencies", "The list", "Save, undo and move data"]);
+  await expect(en.getByRole("heading", { level: 3 })).toHaveText(["Create", "Move and arrange", "Dependencies", "The list", "Shortcuts", "Save, undo and move data"]);
   const enText = await en.innerText();
   for (const mention of ["+ Task", "+ Milestone", "+ Group", "Columns", "Import...", "Move to group...", "Add predecessor...", "Hide done"]) expect(enText).toContain(mention);
 });

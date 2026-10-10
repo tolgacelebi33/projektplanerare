@@ -33,6 +33,8 @@ export class PersistentStore extends MemoryStore {
   override ready: Promise<void>;
   private backend!: Backend;
   private loaded = false;
+  private rescued = false;
+  private rev = 0;
   private readOnly = false;
   private latest: Stored | null = null;
   private saving = false;
@@ -65,7 +67,7 @@ export class PersistentStore extends MemoryStore {
   }
 
   private stored(): Stored {
-    return { schema: SCHEMA, saved_at: new Date().toISOString(), snapshot: this.snapshot(), history: this.getHistory() };
+    return { schema: SCHEMA, rev: ++this.rev, saved_at: new Date().toISOString(), snapshot: this.snapshot(), history: this.getHistory() };
   }
 
   private async init(): Promise<void> {
@@ -74,14 +76,20 @@ export class PersistentStore extends MemoryStore {
     if (this.backend.note) this.loadWarning = this.backend.note;
 
     let raw: unknown = null;
-    try { raw = await this.backend.load(); }
+    try { raw = await this.backend.load(); raw = this.newer(raw); }
     catch (e) {
       if (e instanceof CorruptError) { await this.setAside(e.raw, e.message); }
       else { this.readOnly = true; this.loadWarning = sv.persist.readFailed(msg(e)); this.finish(); return; } // skriv aldrig över något som inte gick att läsa
     }
 
     if (raw !== null) {
-      try { const { snapshot, history } = PersistentStore.normalize(raw); this.restore(snapshot); this.setHistory(history); this.finish(); return; }
+      try {
+        const { snapshot, history } = PersistentStore.normalize(raw);
+        this.rev = (raw as { rev?: number }).rev ?? 0; // löpnumret fortsätter där det slutade
+        this.restore(snapshot); this.setHistory(history);
+        this.finish(this.rescued); // en återställd reservkopia sparas i den vanliga lagringen
+        return;
+      }
       catch (e) { await this.setAside(raw, msg(e)); }
     } else if (this.legacy) {
       const old = this.legacy.read();
@@ -109,6 +117,25 @@ export class PersistentStore extends MemoryStore {
     this.finish(true);
   }
 
+  /**
+   * Reservkopian (se Backend.rescueSync) gäller om den är nyare än det sparade: då avbröts en sparning av en omladdning. Den rensas när den lästs.
+   * Går den inte att tolka ignoreras den (det sparade gäller).
+   */
+  private newer(saved: unknown): unknown {
+    const rescue = this.backend.loadRescue?.() ?? null;
+    if (rescue === null) return saved;
+    try {
+      PersistentStore.normalize(rescue);
+      const num = (x: unknown) => (x && typeof x === "object" && typeof (x as { rev?: unknown }).rev === "number" ? (x as { rev: number }).rev : null);
+      const at = (x: unknown) => (x && typeof x === "object" && "saved_at" in x ? String((x as { saved_at: unknown }).saved_at) : "");
+      // Löpnumret avgör (tidsstämpeln räcker inte: samma millisekund), tidsstämpeln om något av dem saknar löpnummer
+      const rescueIsNewer = num(rescue) !== null && num(saved) !== null ? num(rescue)! > num(saved)! : at(rescue) >= at(saved);
+      if (saved === null || rescueIsNewer) { this.rescued = true; return rescue; }
+    } catch { /* trasig reservkopia: ignoreras */ }
+    this.backend.clearRescue?.();
+    return saved;
+  }
+
   /** Trasig data sparas undan, aldrig över. */
   private async setAside(raw: unknown, reason: string) {
     await this.backend.saveBackup(raw);
@@ -130,11 +157,20 @@ export class PersistentStore extends MemoryStore {
       try {
         while (this.latest) {
           const s = this.latest; this.latest = null;
-          try { await this.backend.save(s); if (this.saveError) { this.saveError = null; this.notify(); } }
+          try { await this.backend.save(s); if (!this.latest) this.backend.clearRescue?.(); if (this.saveError) { this.saveError = null; this.notify(); } }
           catch (e) { this.saveError = `${sv.panel.errors.unknown} ${msg(e)}`; this.notify(); }
         }
       } finally { this.saving = false; }
     })();
+  }
+
+  /**
+   * Anropas när sidan göms eller stängs: finns osparade ändringar (en sparning pågår eller väntar) skrivs det senaste läget synkront till reservplatsen,
+   * eftersom en asynkron sparning kan avbrytas av en omladdning (då skulle bara en äldre mellanversion ligga kvar).
+   */
+  rescueSync(): void {
+    if (!this.loaded || this.readOnly || (!this.saving && !this.latest)) return;
+    this.backend.rescueSync?.(this.stored());
   }
 
   /** Väntar tills allt som ändrats är sparat. */

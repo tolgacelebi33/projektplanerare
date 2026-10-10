@@ -4,6 +4,8 @@ import type { Patch } from "./patch";
 /** Det som sparas: innehållet, ångra-historiken och en version av dataformatet (för framtida migreringar). */
 export interface Stored {
   schema: number;
+  /** Löpnummer som ökar för varje sparning. Avgör vilken kopia som är nyast (tidsstämpeln har bara millisekunders upplösning). */
+  rev?: number;
   saved_at: string;
   snapshot: Snapshot;
   history?: { undo: Patch[]; redo: Patch[] };
@@ -21,6 +23,13 @@ export interface Backend {
   /** Null om inget är sparat. Kastar CorruptError om det som finns inte går att tolka. */
   load(): Promise<unknown | null>;
   save(s: Stored): Promise<void>;
+  /**
+   * Säkerhetsnät för när sidan stängs eller laddas om medan en sparning pågår: skriver det osparade läget synkront (det enda som hinner före en omladdning)
+   * till en reservplats. Vid nästa start läses reservkopian in om den är nyare än det sparade, och rensas. Bästa möjliga: kan misslyckas om utrymmet är slut.
+   */
+  rescueSync?(s: Stored): void;
+  loadRescue?(): unknown | null;
+  clearRescue?(): void;
   /** Sparar undan data som inte gick att läsa, så att den aldrig skrivs över. */
   saveBackup(raw: unknown): Promise<void>;
 }
@@ -33,6 +42,10 @@ export class MemoryBackend implements Backend {
   async load() { if (this.failLoad) throw new Error(this.failLoad); return this.data === null ? null : structuredClone(this.data); }
   async save(s: Stored) { if (this.failSave) throw new Error(this.failSave); this.data = structuredClone(s); this.saves++; }
   async saveBackup(raw: unknown) { this.backup = raw; }
+  rescue: unknown | null = null;
+  rescueSync(s: Stored) { this.rescue = structuredClone(s); }
+  loadRescue() { return this.rescue === null ? null : structuredClone(this.rescue); }
+  clearRescue() { this.rescue = null; }
 }
 
 /** localStorage (ca 5 MB): reserv när IndexedDB saknas, och källan vid migrering från den första versionen. */
@@ -47,6 +60,8 @@ export class LocalStorageBackend implements Backend {
   }
   async save(s: Stored) { this.storage.setItem(this.key, JSON.stringify(s)); }
   async saveBackup(raw: unknown) { try { this.storage.setItem(`${this.key}.backup`, typeof raw === "string" ? raw : JSON.stringify(raw)); } catch { /* ingen plats för säkerhetskopia */ } }
+  // localStorage skriver redan synkront, så reservkopian är bara en vanlig sparning direkt
+  rescueSync(s: Stored) { try { this.storage.setItem(this.key, JSON.stringify(s)); } catch { /* ignoreras */ } }
 }
 
 const STORE = "kv";
@@ -80,4 +95,9 @@ export class IdbBackend implements Backend {
   async load() { const v = await this.run("readonly", (s) => s.get("state")); return v === undefined ? null : v; }
   async save(s: Stored) { await this.run("readwrite", (st) => st.put(s, "state")); }
   async saveBackup(raw: unknown) { try { await this.run("readwrite", (st) => st.put(raw, "state.backup")); } catch { /* ignoreras */ } }
+  // Reservkopian ligger i localStorage (synkront, så den hinner före en omladdning), som en JSON-sträng
+  private static RESCUE = "projektplanerare.rescue";
+  rescueSync(s: Stored) { try { localStorage.setItem(IdbBackend.RESCUE, JSON.stringify(s)); } catch { /* utrymmet slut: bästa möjliga */ } }
+  loadRescue(): unknown | null { try { const r = localStorage.getItem(IdbBackend.RESCUE); return r === null ? null : (JSON.parse(r) as unknown); } catch { return null; } }
+  clearRescue() { try { localStorage.removeItem(IdbBackend.RESCUE); } catch { /* ignoreras */ } }
 }

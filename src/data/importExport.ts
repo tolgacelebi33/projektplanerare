@@ -19,20 +19,28 @@ export async function exportProject(store: MemoryStore, projectId: string, forma
     : { filename: `${base}.csv`, mime: "text/csv;charset=utf-8", text: toCsv(parsed) };
 }
 
-export interface ImportResult { project: Project; created: number; skippedDeps: string[]; warnings: string[] }
+export interface ImportResult { project: Project; created: number; skippedDeps: string[]; warnings: string[]; /** Första nya raden på översta nivån (för att visa den), eller null. */ firstItemId: string | null; /** Lades in i ett befintligt projekt (annars skapades ett nytt). */ merged: boolean }
 
 /**
- * Lägger in en tolkad fil som ett nytt projekt (aldrig i ett befintligt, så att inget kan skrivas över). Projektet skapas med beroendeläget
- * "none" medan posterna läggs in, så att inga datum flyttas, och får sitt riktiga läge sist. Går något fel tas det halvfärdiga projektet bort.
- * Beroenden som lagret avvisar (cykel, dubblett) hoppas över och redovisas.
+ * Lägger in en tolkad fil. Som standard i ett nytt projekt (så att inget kan skrivas över): projektet skapas med beroendeläget "none" medan
+ * posterna läggs in, så att inga datum flyttas, och får sitt riktiga läge sist. Med `into` läggs posterna i det befintliga projektet i stället,
+ * sist på sina nivåer, utan att något befintligt rörs. Då sätts beroendeläget tillfälligt till "none" av samma skäl och återställs sedan,
+ * och hela importen är ett steg att ångra (historiken nollställs inte). Går något fel rullas allt tillbaka: det halvfärdiga projektet tas bort,
+ * eller de nya posterna och beroendena i det befintliga projektet. Beroenden som lagret avvisar (cykel, dubblett) hoppas över och redovisas.
  */
-export async function importParsed(store: MemoryStore, workspaceId: string, parsed: ParsedProject, nameOverride?: string): Promise<ImportResult> {
+export async function importParsed(store: MemoryStore, workspaceId: string, parsed: ParsedProject, nameOverride?: string, into?: string): Promise<ImportResult> {
   const users = await store.listUsers();
   const warnings = [...parsed.warnings];
   const byName = new Map(users.map((u) => [u.name.trim().toLowerCase(), u.id]));
   const unknown = new Set<string>();
-  const project = await store.createProject({ workspace_id: workspaceId, name: (nameOverride ?? parsed.name).trim().slice(0, 100) || sv.ex.defaultName, dependency_mode: "none" });
+  const existing = into ? (await store.listProjects()).find((p) => p.id === into) : undefined;
+  if (into && !existing) throw new Error(sv.ex.projectGone);
+  const originalMode = existing?.dependency_mode ?? "shift";
+  const sortBase = into ? (await store.listItems(into)).reduce((m, i) => Math.max(m, i.sort_order), 0) : 0;
+  const project = existing ?? await store.createProject({ workspace_id: workspaceId, name: (nameOverride ?? parsed.name).trim().slice(0, 100) || sv.ex.defaultName, dependency_mode: "none" });
+  const createdItems: string[] = [], createdDeps: string[] = [];
   try {
+    if (existing && originalMode !== "none") await store.updateProject(project.id, { dependency_mode: "none" });
     // föräldrar före barn
     const byId = new Map(parsed.items.map((i) => [i.id, i]));
     const depth = (id: string): number => { let d = 0; for (let c = byId.get(id); c?.parent_id; c = byId.get(c.parent_id)) d++; return d; };
@@ -48,20 +56,31 @@ export async function importParsed(store: MemoryStore, workspaceId: string, pars
         if (uid && !assignee_id) assignee_id = uid; else { left.push(nm); if (!uid) unknown.add(nm); }
       }
       if (left.length) rest.description = [rest.description.trimEnd(), `${sv.ex.meta.assignees}: ${left.join("; ")}`].filter(Boolean).join("\n\n").slice(0, 5000);
-      const made = await store.createItem({ ...rest, workspace_id: workspaceId, project_id: project.id, parent_id: parent_id ? idMap.get(parent_id)! : null, assignee_id });
-      idMap.set(id, made.id);
+      const made = await store.createItem({ ...rest, sort_order: rest.sort_order + sortBase, workspace_id: workspaceId, project_id: project.id, parent_id: parent_id ? idMap.get(parent_id)! : null, assignee_id });
+      idMap.set(id, made.id); createdItems.push(made.id);
     }
     const skippedDeps: string[] = [];
     for (const d of parsed.deps) {
-      try { await store.createDependency({ workspace_id: workspaceId, from_item_id: idMap.get(d.from)!, to_item_id: idMap.get(d.to)!, type: "finish_to_start" }); }
+      try { createdDeps.push((await store.createDependency({ workspace_id: workspaceId, from_item_id: idMap.get(d.from)!, to_item_id: idMap.get(d.to)!, type: "finish_to_start" })).id); }
       catch { skippedDeps.push(`${byId.get(d.from)?.title ?? d.from} -> ${byId.get(d.to)?.title ?? d.to}`); }
     }
     if (unknown.size) warnings.push(sv.ex.unknownAssignees([...unknown].join(", ")));
+    const firstTop = [...parsed.items].filter((i) => !i.parent_id).sort((a, b) => a.sort_order - b.sort_order)[0];
+    const firstItemId = firstTop ? idMap.get(firstTop.id) ?? null : null;
+    if (existing) {
+      const back = originalMode === "none" ? existing : await store.updateProject(project.id, { dependency_mode: originalMode });
+      return { project: back, created: parsed.items.length, skippedDeps, warnings, firstItemId, merged: true };
+    }
     const final = parsed.dependency_mode === "none" ? project : await store.updateProject(project.id, { dependency_mode: parsed.dependency_mode });
     store.clearHistory();
-    return { project: final, created: parsed.items.length, skippedDeps, warnings };
+    return { project: final, created: parsed.items.length, skippedDeps, warnings, firstItemId, merged: false };
   } catch (e) {
-    await store.deleteProject(project.id).catch(() => undefined);
+    if (existing) {
+      // Rulla tillbaka: de nya beroendena, sedan de nya posterna (barn före föräldrar), och projektets beroendeläge
+      for (const id of createdDeps) await store.deleteDependency(id).catch(() => undefined);
+      for (const id of [...createdItems].reverse()) await store.deleteItem(id).catch(() => undefined);
+      await store.updateProject(project.id, { dependency_mode: originalMode }).catch(() => undefined);
+    } else await store.deleteProject(project.id).catch(() => undefined);
     throw e;
   }
 }

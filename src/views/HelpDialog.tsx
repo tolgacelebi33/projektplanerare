@@ -7,6 +7,11 @@ export function HelpDialog() {
   const btn = useRef<HTMLButtonElement>(null);
   const root = useRef<HTMLDivElement>(null);
   useEffect(() => {
+    const toggle = () => setOpen((o) => !o);
+    window.addEventListener("pp:help", toggle);
+    return () => window.removeEventListener("pp:help", toggle);
+  }, []);
+  useEffect(() => {
     if (!open) return;
     const away = (e: Event) => { if (!root.current?.contains(e.target as Node) && !btn.current?.contains(e.target as Node)) setOpen(false); };
     const esc = (e: KeyboardEvent) => { if (e.key === "Escape") { e.stopPropagation(); setOpen(false); btn.current?.focus(); } };

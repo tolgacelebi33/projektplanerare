@@ -28,8 +28,13 @@ export const enDict: Dict = {
         "Drag the edge between the list and the timeline to change the width. Double-click the edge to fit the text.",
         "Search and Hide done hide rows in the view without changing anything.",
       ] },
+      { h: "Shortcuts", items: [
+        "N adds a task, M a milestone and G a group. T jumps to today, and 1, 2 and 3 switch the zoom to day, week and month.",
+        "/ goes to the search box and ? opens this help. Alt+arrow up or down moves the selected row among its siblings.",
+        "The shortcuts are off while you type in a field, so the letters go into the field.",
+      ] },
       { h: "Save, undo and move data", items: [
-        "Everything is saved in this browser. Export (JSON or CSV) gives a backup, and Import... reads a file in as a new project.",
+        "Everything is saved in this browser. Export (JSON or CSV) gives a backup, and Import... reads a file in as a new project. Import here... adds the file's items at the end of this project instead, and can be undone.",
         "Undo and Redo are in the toolbar, and as Cmd or Ctrl+Z (with Shift to redo).",
       ] },
     ],
@@ -146,6 +151,7 @@ export const enDict: Dict = {
   project: {
     duplicate: "Copy", import: "Import...", importFile: "Import file", export: "Export", exportJson: "JSON (whole project)", exportCsv: "CSV (for Excel)", exportTemplate: "Import template (CSV)",
     importedAs: (name: string, n: number) => `Imported ${n} items as the new project "${name}".`,
+    importInto: "Import here...", importIntoHint: "Add the file's items at the end of this project instead of in a new one (can be undone).", importedInto: (name: string, n: number) => `Added ${n} items at the end of the project "${name}". You can undo it.`,
     label: "Project", new: "New", rename: "Rename", remove: "Delete", create: "Create", cancel: "Cancel", save: "Save",
     namePlaceholder: "Project name", newName: "Name of the new project", defaultName: "New project",
     confirm: (name: string, n: number) => `Delete the project "${name}" with ${n} items? This cannot be undone.`,
