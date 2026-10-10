@@ -4,6 +4,7 @@ import type { Dict } from "./dict-sv";
 export const enDict: Dict = {
   lang: { label: "Language", sv: "SV", en: "EN", svName: "Svenska", enName: "English" },
   group: { addTask: (title: string) => `Add task to the group "${title}"`, count: (n: number) => `${n} items directly in the group`, quickIn: (title: string) => `Add task to "${title}"...  (Enter)` },
+  cols: { label: "Columns", hint: "Choose which columns the grid shows. Status, assignee and priority can be changed right in the row.", none: "None" },
   grid: { title: "Title", end: "End", resize: "Column width", resizeHint: "Drag to change the width of the left column. Double-click to fit the text. Arrow keys change it in steps." },
   dates: {
     monthsFull: ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"],

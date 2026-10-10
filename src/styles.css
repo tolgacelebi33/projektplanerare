@@ -305,3 +305,19 @@ body[data-overlay] .gantt_tooltip { display: none !important; }
 /* Rader går att dra i rutnätet (byta ordning och grupp) */
 .dhx-host .gantt_grid_data .gantt_row { cursor: grab; }
 .dhx-host .gantt_grid_data .gantt_row .row-check, .dhx-host .gantt_grid_data .gantt_row .row-add, .dhx-host .gantt_grid_data .gantt_row .gantt_tree_icon { cursor: pointer; }
+
+/* Valbara kolumner i rutnätet: redigerbara rutor (status, ansvarig, prioritet) direkt i raden */
+.dhx-host .cell-select { width: calc(100% - 6px); max-width: 100%; margin: 0 3px; font: inherit; font-size: var(--fs-sm); color: var(--text); background: transparent; border: var(--line-width) solid transparent; border-radius: 4px; padding: 1px 2px; cursor: pointer; text-overflow: ellipsis; vertical-align: middle; }
+.dhx-host .gantt_row:hover .cell-select, .dhx-host .cell-select:focus-visible { border-color: var(--line); }
+.dhx-host .cell-select:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.dhx-host .cell-select.chip { color: var(--chip-fg, var(--text)); background: var(--chip-bg, transparent); border-color: transparent; font-weight: var(--weight-strong); }
+.dhx-host .cell-select.chip.st-not_started { --chip-bg: var(--status-not-started-bg); --chip-fg: var(--status-not-started-fg); }
+.dhx-host .cell-select.chip.st-in_progress { --chip-bg: var(--status-in-progress-bg); --chip-fg: var(--status-in-progress-fg); }
+.dhx-host .cell-select.chip.st-done { --chip-bg: var(--status-done-bg); --chip-fg: var(--status-done-fg); }
+.dhx-host .cell-select.chip.st-blocked { --chip-bg: var(--status-blocked-bg); --chip-fg: var(--status-blocked-fg); }
+.dhx-host .cell-select.chip option { background: var(--surface); color: var(--text); }
+.dhx-host .cell-select.prio-urgent, .dhx-host .cell-select.prio-high { font-weight: var(--weight-strong); }
+.dhx-host .cell-select.prio-low { color: var(--text-muted); }
+.col-picker { position: relative; }
+.col-picker-pop { position: absolute; top: calc(100% + 6px); left: 0; z-index: 30; min-width: 170px; padding: 8px 10px; display: grid; gap: 6px; background: var(--surface); border: var(--line-width) solid var(--line); border-radius: 8px; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25); }
+.col-picker-row { display: flex; align-items: center; gap: 8px; font-size: var(--fs-md); cursor: pointer; }

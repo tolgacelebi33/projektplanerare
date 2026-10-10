@@ -8,7 +8,7 @@ import { ContextMenu, type MenuItem } from "./views/ContextMenu";
 import { QuickAdd } from "./views/QuickAdd";
 import type { ISODate } from "./data/types";
 import { todayISO } from "./data/dates";
-import type { ItemType } from "./data/types";
+import type { ItemType, Priority, Status, User } from "./data/types";
 import { PersistentStore } from "./data/PersistentStore";
 import { getApp } from "./store";
 import { useProjects } from "./useProjects";
@@ -16,6 +16,8 @@ import { ProjectBar } from "./views/ProjectBar";
 import { LANGS, setLang, storedLang, sv, type Lang } from "./i18n/sv";
 import { focusMedianOnNextProject, rememberScroll, uiCarry } from "./scrollCarry";
 import { clampGrid, loadGridWidth, saveGridWidth } from "./layout";
+import { COLUMN_WIDTH, loadColumns, saveColumns, type ColumnId } from "./columns";
+import { ColumnPicker } from "./views/ColumnPicker";
 import { GridResizer } from "./views/GridResizer";
 import { useProjectData } from "./proto/useProjectData";
 import type { Zoom } from "./proto/zoom";
@@ -209,6 +211,23 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
     document.querySelectorAll<HTMLElement>(".gantt-host .grid-title").forEach((e) => { extra = Math.max(extra, e.scrollWidth - e.clientWidth); });
     if (extra > 0) { changeGrid(gridRef.current + extra + 8); commitGrid(); }
   };
+  // Valbara kolumner i rutnätet. Rutnätet blir lika mycket bredare (eller smalare) som kolumnen, så att titeln inte trängs ihop.
+  const [columns, setColumns] = useState<ColumnId[]>(loadColumns);
+  const toggleColumn = (c: ColumnId) => {
+    const on = columns.includes(c);
+    const next = (["status", "assignee", "priority", "start", "end", "progress"] as ColumnId[]).filter((x) => (x === c ? !on : columns.includes(x)));
+    setColumns(next); saveColumns(next);
+    changeGrid(gridRef.current + (on ? -COLUMN_WIDTH[c] : COLUMN_WIDTH[c])); commitGrid();
+  };
+  const [users, setUsers] = useState<User[]>([]);
+  useEffect(() => { let on = true; void store.listUsers().then((u) => { if (on) setUsers(u); }).catch(() => undefined); return () => { on = false; }; }, [store]);
+  /** Status, prioritet eller ansvarig ändrad direkt i en rad. */
+  const editField = async (id: string, field: "status" | "priority" | "assignee", value: string) => {
+    try {
+      await store.updateItem(id, field === "assignee" ? { assignee_id: value || null } : field === "status" ? { status: value as Status } : { priority: value as Priority });
+      await refresh();
+    } catch (e) { setWriteError(friendlyError(e)); }
+  };
   const [todayToken, setTodayToken] = useState(0);
   // Meddelanden försvinner av sig själva efter en stund (och går att stänga)
   useEffect(() => { if (!writeError) return; const t = window.setTimeout(() => setWriteError(null), 9000); return () => window.clearTimeout(t); }, [writeError]);
@@ -333,6 +352,8 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
           {filtering && state.kind === "ready" && <span className="toolbar-label" role="status">{sv.filter.count(shown.items.length, state.items.length)}</span>}
         </div>
         <span className="toolbar-sep" aria-hidden="true" />
+        <ColumnPicker columns={columns} onToggle={toggleColumn} />
+        <span className="toolbar-sep" aria-hidden="true" />
         <div className="add-group" role="group" aria-label={sv.history.label}>
           <button type="button" className="mini" disabled={!hist.undo} title={sv.history.undoHint} onClick={() => void travel("undo")}>{sv.history.undo}</button>
           <button type="button" className="mini" disabled={!hist.redo} title={sv.history.redoHint} onClick={() => void travel("redo")}>{sv.history.redo}</button>
@@ -364,7 +385,7 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
         {state.kind === "ready" && projects.projectId && view === "gantt" && (
           <div className="gantt-wrap">
           <div className="gantt-main">
-          <DhtmlxGantt key={theme} gridWidth={gridWidth} revealId={reveal} todayToken={todayToken} onPersisted={() => void refresh()}
+          <DhtmlxGantt key={theme} gridWidth={gridWidth} columns={columns} users={users} onEditField={editField} revealId={reveal} todayToken={todayToken} onPersisted={() => void refresh()}
             onNotice={setWriteError}
             onCreateAt={({ rowId, date }) => void addItem("task", { anchorId: rowId, start: date }).catch(() => undefined)}
             onRename={(id) => { setJustCreated(id); setEditId(id); }}

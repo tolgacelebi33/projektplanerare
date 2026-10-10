@@ -4,6 +4,7 @@ import type { Status } from "../data/types";
 export const svDict = {
   lang: { label: "Språk", sv: "SV", en: "EN", svName: "Svenska", enName: "English" },
   group: { addTask: (title: string) => `Lägg till uppgift i gruppen "${title}"`, count: (n: number) => `${n} poster direkt i gruppen`, quickIn: (title: string) => `Lägg till uppgift i "${title}"...  (Enter)` },
+  cols: { label: "Kolumner", hint: "Välj vilka kolumner som visas i rutnätet. Status, ansvarig och prioritet kan ändras direkt i raden.", none: "Ingen" },
   grid: { title: "Titel", end: "Slut", resize: "Kolumnbredd", resizeHint: "Dra för att ändra bredden på vänstra kolumnen. Dubbelklicka för att passa texten. Pilar ändrar i steg." },
   dates: {
     monthsFull: ["januari", "februari", "mars", "april", "maj", "juni", "juli", "augusti", "september", "oktober", "november", "december"],
