@@ -250,13 +250,30 @@ function parsePeriod(raw: string): { start: string; end: string } | null {
 export const PLACEHOLDER_DAYS = 7;
 
 export function parseCsv(text: string, name: string, today: string = todayISO()): ParsedProject {
-  const rows = readCsv(text);
+  return parseRows(readCsv(text), name, today);
+}
+
+/** Raderna ovanför rubrikraden tas bort (rubrikraden är den första inom de 15 första som har en titelkolumn). Finns ingen titelkolumn lämnas raderna orörda. */
+export function trimToHeader(rows: string[][]): string[][] {
+  const at = rows.slice(0, 15).findIndex((r) => r.some((c) => ALIASES.title.includes(norm(c))));
+  return at > 0 ? rows.slice(at) : rows;
+}
+
+/**
+ * Tolkar rader (första raden är rubriker) till ett projekt. Delas av CSV och Excel.
+ * `fractionProgress`: Excel lagrar procent som bråk (40 % är 0,4). Är alla värden i framstegskolumnen högst 1, och något över 0, tolkas de som bråk.
+ */
+export function parseRows(rows: string[][], name: string, today: string = todayISO(), opts: { fractionProgress?: boolean } = {}): ParsedProject {
   if (rows.length < 2) throw new ImportError(sv.ex.csvNoRows);
   if (rows.length - 1 > MAX_IMPORT_ITEMS) throw new ImportError(sv.ex.tooManyRows(MAX_IMPORT_ITEMS));
   const head = rows[0].map((h) => norm(h));
   const col: Record<string, number> = {};
   for (const [key, names] of Object.entries(ALIASES)) col[key] = head.findIndex((h) => names.includes(h));
   if (col.title < 0) throw new ImportError(sv.ex.csvColumn(sv.grid.title));
+  const progScale = opts.fractionProgress && col.progress >= 0 && (() => {
+    const v = rows.slice(1).map((r) => (r[col.progress] ?? "").trim()).filter(Boolean).map((x) => Number(x.replace(/%$/, "").replace(",", "."))).filter(Number.isFinite);
+    return v.length > 0 && v.some((x) => x > 0) && v.every((x) => x <= 1) ? 100 : 1;
+  })() || 1;
   const get = (r: string[], k: string) => (col[k] >= 0 ? uncell((r[col[k]] ?? "").trim()) : "");
   const getRaw = (r: string[], k: string) => (col[k] >= 0 ? uncell(r[col[k]] ?? "") : "");
 
@@ -295,7 +312,7 @@ export function parseCsv(text: string, name: string, today: string = todayISO())
 
     const progRaw = get(r, "progress").replace(/%$/, "").trim().replace(",", ".");
     const progNum = progRaw === "" ? 0 : Number(progRaw);
-    const progress = Number.isFinite(progNum) ? Math.min(100, Math.max(0, Math.round(progNum))) : 0;
+    const progress = Number.isFinite(progNum) ? Math.min(100, Math.max(0, Math.round(progNum * progScale))) : 0;
 
     // Allt som inte har egen plats i modellen läggs sist i beskrivningen i stället för att försvinna
     const meta: string[] = [];
@@ -365,6 +382,16 @@ export function parseFile(fileName: string, text: string): ParsedProject {
   if (lower.endsWith(".json")) return parseJson(text);
   if (lower.endsWith(".csv") || lower.endsWith(".txt")) return parseCsv(text, fileName);
   throw new ImportError(sv.ex.fileType);
+}
+
+/** Läser en uppladdad fil: Excel (.xlsx) som binärfil, övriga som text. */
+export async function parseUpload(file: File): Promise<ParsedProject> {
+  if (file.size > MAX_IMPORT_BYTES) throw new ImportError(sv.ex.fileTooBig);
+  if (file.name.toLowerCase().endsWith(".xlsx")) {
+    const { parseXlsx } = await import("./xlsx"); // laddas först när en Excel-fil väljs
+    return parseXlsx(file, file.name);
+  }
+  return parseFile(file.name, await file.text());
 }
 
 export function fileSlug(name: string): string {

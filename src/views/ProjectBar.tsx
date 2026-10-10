@@ -57,7 +57,7 @@ export function ProjectBar({ projects, projectId, itemCount, onSelect, onCreate,
         {current && <button type="button" className="mini" onClick={() => void run(onDuplicate)}>{sv.project.duplicate}</button>}
         <button type="button" className="mini" onClick={() => { intoRef.current = false; fileRef.current?.click(); }}>{sv.project.import}</button>
         {current && <button type="button" className="mini" title={sv.project.importIntoHint} onClick={() => { intoRef.current = true; fileRef.current?.click(); }}>{sv.project.importInto}</button>}
-        <input ref={fileRef} type="file" accept=".json,.csv,.txt" hidden aria-label={sv.project.importFile}
+        <input ref={fileRef} type="file" accept=".json,.csv,.txt,.xlsx" hidden aria-label={sv.project.importFile}
           onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) { const into = intoRef.current; intoRef.current = false; void run(() => onImport(f, into)); } }} />
         {current && (
           <select className="project-select project-select-sm" aria-label={sv.project.export} value=""

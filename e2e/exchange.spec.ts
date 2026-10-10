@@ -69,7 +69,7 @@ test("X4 en felaktig fil visar ett begripligt fel i projektraden, och inget proj
   await bar(page).getByLabel("Importfil").setInputFiles({ name: "fel.csv", mimeType: "text/csv", buffer: Buffer.from("Titel;Start\nX;2026-13-40\n", "utf8") });
   await expect(bar(page).getByRole("alert")).toContainText("Rad 2");
   await expect(projectSelect(page).locator("option")).toHaveCount(1);
-  await bar(page).getByLabel("Importfil").setInputFiles({ name: "x.xlsx", mimeType: "application/octet-stream", buffer: Buffer.from("x") });
+  await bar(page).getByLabel("Importfil").setInputFiles({ name: "x.xls", mimeType: "application/octet-stream", buffer: Buffer.from("x") });
   await expect(bar(page).getByRole("alert")).toContainText("Filtypen stöds inte");
   await expect(projectSelect(page).locator("option")).toHaveCount(1);
 });

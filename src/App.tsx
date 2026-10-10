@@ -1,6 +1,6 @@
 import { Suspense, lazy, useEffect, useMemo, useRef, useState } from "react";
 import { downloadText } from "./download";
-import { MAX_IMPORT_BYTES, ImportError, parseFile } from "./data/exchange";
+import { MAX_IMPORT_BYTES, ImportError, parseUpload } from "./data/exchange";
 import { duplicateProject, exportProject, importParsed, type ExportFormat, type ImportResult } from "./data/importExport";
 import { bulkDelete, bulkMove, bulkStatus, canMove, deleteSubtree, descendants, epicChoices, filterActive, filterView, moveTargets, newItemDraft, planBoardDrop, planMove, rangeIds, selectionRoots, swapWithSibling, type BulkResult } from "./data/actions";
 import { BulkBar } from "./views/BulkBar";
@@ -245,7 +245,7 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
   };
   const doImport = async (file: File, into = false) => {
     if (file.size > MAX_IMPORT_BYTES) throw new ImportError(sv.ex.fileTooBig);
-    const parsed = parseFile(file.name, await file.text());
+    const parsed = await parseUpload(file);
     if (into && projects.projectId) {
       // In i det här projektet: inget nytt projekt, vyn hämtas om och den första nya raden visas
       const res = await importParsed(store, workspaceId, parsed, undefined, projects.projectId);

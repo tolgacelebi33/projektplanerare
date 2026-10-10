@@ -50,7 +50,7 @@ test("L3 felmeddelanden vid import följer språket", async ({ page }) => {
   const bar = page.getByRole("group", { name: "Project" });
   await bar.getByLabel("Import file").setInputFiles({ name: "bad.csv", mimeType: "text/csv", buffer: Buffer.from("Title;Start\nX;2026-13-40\n", "utf8") });
   await expect(bar.getByRole("alert")).toContainText("Row 2: start date");
-  await bar.getByLabel("Import file").setInputFiles({ name: "x.xlsx", mimeType: "application/octet-stream", buffer: Buffer.from("x") });
+  await bar.getByLabel("Import file").setInputFiles({ name: "x.xls", mimeType: "application/octet-stream", buffer: Buffer.from("x") });
   await expect(bar.getByRole("alert")).toContainText("Unsupported file type");
 });
 

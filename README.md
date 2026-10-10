@@ -1,6 +1,6 @@
 # Projektplanerare
 
-Personligt verktyg för projekt och roadmap: tidslinje (Gantt) och årshjul, med grupper, uppgifter och milstolpar, beroenden, ångra/gör om, sök, import och export (JSON och CSV). Svenska och engelska. Data sparas i webbläsaren (localStorage), det finns ingen server och ingen inloggning.
+Personligt verktyg för projekt och roadmap: tidslinje (Gantt) och årshjul, med grupper, uppgifter och milstolpar, beroenden, ångra/gör om, sök, export (JSON och CSV) och import (JSON, CSV och Excel .xlsx). Svenska och engelska. Data sparas i webbläsaren (localStorage), det finns ingen server och ingen inloggning.
 
 Live: https://project.celebi.io
 

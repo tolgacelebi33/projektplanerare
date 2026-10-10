@@ -35,7 +35,7 @@ Regler (ska ha tester):
 - **Epics (grupper) datum härleds** ur innehållet (tidigaste start, senaste slut bland barnen, milstolpar och nästlade epics inräknade) och sätts av `DataStore`, aldrig direkt. En epic utan innehåll behåller sina datum. Beslut 2026-10-09.
 - Bara en epic kan vara förälder. Titel högst 200 tecken, beskrivning högst 5000.
 - **Beroenden och datum:** projektet har läget "shift" (standard, efterföljare flyttas framåt med bibehållen längd, och en efterföljare får inte flyttas före föregångarens slut: `before_predecessor`) eller "none". Beslut 2026-10-10.
-- **Export/import:** JSON och CSV (`src/data/exchange.ts`, `importExport.ts`), import skapar alltid ett nytt projekt och är allt-eller-inget. Kopiera projekt använder samma väg. Beslut 2026-10-10.
+- **Export/import:** export som JSON och CSV, import av JSON, CSV och Excel (.xlsx, `src/data/xlsx.ts`, läsaren `read-excel-file`, MIT) (`src/data/exchange.ts`, `importExport.ts`), import skapar alltid ett nytt projekt och är allt-eller-inget. Kopiera projekt använder samma väg. Beslut 2026-10-10.
 - **Smart import:** bara en titelkolumn krävs, kolumner och värden känns igen på synonymer, saknade datum blir idag + en vecka, och det som saknar plats i modellen läggs i beskrivningen. Dra rader i rutnätet byter ordning och epic (`planMove`). Beslut 2026-10-10.
 - **Språk:** svenska (standard) och engelska, alla texter via `src/i18n/dict-sv.ts` och `en.ts`. Lägg aldrig text direkt i komponenter eller regler: lägg den i båda ordlistorna.
 - **Ångra/gör om** ligger i `MemoryStore` (snapshot per skrivning, skrivningar inom 250 ms är ett steg, projekt som skapas eller tas bort nollställer historiken). Sök och "Dölj klara" filtrerar bara vyn (`filterView`), aldrig data.
