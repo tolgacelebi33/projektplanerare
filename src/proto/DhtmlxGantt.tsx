@@ -23,7 +23,7 @@ const ZOOM = {
 } as const;
 
 import { GRID_WIDTH } from "../layout";
-import { scrollCarry } from "../scrollCarry";
+import { consumeFocusMedian, scrollCarry } from "../scrollCarry";
 /** Rutnätets fasta bredd är GRID_WIDTH (layout.ts). Panelen till höger tar plats från tidslinjen, aldrig från rutnätet. */
 
 interface TaskRow { id: string; text: string; start_date: Date; end_date: Date; type: string; kind: Item["type"]; parent: string | number; status: Status; open: boolean }
@@ -294,6 +294,7 @@ export function DhtmlxGantt({ store, items, deps, zoom, onError, onPersisted, re
       gantt.getLinks().length === links.length && links.every((l) => gantt.isLinkExists(l.id) && String(gantt.getLink(l.id).source) === l.source && String(gantt.getLink(l.id).target) === l.target);
     gantt.silent(() => {
       if (sameStructure) {
+        consumeFocusMedian();
         gantt.batchUpdate(() => {
           // Bara det som ändrats ritas om. Ritas alla staplar om vid varje sparning byts staplen man är på väg att klicka på ut under klicket.
           for (const t of tasks) {
@@ -313,10 +314,17 @@ export function DhtmlxGantt({ store, items, deps, zoom, onError, onPersisted, re
       gantt.parse({ data: tasks.map((t) => ({ ...t, open: openState.current.get(t.id) ?? true })), links });
       const to = scrollCarry.saved ?? scroll;
       const restored = scrollCarry.saved !== null;
+      const wantFocus = consumeFocusMedian();
+      const focus = wantFocus && !restored && tasks.length > 0;
       scrollCarry.saved = null;
       gantt.scrollTo(to.x, to.y);
       // Direkt efter en ommontering har biblioteket inte hunnit mäta sina ytor, och en scroll då ignoreras. Görs därför om efter ritningen.
       if (restored) requestAnimationFrame(() => requestAnimationFrame(() => gantt.scrollTo(to.x, to.y)));
+      if (focus) {
+        const starts = tasks.map((t) => t.start_date.getTime()).sort((a, b) => a - b);
+        const median = new Date(starts[Math.floor(starts.length / 2)]);
+        requestAnimationFrame(() => requestAnimationFrame(() => gantt.showDate(median)));
+      }
     });
     // Bocken ritas om när statusen ändras. Har den växlats med tangentbord ska fokus ligga kvar på den nya knappen.
     const id = pendingFocus.current;

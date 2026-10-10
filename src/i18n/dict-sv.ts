@@ -106,7 +106,7 @@ export const svDict = {
   history: { label: "Historik", undo: "Ångra", redo: "Gör om", undoHint: "Ångra senaste ändringen (Cmd/Ctrl+Z)", redoHint: "Gör om (Cmd/Ctrl+Shift+Z)" },
   check: { done: "Markera som klar", undone: "Markera som inte klar" },
   dismiss: "Stäng meddelandet",
-  add: { label: "Lägg till", task: "Uppgift", milestone: "Milstolpe", epic: "Epic", hint: "Läggs i den epic som är vald, annars överst." },
+  add: { label: "Lägg till", task: "Uppgift", milestone: "Milstolpe", epic: "Epic", hint: "Uppgift och milstolpe läggs i den epic som är vald (eller bredvid vald post), annars överst. En epic läggs alltid på översta nivån. Högerklicka på en epic för att skapa en epic i den." },
   deps: { label: "Beroenden", shift: "Flytta efterföljare", none: "Ingen åtgärd", hint: "Flytta efterföljare: en uppgift som börjar efter en annan skjuts framåt när den andra flyttas, och kan inte börja före att den är klar. Ingen åtgärd: beroenden ritas men ändrar inga datum." },
   project: {
     duplicate: "Kopiera", import: "Importera...", importFile: "Importfil", export: "Exportera", exportJson: "JSON (hela projektet)", exportCsv: "CSV (för Excel)", exportTemplate: "Importmall (CSV)",

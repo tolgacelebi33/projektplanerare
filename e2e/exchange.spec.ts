@@ -104,7 +104,7 @@ test("X7 en fil som inte följer appens format (andra rubriker, projekt och akti
   const csv = [HEAD,
     line({ ID: "W1", RecordType: "project", Name: "IT-styrmodell", Status: "in_progress", Area: "IT", Contacts: "Anna; Bo" }),
     line({ ID: "W1-A", ParentID: "W1", RecordType: "activity", Name: "Fastställ mandat", Status: "planned", Description: "Beslut, återgivet" }),
-    line({ ID: "W1-B", ParentID: "W1", RecordType: "activity", Name: "Följ upp", Status: "unknown", Assignee: "Micaela" }),
+    line({ ID: "W1-B", ParentID: "W1", RecordType: "activity", Name: "Följ upp", Status: "unknown", Assignee: "Karin" }),
     line({ ID: "W2", RecordType: "project", Name: "Qlik", Status: "in_progress", TargetPeriod: "Q4 2026" }),
     line({ ID: "W2-A", ParentID: "W2", RecordType: "milestone", Name: "Beslut", Status: "idea", DueDate: "2026-12-01" }),
   ].join("\n") + "\n";
@@ -118,7 +118,7 @@ test("X7 en fil som inte följer appens format (andra rubriker, projekt och akti
   expect([by["Fastställ mandat"].start, by["Fastställ mandat"].end]).toEqual(["2026-10-09", "2026-10-15"]); // idag, en vecka
   expect(by["IT-styrmodell"].type).toBe("epic");
   expect([by.Qlik.start, by.Qlik.end]).toEqual(["2026-12-01", "2026-12-01"]); // epicens datum härleds ur milstolpen
-  expect(by["Följ upp"].description).toContain("Ansvarig: Micaela");
+  expect(by["Följ upp"].description).toContain("Ansvarig: Karin");
   expect(by["IT-styrmodell"].description).toContain("Kontakter: Anna; Bo");
 });
 
@@ -130,4 +130,40 @@ test("X8 importmallen går att ladda ner och läsa in igen utan fel", async ({ p
   await expect(bar(page).getByRole("alert")).toHaveCount(0);
   await expect(projectSelect(page).locator("option")).toHaveCount(2);
   await expect.poll(async () => (await titles(page)).join("|")).toBe("Webbplatslansering|Design|Bygg|Lansering");
+});
+
+test("X9 efter import hoppar tidslinjen dit de flesta posterna finns, så att staplarna syns direkt", async ({ page }) => {
+  await openApp(page, "dhtmlx");
+  // En post med tidigt datum och många utan datum (hamnar idag): tidslinjen börjar tidigt men de flesta posterna ligger vid idag
+  const lines = ["Titel;Start;Slut", "Gammal;2026-02-17;2026-02-20", ...Array.from({ length: 12 }, (_, i) => `Utan datum ${i + 1};;`)].join("\n");
+  await bar(page).getByLabel("Importfil").setInputFiles({ name: "spridd.csv", mimeType: "text/csv", buffer: Buffer.from(lines, "utf8") });
+  await expect(projectSelect(page).locator("option:checked")).toHaveText("spridd");
+  await expect(page.locator(".gantt_row .grid-title", { hasText: "Utan datum 1" }).first()).toBeVisible(); // det nya projektets rader, inte det gamla
+  await page.waitForTimeout(800);
+  const chart = (await page.locator(".gantt_task").boundingBox())!;
+  const boxes = await page.locator(".gantt_task_line").evaluateAll((els) => els.map((e) => { const r = e.getBoundingClientRect(); return [r.x, r.right]; }));
+  const inside = boxes.filter(([l, r]) => l >= chart.x - 1 && r <= chart.x + chart.width + 1);
+  expect(inside.length).toBeGreaterThanOrEqual(10); // de flesta av de 12 odaterade staplarna syns utan att scrolla
+});
+
+test("X10 att importera ett projekt hoppar till dess mediandag, men en vanlig ändring flyttar inte vyn", async ({ page }) => {
+  await openApp(page, "dhtmlx");
+  const lines = ["Titel;Start;Slut", "Gammal;2026-02-17;2026-02-20", ...Array.from({ length: 8 }, (_, i) => `Senare ${i + 1};2026-10-12;2026-10-14`)].join("\n");
+  await bar(page).getByLabel("Importfil").setInputFiles({ name: "median.csv", mimeType: "text/csv", buffer: Buffer.from(lines, "utf8") });
+  await expect(projectSelect(page).locator("option:checked")).toHaveText("median");
+  await expect(page.locator(".gantt_row .grid-title", { hasText: "Senare 1" }).first()).toBeVisible();
+  await page.waitForTimeout(800);
+  const x1 = await page.evaluate(() => (window as any).__dhx.getScrollState().x as number);
+  expect(x1).toBeGreaterThan(300); // inte längst till vänster
+  // en vanlig ändring (ny rad) ska inte flytta vyn
+  await page.getByRole("textbox", { name: "Lägg till uppgift" }).click(); await page.keyboard.type("Ny"); await page.keyboard.press("Enter");
+  await page.waitForTimeout(700);
+  const x2 = await page.evaluate(() => (window as any).__dhx.getScrollState().x as number);
+  expect(Math.abs(x2 - x1)).toBeLessThan(60);
+  // och att byta tillbaka till det första projektet hoppar till dess mediandag (inte kvar på det föregåendes plats)
+  await projectSelect(page).selectOption({ label: "Webbplatslansering" });
+  await expect(page.locator(".gantt_row .grid-title", { hasText: "Förstudie" }).first()).toBeVisible();
+  await page.waitForTimeout(800);
+  const x3 = await page.evaluate(() => (window as any).__dhx.getScrollState().x as number);
+  expect(x3).not.toBe(x1);
 });

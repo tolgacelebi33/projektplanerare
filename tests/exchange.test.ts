@@ -174,7 +174,7 @@ describe("smart import: en fil som inte följer appens egen mall", () => {
   const long = "L".repeat(230);
   const csv = [HEAD,
     row({ ID: "P1", RecordType: "project", Name: "Projekt ett", Description: "Beskrivning, med komma", Status: "in_progress", Area: "ERP", Contacts: "Anna; Bo", TargetPeriod: "Q4 2026", Basis: "Identifierat" }),
-    row({ ID: "P1-A", ParentID: "P1", RecordType: "activity", Name: "Aktivitet utan datum", Status: "planned", Assignee: "Tolga/Oscar" }),
+    row({ ID: "P1-A", ParentID: "P1", RecordType: "activity", Name: "Aktivitet utan datum", Status: "planned", Assignee: "Karin/Sven" }),
     row({ ID: "P1-B", ParentID: "P1", RecordType: "work_package", Name: "Arbetspaket", Status: "unknown" }),
     row({ ID: "P1-B1", ParentID: "P1-B", RecordType: "deliverable", Name: "Leverans", Status: "done", CompletedDate: "2026-04-27" }),
     row({ ID: "P1-M", ParentID: "P1", RecordType: "milestone", Name: "Beslut", DueDate: "2026-12-01", Status: "idea" }),
@@ -248,7 +248,7 @@ describe("smart import: en fil som inte följer appens egen mall", () => {
     expect(items.length).toBe(7);
     const a = items.find((i) => i.title === "Aktivitet utan datum")!;
     expect(a.assignee_id).toBeNull();
-    expect(a.description).toContain("Ansvarig: Tolga; Oscar");
+    expect(a.description).toContain("Ansvarig: Karin; Sven");
     expect(res.warnings.join(" ")).toMatch(/Ansvariga som inte finns som användare/);
     expect(items.filter((i) => i.type === "epic").length).toBe(3); // P1, arbetspaketet (har innehåll) och P2 (projekt utan innehåll)
   });

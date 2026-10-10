@@ -14,7 +14,7 @@ import { createStore } from "./store";
 import { useProjects } from "./useProjects";
 import { ProjectBar } from "./views/ProjectBar";
 import { LANGS, setLang, storedLang, sv, type Lang } from "./i18n/sv";
-import { rememberScroll, uiCarry } from "./scrollCarry";
+import { focusMedianOnNextProject, rememberScroll, uiCarry } from "./scrollCarry";
 import { useProjectData } from "./proto/useProjectData";
 import type { Zoom } from "./proto/zoom";
 import { ItemPanel } from "./views/ItemPanel";
@@ -156,12 +156,14 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof createStore>; l
   const doImport = async (file: File) => {
     if (file.size > MAX_IMPORT_BYTES) throw new ImportError(sv.ex.fileTooBig);
     const res = await importParsed(store, workspaceId, parseFile(file.name, await file.text()));
+    focusMedianOnNextProject();
     await projects.reload(res.project.id);
     report(res);
   };
   const doDuplicate = async () => {
     if (!projects.projectId) return;
     const res = await duplicateProject(store, workspaceId, projects.projectId);
+    focusMedianOnNextProject();
     await projects.reload(res.project.id);
     report(res);
   };
@@ -253,7 +255,7 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof createStore>; l
       <div className="toolbar project-row">
         {projects.projects && (
           <ProjectBar projects={projects.projects} projectId={projects.projectId} itemCount={state.kind === "ready" ? state.items.length : 0}
-            onSelect={projects.select} onCreate={projects.create} onRename={projects.rename} onRemove={projects.remove} onDependencyMode={projects.setDependencyMode}
+            onSelect={(id) => { focusMedianOnNextProject(); projects.select(id); }} onCreate={(n) => { focusMedianOnNextProject(); return projects.create(n); }} onRename={projects.rename} onRemove={(id) => { focusMedianOnNextProject(); return projects.remove(id); }} onDependencyMode={projects.setDependencyMode}
             onDuplicate={doDuplicate} onExport={doExport} onImport={doImport} />
         )}
         <span className="lib-tag">{app.persistent ? sv.project.persisted : sv.project.demo}</span>
@@ -303,7 +305,7 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof createStore>; l
         <div className="add-group" role="group" aria-label={sv.add.label} title={sv.add.hint}>
           <span className="toolbar-label">{sv.add.label}</span>
           {(["task", "milestone", "epic"] as ItemType[]).map((k) => (
-            <button key={k} type="button" className="mini" disabled={!projects.projectId || state.kind !== "ready"} onClick={() => void addItem(k).catch(() => undefined)}>+ {sv.add[k]}</button>
+            <button key={k} type="button" className="mini" disabled={!projects.projectId || state.kind !== "ready"} onClick={() => void addItem(k, k === "epic" ? { anchorId: null } : {}).catch(() => undefined)}>+ {sv.add[k]}</button>
           ))}
         </div>
       </div>

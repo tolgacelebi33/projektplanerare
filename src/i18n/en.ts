@@ -101,7 +101,7 @@ export const enDict: Dict = {
   history: { label: "History", undo: "Undo", redo: "Redo", undoHint: "Undo the last change (Cmd/Ctrl+Z)", redoHint: "Redo (Cmd/Ctrl+Shift+Z)" },
   check: { done: "Mark as done", undone: "Mark as not done" },
   dismiss: "Dismiss the message",
-  add: { label: "Add", task: "Task", milestone: "Milestone", epic: "Epic", hint: "Added in the selected epic, otherwise at the top." },
+  add: { label: "Add", task: "Task", milestone: "Milestone", epic: "Epic", hint: "Tasks and milestones are added in the selected epic (or next to the selected item), otherwise at the top. An epic is always added at the top level. Right-click an epic to create an epic inside it." },
   deps: { label: "Dependencies", shift: "Move successors", none: "No action", hint: "Move successors: a task that starts after another is pushed forward when the other moves, and cannot start before it is done. No action: dependencies are drawn but change no dates." },
   project: {
     duplicate: "Copy", import: "Import...", importFile: "Import file", export: "Export", exportJson: "JSON (whole project)", exportCsv: "CSV (for Excel)", exportTemplate: "Import template (CSV)",
