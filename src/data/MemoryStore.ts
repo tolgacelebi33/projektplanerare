@@ -1,6 +1,7 @@
 import type { DataStore } from "./DataStore";
 import { RuleError, rederiveEpics, shiftSuccessors, validateDependency, validateItemShape, validateParent } from "./rules";
 import { addDays } from "./dates";
+import { applyPatch, isPatchList, makePatch, type Patch } from "./patch";
 import type { Dependency, DependencyMode, Fixture, Item, Project, User } from "./types";
 
 /** Allt lagret håller, för att kunna sparas och återställas. */
@@ -50,46 +51,69 @@ export class MemoryStore implements DataStore {
     rederiveEpics(this.items, [...changedIds, ...moved].map((id) => this.items.get(id)?.parent_id ?? null));
   }
 
+  /** Klar när lagringen är inläst. Direkt för minneslagring, asynkron för lagring i webbläsaren. */
+  ready: Promise<void> = Promise.resolve();
   /** Anropas efter varje lyckad skrivning. Underklasser sparar här. */
   protected afterWrite(): void {}
+  /** Meddelar lyssnare (UI) att något ändrats utan en skrivning, t.ex. att lagringen blev inläst eller att en sparning misslyckades. */
+  protected notify(): void { this.listeners.forEach((l) => l()); }
 
-  // Ångra och gör om. Varje skrivning sparar läget före den. Skrivningar som kommer tätt efter varandra (en handling i UI kan bli flera anrop,
-  // t.ex. skapa + döpa om, eller ta bort ett helt innehåll) räknas som ett steg. Projekt skapas och tas bort utan att kunna ångras:
-  // historiken nollställs då, så att ett steg aldrig pekar på ett projekt som UI inte känner till.
+  // Ångra och gör om. Varje skrivning sparar en ändringspost (bara det som skilde, se patch.ts) tillbaka till läget före den. Skrivningar som
+  // kommer tätt efter varandra (en handling i UI kan bli flera anrop, t.ex. skapa + döpa om, eller ta bort ett helt innehåll) räknas som ett steg.
+  // Projekt skapas och tas bort utan att kunna ångras: historiken nollställs då, så att ett steg aldrig pekar på ett projekt som UI inte känner till.
   private current: Snapshot | null = null;
-  private undoStack: Snapshot[] = [];
-  private redoStack: Snapshot[] = [];
+  private undoStack: Patch[] = [];
+  private redoStack: Patch[] = [];
   private lastCommitAt = 0;
+  private stepBase: Snapshot | null = null;
   private listeners = new Set<() => void>();
   static readonly GROUP_MS = 250;
+  static readonly MAX_STEPS = 100;
 
   private commit(resetHistory = false): void {
     const now = performance.now();
+    const after = this.snapshot();
     if (resetHistory) { this.undoStack = []; this.redoStack = []; }
     else if (this.current) {
-      if (now - this.lastCommitAt > MemoryStore.GROUP_MS || this.undoStack.length === 0) this.undoStack.push(this.current);
-      if (this.undoStack.length > 100) this.undoStack.shift();
+      // Nytt steg: utgångsläget är läget före skrivningen. Tätt följande skrivningar hör till samma steg och räknas mot samma utgångsläge,
+      // så att ordningen av återställda poster blir exakt som den var.
+      const newStep = now - this.lastCommitAt > MemoryStore.GROUP_MS || this.undoStack.length === 0 || !this.stepBase;
+      if (newStep) this.stepBase = this.current;
+      const back = makePatch(after, this.stepBase!); // från läget nu tillbaka till stegets utgångsläge
+      if (newStep) this.undoStack.push(back); else this.undoStack[this.undoStack.length - 1] = back;
+      if (this.undoStack.length > MemoryStore.MAX_STEPS) this.undoStack.shift();
       this.redoStack = [];
     }
     this.lastCommitAt = now;
-    this.current = this.snapshot();
+    this.current = after;
     this.afterWrite();
     this.listeners.forEach((l) => l());
   }
   /** Nollställer historiken (efter en import, som annars skulle ångras post för post). */
-  clearHistory(): void { this.undoStack = []; this.redoStack = []; this.listeners.forEach((l) => l()); }
+  clearHistory(): void { this.undoStack = []; this.redoStack = []; this.stepBase = null; this.afterWrite(); this.listeners.forEach((l) => l()); }
+  /** Historiken som data, för att sparas tillsammans med innehållet. */
+  getHistory(): { undo: Patch[]; redo: Patch[] } { return { undo: this.undoStack, redo: this.redoStack }; }
+  /** Läser tillbaka en sparad historik. Ogiltig form ignoreras (ingen historik). */
+  setHistory(h: unknown): void {
+    const x = h as { undo?: unknown; redo?: unknown } | null;
+    if (x && isPatchList(x.undo) && isPatchList(x.redo)) { this.undoStack = x.undo.slice(-MemoryStore.MAX_STEPS); this.redoStack = x.redo.slice(-MemoryStore.MAX_STEPS); }
+    else { this.undoStack = []; this.redoStack = []; }
+    this.listeners.forEach((l) => l());
+  }
   get canUndo() { return this.undoStack.length > 0; }
   get canRedo() { return this.redoStack.length > 0; }
   subscribe(l: () => void): () => void { this.listeners.add(l); return () => { this.listeners.delete(l); }; }
 
-  private async travel(from: Snapshot[], to: Snapshot[]): Promise<boolean> {
-    const target = from.pop();
-    if (!target) return false;
-    if (this.current) to.push(this.current);
+  private async travel(from: Patch[], to: Patch[]): Promise<boolean> {
+    const patch = from.pop();
+    if (!patch || !this.current) return false;
+    const target = applyPatch(this.current, patch);
+    to.push(makePatch(target, this.current)); // från målläget tillbaka till nuläget, för att kunna gå åt andra hållet
     const seq = this.seq;
     this.restore(target);
     this.seq = Math.max(seq, target.seq); // id återanvänds aldrig
-    this.lastCommitAt = 0;
+    this.current = this.snapshot();
+    this.lastCommitAt = 0; this.stepBase = null;
     this.afterWrite();
     this.listeners.forEach((l) => l());
     return true;

@@ -3,6 +3,7 @@ import { addDays, diffDays } from "../src/data/dates";
 import { largeFixture, smallFixture } from "../src/data/fixtures";
 import { MemoryStore } from "../src/data/MemoryStore";
 import { PersistentStore } from "../src/data/PersistentStore";
+import { MemoryBackend } from "../src/data/backends";
 import type { Item } from "../src/data/types";
 
 const get = async (s: MemoryStore, id: string, project = "proj_1") => (await s.listItems(project)).find((i) => i.id === id)!;
@@ -124,12 +125,12 @@ describe("beroenden flyttar efterföljare (läge shift)", () => {
     expect(await dates(s, ["i9", "i10", "i11"])).toEqual(before);
   });
   it("flytten sparas och överlever omladdning", async () => {
-    const mem = new Map<string, string>();
-    const storage = { getItem: (k: string) => mem.get(k) ?? null, setItem: (k: string, v: string) => { mem.set(k, v); } };
-    const a = new PersistentStore("k", smallFixture(), storage);
+    const be = new MemoryBackend();
+    const a = new PersistentStore(smallFixture(), () => be); await a.ready;
     await a.updateItem("i6", { start: "2026-03-30", end: "2026-04-03" });
     await a.updateProject("proj_1", { dependency_mode: "none" });
-    const b = new PersistentStore("k", smallFixture(), storage);
+    await a.flush();
+    const b = new PersistentStore(smallFixture(), () => be); await b.ready;
     expect((await get(b, "i9")).start).toBe("2026-04-04");
     expect((await b.listProjects())[0].dependency_mode).toBe("none");
   });

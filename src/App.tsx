@@ -10,7 +10,7 @@ import type { ISODate } from "./data/types";
 import { todayISO } from "./data/dates";
 import type { ItemType } from "./data/types";
 import { PersistentStore } from "./data/PersistentStore";
-import { createStore } from "./store";
+import { getApp } from "./store";
 import { useProjects } from "./useProjects";
 import { ProjectBar } from "./views/ProjectBar";
 import { LANGS, setLang, storedLang, sv, type Lang } from "./i18n/sv";
@@ -31,12 +31,16 @@ const VIEW0 = params.get("view") === "wheel" ? "wheel" : "gantt";
 
 /** Byter man språk monteras appen om (nyckeln), men lagret är kvar, så ingen data försvinner. */
 export function App() {
-  const app = useMemo(() => createStore(params), []);
+  const app = useMemo(() => getApp(params), []);
   const [lng, setLng] = useState<Lang>(storedLang);
+  // Lagringen är inläst först när `ready` är klar (IndexedDB är asynkron). Under tiden visas laddning.
+  const [ready, setReady] = useState(false);
+  useEffect(() => { let on = true; void app.store.ready.then(() => { if (on) setReady(true); }); return () => { on = false; }; }, [app]);
+  if (!ready) return <p role="status" className="app-loading">{sv.loading}</p>;
   return <AppInner key={lng} app={app} lng={lng} onLang={(l) => { setLang(l); setLng(l); }} />;
 }
 
-function AppInner({ app, lng, onLang }: { app: ReturnType<typeof createStore>; lng: Lang; onLang: (l: Lang) => void }) {
+function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: Lang; onLang: (l: Lang) => void }) {
   const { store, workspaceId } = app;
   // Exponeras för tester. Sätts i effekt, inte i useMemo, så att det är exakt den store UI:t använder (StrictMode kör useMemo två gånger).
   useEffect(() => { (window as unknown as { __store: unknown }).__store = store; }, [store]);
@@ -290,7 +294,7 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof createStore>; l
             onSelect={(id) => { focusMedianOnNextProject(); projects.select(id); }} onCreate={(n) => { focusMedianOnNextProject(); return projects.create(n); }} onRename={projects.rename} onRemove={(id) => { focusMedianOnNextProject(); return projects.remove(id); }} onDependencyMode={projects.setDependencyMode}
             onDuplicate={doDuplicate} onExport={doExport} onImport={doImport} />
         )}
-        <span className="lib-tag">{app.persistent ? sv.project.persisted : sv.project.demo}</span>
+        <span className="lib-tag" title={persistent?.persistGranted === true ? sv.project.persistYes : persistent?.persistGranted === false ? sv.project.persistNo : undefined}>{app.persistent ? sv.project.persisted : sv.project.demo}</span>
       </div>
       <div className="toolbar">
         <span className="toolbar-label">{sv.view.label}</span>

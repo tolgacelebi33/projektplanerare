@@ -234,9 +234,10 @@ test.describe("sparande i webbläsaren (utan ?fixture)", () => {
 
   test("U13 misslyckad sparning visas för användaren", async ({ page }) => {
     await page.addInitScript(() => {
-      const orig = Storage.prototype.setItem;
+      // Simulerar full lagring: den första skrivningen (exempeldata) går igenom, därefter kastar IndexedDB
+      const orig = IDBObjectStore.prototype.put;
       let calls = 0;
-      Storage.prototype.setItem = function (k: string, v: string) { if (k === "projektplanerare.data.v1" && ++calls > 1) throw new Error("kvoten är full"); return orig.call(this, k, v); };
+      IDBObjectStore.prototype.put = function (...args: Parameters<typeof orig>) { if (++calls > 1) throw new Error("kvoten är full"); return orig.apply(this, args); };
     });
     await page.goto(url); await page.waitForSelector(".gantt_task_line");
     await page.locator(SEL.dhtmlx.bar("i7")).click();

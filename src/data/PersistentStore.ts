@@ -1,39 +1,50 @@
 import { sv } from "../i18n/sv";
+import { CorruptError, LocalStorageBackend, MemoryBackend, SCHEMA, type Backend, type Stored } from "./backends";
 import { MemoryStore, type Snapshot } from "./MemoryStore";
 import { validateItemShape } from "./rules";
 import type { Fixture } from "./types";
 
+/** Den första versionens lagring (localStorage) som läses en gång och flyttas till den nya. Den gamla kopian raderas aldrig av appen. */
+export interface Legacy {
+  read(): string | null;
+  /** Sparar undan trasig gammal data. */
+  backup(raw: string): void;
+  /** Anropas när flytten är kontrollerad. */
+  migrated(): void;
+  /** Reserv om den nya lagringen inte går att kontrollera: fortsätt spara som förut. */
+  fallback(): Backend;
+}
+
+const msg = (e: unknown) => (e instanceof Error ? e.message : String(e));
+
 /**
- * Lagring i webbläsaren (localStorage) bakom samma DataStore-gränssnitt som MemoryStore.
- * Första gången (eller efter att data rensats) läggs exempelprojektet in. Skadad lagrad data skrivs aldrig över:
- * den flyttas till en säkerhetskopia under `<nyckel>.backup` och exempeldata läggs in, och `loadWarning` talar om det.
+ * Innehållet sparas via en `Backend` (IndexedDB som standard, localStorage som reserv) bakom samma DataStore-gränssnitt som MemoryStore.
+ * Laddningen är asynkron (`ready`). Första gången läggs exempelprojektet in. Data som inte går att läsa skrivs aldrig över: den sparas undan,
+ * en varning visas och exempeldata läggs in. Går det inte att läsa alls (fel, inte trasig data) sparas ingenting, för att inte skriva över det som finns.
+ * Ångra-historiken sparas tillsammans med innehållet och finns kvar efter omladdning.
  */
 export class PersistentStore extends MemoryStore {
   /** Satt om något gick fel vid inläsning. Visas för användaren. */
   loadWarning: string | null = null;
   /** Satt om senaste sparningen misslyckades (full lagring, blockerad). Data finns då bara i minnet. */
   saveError: string | null = null;
+  /** Webbläsaren har lovat att inte rensa lagringen av sig själv (sätts av appen när den frågat). */
+  persistGranted: boolean | null = null;
+  override ready: Promise<void>;
+  private backend!: Backend;
+  private loaded = false;
+  private readOnly = false;
+  private latest: Stored | null = null;
+  private saving = false;
+  private pending: Promise<void> = Promise.resolve();
 
-  constructor(private key: string, seed: Fixture, private storage: Pick<Storage, "getItem" | "setItem"> = localStorage) {
+  constructor(seed: Fixture, private getBackend: () => Promise<Backend> | Backend, private legacy: Legacy | null = null) {
     super(seed);
-    let raw: string | null = null;
-    try { raw = storage.getItem(key); } catch (e) { this.loadWarning = sv.persist.unreadable(String(e)); }
-    if (raw !== null) {
-      try {
-        const snap = JSON.parse(raw) as Snapshot;
-        PersistentStore.check(snap);
-        this.restore(snap);
-        return;
-      } catch (e) {
-        try { storage.setItem(`${key}.backup`, raw); } catch { /* ingen plats för säkerhetskopia */ }
-        this.loadWarning = sv.persist.corrupt(key, e instanceof Error ? e.message : String(e));
-      }
-    }
-    this.afterWrite(); // första gången: spara exempeldata
+    this.ready = this.init();
   }
 
   /** Kastar om data inte har rätt form eller bryter datamodellens regler. */
-  private static check(s: Snapshot) {
+  static check(s: Snapshot) {
     if (!s || !Array.isArray(s.projects) || !Array.isArray(s.items) || !Array.isArray(s.dependencies) || !Array.isArray(s.users) || typeof s.seq !== "number")
       throw new Error(sv.persist.badShape);
     const ids = new Set(s.items.map((i) => i.id));
@@ -45,13 +56,89 @@ export class PersistentStore extends MemoryStore {
     for (const d of s.dependencies) if (!ids.has(d.from_item_id) || !ids.has(d.to_item_id)) throw new Error(sv.persist.depMissing(d.id));
   }
 
-  protected override afterWrite(): void {
-    if (!this.key) return; // körs från basklassens konstruktor innan fälten är satta
-    try {
-      this.storage.setItem(this.key, JSON.stringify(this.snapshot()));
-      this.saveError = null;
-    } catch (e) {
-      this.saveError = `Det gick inte att spara: ${e instanceof Error ? e.message : String(e)}`;
-    }
+  /** Både den nya formen ({ snapshot, history }) och den första versionens (bara innehållet) godtas. */
+  private static normalize(raw: unknown): { snapshot: Snapshot; history: unknown } {
+    const o = raw as { snapshot?: Snapshot; history?: unknown } | null;
+    const snapshot = (o && o.snapshot ? o.snapshot : raw) as Snapshot;
+    PersistentStore.check(snapshot);
+    return { snapshot, history: o && o.snapshot ? o.history : undefined };
   }
+
+  private stored(): Stored {
+    return { schema: SCHEMA, saved_at: new Date().toISOString(), snapshot: this.snapshot(), history: this.getHistory() };
+  }
+
+  private async init(): Promise<void> {
+    try { this.backend = await this.getBackend(); }
+    catch (e) { this.backend = new MemoryBackend(); this.readOnly = true; this.loadWarning = sv.persist.readFailed(msg(e)); this.finish(); return; }
+    if (this.backend.note) this.loadWarning = this.backend.note;
+
+    let raw: unknown = null;
+    try { raw = await this.backend.load(); }
+    catch (e) {
+      if (e instanceof CorruptError) { await this.setAside(e.raw, e.message); }
+      else { this.readOnly = true; this.loadWarning = sv.persist.readFailed(msg(e)); this.finish(); return; } // skriv aldrig över något som inte gick att läsa
+    }
+
+    if (raw !== null) {
+      try { const { snapshot, history } = PersistentStore.normalize(raw); this.restore(snapshot); this.setHistory(history); this.finish(); return; }
+      catch (e) { await this.setAside(raw, msg(e)); }
+    } else if (this.legacy) {
+      const old = this.legacy.read();
+      if (old !== null) {
+        let valid: { snapshot: Snapshot; history: unknown } | null = null;
+        try { valid = PersistentStore.normalize(JSON.parse(old)); }
+        catch (e) { this.legacy.backup(old); this.loadWarning = sv.persist.corrupt("projektplanerare.data.v1", msg(e)); } // trasig gammal data: undan, börja om
+        if (valid) {
+          try {
+            this.restore(valid.snapshot); this.setHistory(valid.history);
+            await this.backend.save(this.stored());
+            const back = PersistentStore.normalize(await this.backend.load()); // det som sparades ska gå att läsa tillbaka lika
+            if (JSON.stringify(back.snapshot) !== JSON.stringify(valid.snapshot)) throw new Error("verifiering misslyckades");
+            this.legacy.migrated();
+          } catch (e) {
+            // flytten kunde inte kontrolleras: fortsätt spara i den gamla lagringen, som är orörd
+            this.loadWarning = sv.persist.migrationFailed(msg(e));
+            this.backend = this.legacy.fallback();
+          }
+          this.finish(); return;
+        }
+      }
+    }
+    // inget sparat, eller trasigt: exempeldata (som redan ligger i minnet från konstruktorn) sparas som första tillstånd
+    this.finish(true);
+  }
+
+  /** Trasig data sparas undan, aldrig över. */
+  private async setAside(raw: unknown, reason: string) {
+    await this.backend.saveBackup(raw);
+    this.loadWarning = sv.persist.corrupt(`${this.backend.kind === "localstorage" ? "projektplanerare.data.v1" : "projektplanerare"}`, reason);
+  }
+
+  private finish(writeInitial = false) {
+    this.loaded = true;
+    if (writeInitial && !this.readOnly) this.afterWrite();
+    this.notify();
+  }
+
+  protected override afterWrite(): void {
+    if (!this.loaded || this.readOnly) return;
+    this.latest = this.stored();
+    if (this.saving) return; // en sparning pågår: den tar det senaste läget när den är klar
+    this.saving = true;
+    this.pending = (async () => {
+      try {
+        while (this.latest) {
+          const s = this.latest; this.latest = null;
+          try { await this.backend.save(s); if (this.saveError) { this.saveError = null; this.notify(); } }
+          catch (e) { this.saveError = `${sv.panel.errors.unknown} ${msg(e)}`; this.notify(); }
+        }
+      } finally { this.saving = false; }
+    })();
+  }
+
+  /** Väntar tills allt som ändrats är sparat. */
+  flush(): Promise<void> { return this.pending; }
 }
+
+export { LocalStorageBackend };
