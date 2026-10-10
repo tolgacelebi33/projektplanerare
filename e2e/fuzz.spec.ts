@@ -113,7 +113,7 @@ class Sim {
     await this.page.waitForTimeout(80); await this.page.mouse.up(); return `länk ${a.id}.${sideA} -> ${c.id}.${sideC}`;
   }
   async hoverAround() { const b = await this.bars(); if (!b.length) return "inget att hovra"; const t = this.pick(b); for (let i = 0; i < 4; i++) { await this.page.mouse.move(t.x + t.w / 2 + i * 2, t.y + t.h / 2 + (i % 2)); await this.page.waitForTimeout(70); } return `hover ${t.id}`; }
-  async addButton() { const k = this.pick(["Uppgift", "Milstolpe", "Epic"]); await this.page.getByRole("group", { name: "Lägg till" }).getByRole("button", { name: `+ ${k}` }).click(); return `+ ${k}`; }
+  async addButton() { const k = this.pick(["Uppgift", "Milstolpe", "Grupp"]); await this.page.getByRole("group", { name: "Lägg till" }).getByRole("button", { name: `+ ${k}` }).click(); return `+ ${k}`; }
   async panelEdit() {
     const panel = this.page.locator("aside.panel"); if (!(await panel.count())) return "ingen panel";
     const t = this.pick(["status", "priority", "assignee", "title", "progress", "description", "start", "end", "parent", "order", "pred", "succ", "removeDep"]);

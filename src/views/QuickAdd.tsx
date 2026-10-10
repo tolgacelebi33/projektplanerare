@@ -1,9 +1,8 @@
 import { useRef, useState } from "react";
-import { GRID_WIDTH } from "../layout";
 import { sv } from "../i18n/sv";
 
 /** Rad under rutnätet för att lägga till uppgifter snabbt: skriv, tryck Enter och fortsätt. Fokus ligger kvar i fältet. */
-export function QuickAdd({ onAdd, disabled }: { onAdd: (title: string) => Promise<unknown>; disabled?: boolean }) {
+export function QuickAdd({ onAdd, disabled, width, groupName = null }: { onAdd: (title: string) => Promise<unknown>; disabled?: boolean; width: number; groupName?: string | null }) {
   const [value, setValue] = useState("");
   const busy = useRef(false);
   const submit = async () => {
@@ -14,7 +13,7 @@ export function QuickAdd({ onAdd, disabled }: { onAdd: (title: string) => Promis
   };
   return (
     <div className="quick-add">
-      <input aria-label={sv.quick.label} placeholder={sv.quick.placeholder} value={value} maxLength={250} disabled={disabled} style={{ width: GRID_WIDTH - 16 }}
+      <input aria-label={sv.quick.label} placeholder={groupName ? sv.group.quickIn(groupName) : sv.quick.placeholder} value={value} maxLength={250} disabled={disabled} style={{ width: width - 16 }}
         onChange={(e) => setValue(e.target.value)}
         onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); void submit(); } if (e.key === "Escape" && value) { e.stopPropagation(); setValue(""); } }} />
     </div>

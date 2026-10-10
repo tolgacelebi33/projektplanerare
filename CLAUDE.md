@@ -31,7 +31,8 @@ Regler (ska ha tester):
 - `parent_id` och beroenden får aldrig korsa workspace eller projekt.
 - Beroenden får inte bilda cykler.
 - Milstolpe: start = slut (antagande, bekräfta i fas 1).
-- **Epics datum härleds** ur innehållet (tidigaste start, senaste slut bland barnen, milstolpar och nästlade epics inräknade) och sätts av `DataStore`, aldrig direkt. En epic utan innehåll behåller sina datum. Beslut 2026-10-09.
+- **Namn i gränssnittet: Grupp** (beslut 2026-10-10, efter monday och Asana). Den interna typen heter `epic` och ändras inte (sparad data och exportfiler). Nya poster utan val hamnar i den aktiva gruppen.
+- **Epics (grupper) datum härleds** ur innehållet (tidigaste start, senaste slut bland barnen, milstolpar och nästlade epics inräknade) och sätts av `DataStore`, aldrig direkt. En epic utan innehåll behåller sina datum. Beslut 2026-10-09.
 - Bara en epic kan vara förälder. Titel högst 200 tecken, beskrivning högst 5000.
 - **Beroenden och datum:** projektet har läget "shift" (standard, efterföljare flyttas framåt med bibehållen längd, och en efterföljare får inte flyttas före föregångarens slut: `before_predecessor`) eller "none". Beslut 2026-10-10.
 - **Export/import:** JSON och CSV (`src/data/exchange.ts`, `importExport.ts`), import skapar alltid ett nytt projekt och är allt-eller-inget. Kopiera projekt använder samma väg. Beslut 2026-10-10.

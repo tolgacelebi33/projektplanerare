@@ -88,6 +88,7 @@ body {
   --surface-alt: color-mix(in srgb, var(--sv-svart) 7%, var(--sv-aluminiumgra));
   --text: var(--sv-svart);
   --text-muted: color-mix(in srgb, var(--sv-svart) 78%, transparent);
+  --placeholder: color-mix(in srgb, var(--sv-svart) 92%, transparent); /* platshållartext: kontrast minst 4,5 mot fältets bakgrund (mätt 4,7), därför tätare än --text-muted */
   --line: var(--sv-svart);
   --grid-line: color-mix(in srgb, var(--sv-svart) 18%, transparent);
   --row-hover: color-mix(in srgb, var(--sv-svart) 8%, transparent);
@@ -106,6 +107,7 @@ body {
   --surface-alt: color-mix(in srgb, var(--sv-svart) 4%, var(--sv-vit));
   --text: var(--sv-svart);
   --text-muted: color-mix(in srgb, var(--sv-svart) 62%, transparent);
+  --placeholder: color-mix(in srgb, var(--sv-svart) 70%, transparent);
   --line: var(--sv-svart);
   --grid-line: color-mix(in srgb, var(--sv-svart) 12%, transparent);
   --row-hover: color-mix(in srgb, var(--sv-svart) 5%, transparent);
@@ -124,6 +126,7 @@ body {
   --surface-alt: color-mix(in srgb, var(--sv-svart) 82%, var(--sv-vit));
   --text: var(--sv-vit);
   --text-muted: color-mix(in srgb, var(--sv-vit) 68%, transparent);
+  --placeholder: color-mix(in srgb, var(--sv-vit) 70%, transparent);
   --line: color-mix(in srgb, var(--sv-vit) 70%, transparent);
   --grid-line: color-mix(in srgb, var(--sv-vit) 14%, transparent);
   --row-hover: color-mix(in srgb, var(--sv-vit) 7%, transparent);

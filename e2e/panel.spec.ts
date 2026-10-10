@@ -154,7 +154,7 @@ for (const lib of LIBS) {
       await openApp(page, lib);
       await clearWrites(page);
       await page.locator(rowOf(lib, "i12")).click();
-      await expect(panel(page).locator(".panel-kind")).toHaveText("Epic");
+      await expect(panel(page).locator(".panel-kind")).toHaveText("Grupp");
       await expect(panel(page).locator('input[name="start"]')).toHaveCount(0);
       await expect(panel(page).locator(".panel-muted").first()).toContainText("räknas ur dess innehåll");
       const contents = panel(page).locator('[data-section="contents"] li');

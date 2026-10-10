@@ -3,7 +3,7 @@ import { SEL, items, openApp, setZoom, writes } from "./helpers";
 
 const panel = (page: Page) => page.locator("aside.panel");
 const rows = (page: Page) => page.locator(".gantt_row .grid-title").allTextContents().then((a) => a.map((t) => t.trim()));
-const add = (page: Page, name: "Uppgift" | "Milstolpe" | "Epic") => page.getByRole("group", { name: "Lägg till" }).getByRole("button", { name: `+ ${name}` }).click();
+const add = (page: Page, name: "Uppgift" | "Milstolpe" | "Grupp") => page.getByRole("group", { name: "Lägg till" }).getByRole("button", { name: `+ ${name}` }).click();
 type Row = { id: string; title: string; parent_id: string | null; type: string; start: string; end: string; sort_order: number };
 const all = (page: Page) => items(page) as unknown as Promise<Row[]>;
 
@@ -60,8 +60,8 @@ test.describe("skapa", () => {
 
   test("U4 ny epic överst, uppgift inuti den: epicen får uppgiftens datum", async ({ page }) => {
     await openApp(page, "dhtmlx");
-    await add(page, "Epic");
-    await expect(panel(page).locator(".panel-kind")).toHaveText("Epic");
+    await add(page, "Grupp");
+    await expect(panel(page).locator(".panel-kind")).toHaveText("Grupp");
     await page.keyboard.type("Underhåll"); await page.keyboard.press("Enter");
     await expect.poll(async () => (await all(page)).find((i) => i.title === "Underhåll")?.id).toBeTruthy();
     const epic = (await all(page)).find((i) => i.title === "Underhåll")!;
@@ -104,7 +104,7 @@ test.describe("ta bort", () => {
     await openApp(page, "dhtmlx");
     await page.locator('.gantt_row[data-task-id="i8"] .grid-title').click(); // Gränssnitt: i9 + i10 under
     await panel(page).getByRole("button", { name: "Ta bort", exact: true }).click();
-    await expect(panel(page).getByRole("alert")).toContainText('Ta bort epicen "Gränssnitt" och de 2 poster den innehåller?');
+    await expect(panel(page).getByRole("alert")).toContainText('Ta bort gruppen "Gränssnitt" och de 2 poster den innehåller?');
     await panel(page).getByRole("button", { name: "Ta bort" }).first().click();
     await expect(panel(page)).toHaveCount(0);
     const left = (await all(page)).map((i) => i.id);

@@ -15,6 +15,8 @@ import { useProjects } from "./useProjects";
 import { ProjectBar } from "./views/ProjectBar";
 import { LANGS, setLang, storedLang, sv, type Lang } from "./i18n/sv";
 import { focusMedianOnNextProject, rememberScroll, uiCarry } from "./scrollCarry";
+import { clampGrid, loadGridWidth, saveGridWidth } from "./layout";
+import { GridResizer } from "./views/GridResizer";
 import { useProjectData } from "./proto/useProjectData";
 import type { Zoom } from "./proto/zoom";
 import { ItemPanel } from "./views/ItemPanel";
@@ -55,6 +57,9 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof createStore>; l
   const firstYear = state.kind === "ready" && state.items.length ? Number(state.items.map((i) => i.start).sort()[0].slice(0, 4)) : new Date().getFullYear();
   const effectiveYear = year ?? firstYear;
   const [editId, setEditId] = useState<string | null>(null);
+  // Aktiv grupp: den grupp man senast valde eller skapade (eller vars post man valde). Nya poster hamnar där när inget är valt, som i monday och Asana.
+  const [activeGroup, setActiveGroup] = useState<string | null>(null);
+  const [panelFocus, setPanelFocus] = useState<"placement" | "pred" | "succ" | null>(null);
   const down = useRef<{ x: number; y: number; id: string | null } | null>(null);
   const mainRef = useRef<HTMLElement>(null);
   const itemsRef = useRef<Set<string>>(new Set());
@@ -67,7 +72,7 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof createStore>; l
     // Ett klick tolkas från nedtryck och upplyft (inte från click-händelsen): biblioteket kan rita om staplen mellan de två, och då
     // hamnar click på fel element och går förlorat. Målet läses vid nedtrycket, innan något hunnit ritas om.
     const resolve = (t: Element) => {
-      if (t.closest(".gantt_tree_icon, .gantt_task_drag, .row-check")) return null; // fällpil och kanthandtag. Länkhandtag på milstolpar täcker romben och räknas som stapeln.
+      if (t.closest(".gantt_tree_icon, .gantt_task_drag, .row-check, .row-add")) return null; // fällpil och kanthandtag. Länkhandtag på milstolpar täcker romben och räknas som stapeln.
       // Bara staplar och rader i rutnätet öppnar en post. Ett klick på en tom del av tidslinjen gör ingenting.
       return t.closest(".gantt-host .gantt_task_line[data-task-id], .gantt-host .gantt_row[data-task-id]")?.getAttribute("data-task-id") ?? null;
     };
@@ -95,7 +100,7 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof createStore>; l
   const addItem = async (kind: ItemType, opts: { anchorId?: string | null; start?: ISODate | null; title?: string; open?: boolean } = {}) => {
     if (!projects.projectId || state.kind !== "ready") return;
     try {
-      const anchor = opts.anchorId === undefined ? editId : opts.anchorId;
+      const anchor = opts.anchorId === undefined ? (editId ?? activeGroup) : opts.anchorId;
       const selected = anchor ? state.items.find((i) => i.id === anchor) ?? null : null;
       const draft = newItemDraft(kind, state.items, selected, { projectId: projects.projectId, workspaceId }, todayISO(), opts.start ?? undefined);
       const created = await store.createItem(opts.title ? { ...draft, title: opts.title } : draft);
@@ -114,6 +119,19 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof createStore>; l
     try { await store.updateItem(id, { status: it.status === "done" ? "not_started" : "done" }); await refresh(); }
     catch (e) { setWriteError(friendlyError(e)); }
   };
+  useEffect(() => {
+    if (!editId || state.kind !== "ready") return;
+    const it = state.items.find((i) => i.id === editId);
+    if (it) setActiveGroup(it.type === "epic" ? it.id : it.parent_id);
+  }, [editId, state]);
+  // Målgruppen för nya poster: vald posts grupp, annars den aktiva gruppen (om den finns kvar)
+  const targetGroup = (() => {
+    if (state.kind !== "ready") return null;
+    const sel = editId ? state.items.find((i) => i.id === editId) : null;
+    const gid = sel ? (sel.type === "epic" ? sel.id : sel.parent_id) : activeGroup;
+    return gid ? state.items.find((i) => i.id === gid && i.type === "epic") ?? null : null;
+  })();
+
   // Ångra och gör om
   const [hist, setHist] = useState({ undo: store.canUndo, redo: store.canRedo });
   useEffect(() => {
@@ -176,6 +194,17 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof createStore>; l
       await refresh(); // även utan ändring: biblioteket kan ha visat raden på en plats som inte gäller
     } catch (e) { setWriteError(friendlyError(e)); reload(); }
   };
+  // Vänstra kolumnens bredd: användarens val, sparas i webbläsaren. Begränsas av utrymmet så att tidslinjen alltid syns.
+  const [gridWidth, setGridWidth] = useState(loadGridWidth);
+  const gridRef = useRef(gridWidth);
+  const changeGrid = (w: number) => { const next = clampGrid(w, mainRef.current?.clientWidth ?? Infinity); gridRef.current = next; setGridWidth(next); };
+  const commitGrid = () => saveGridWidth(gridRef.current);
+  /** Dubbelklick på dragfältet: bredda så att de längsta synliga titlarna ryms (de rader som ritats just nu). */
+  const fitGrid = () => {
+    let extra = 0;
+    document.querySelectorAll<HTMLElement>(".gantt-host .grid-title").forEach((e) => { extra = Math.max(extra, e.scrollWidth - e.clientWidth); });
+    if (extra > 0) { changeGrid(gridRef.current + extra + 8); commitGrid(); }
+  };
   const [todayToken, setTodayToken] = useState(0);
   // Meddelanden försvinner av sig själva efter en stund (och går att stänga)
   useEffect(() => { if (!writeError) return; const t = window.setTimeout(() => setWriteError(null), 9000); return () => window.clearTimeout(t); }, [writeError]);
@@ -200,6 +229,8 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof createStore>; l
       { id: "milestone", label: here ? sv.menu.newMilestoneHere : isEpic ? sv.menu.newMilestoneIn : sv.menu.newMilestoneNext },
       ...(isEpic ? [{ id: "epic-in", label: sv.menu.newEpicIn }] : []),
       { id: "epic", label: sv.menu.newEpic },
+      { id: "move-to", label: sv.menu.moveToGroup },
+      ...(isEpic ? [] : [{ id: "pred", label: sv.menu.addPred }, { id: "succ", label: sv.menu.addSucc }]),
       { id: "up", label: sv.menu.moveUp, disabled: !canMove(state.items, menuItem.id, "up") },
       { id: "down", label: sv.menu.moveDown, disabled: !canMove(state.items, menuItem.id, "down") },
       { id: "remove", label: sv.menu.remove, danger: true },
@@ -212,6 +243,7 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof createStore>; l
     setMenu(null);
     try {
       if (choice === "open" && target) setEditId(target.id);
+      else if ((choice === "move-to" || choice === "pred" || choice === "succ") && target) { setPanelFocus(choice === "move-to" ? "placement" : choice); setEditId(target.id); }
       else if (choice === "task" || choice === "milestone") await addItem(choice, { anchorId: target?.id ?? null, start: m.date });
       else if (choice === "epic-in") await addItem("epic", { anchorId: target?.id ?? null, start: m.date });
       else if (choice === "epic") await addItem("epic", { anchorId: null, start: m.date });
@@ -327,20 +359,23 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof createStore>; l
         {state.kind === "ready" && projects.projectId && view === "wheel" && <YearWheel items={shown.items} year={effectiveYear} selectedId={editId} onOpen={setEditId} onContext={openMenu} />}
         {state.kind === "ready" && projects.projectId && view === "gantt" && (
           <div className="gantt-wrap">
-          <DhtmlxGantt key={theme} revealId={reveal} todayToken={todayToken} onPersisted={() => void refresh()}
+          <div className="gantt-main">
+          <DhtmlxGantt key={theme} gridWidth={gridWidth} revealId={reveal} todayToken={todayToken} onPersisted={() => void refresh()}
             onNotice={setWriteError}
             onCreateAt={({ rowId, date }) => void addItem("task", { anchorId: rowId, start: date }).catch(() => undefined)}
             onRename={(id) => { setJustCreated(id); setEditId(id); }}
             onContext={openMenu}
-            onToggleDone={(id) => void toggleDone(id)} onMoveRow={moveRow} store={store} items={shown.items} deps={shown.deps} zoom={zoom}
+            onToggleDone={(id) => void toggleDone(id)} onMoveRow={moveRow} onAddInGroup={(gid) => void addItem("task", { anchorId: gid }).catch(() => undefined)} store={store} items={shown.items} deps={shown.deps} zoom={zoom}
             onError={(e) => { setWriteError(typeof e === "string" ? e : friendlyError(e)); reload(); }} />
-          <QuickAdd onAdd={(title) => addItem("task", { title, open: false })} />
+          <GridResizer width={gridWidth} onChange={changeGrid} onCommit={commitGrid} onFit={fitGrid} />
+          </div>
+          <QuickAdd width={gridWidth} groupName={targetGroup?.title ?? null} onAdd={(title) => addItem("task", { title, open: false })} />
           </div>
         )}
        </Suspense>
       </main>
       {editId && (
-        <ItemPanel key="panel" store={store} projectId={projects.projectId!} itemId={editId} dataVersion={state.kind === "ready" ? state.items : undefined} autoSelectTitle={editId === justCreated}
+        <ItemPanel key="panel" store={store} projectId={projects.projectId!} itemId={editId} dataVersion={state.kind === "ready" ? state.items : undefined} autoSelectTitle={editId === justCreated} focusField={panelFocus} onFocusDone={() => setPanelFocus(null)}
           onClose={() => setEditId(null)} onChanged={() => void refresh()} onOpen={setEditId} />
       )}
       </div>

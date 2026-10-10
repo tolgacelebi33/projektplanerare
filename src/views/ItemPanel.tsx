@@ -18,8 +18,10 @@ type SaveState = { kind: "idle" } | { kind: "saving" } | { kind: "saved" } | { k
  * Detaljpanel för en post, fast bredd, dockad till höger. Ändringar sparas per fält direkt (inget spara-steg), så att man
  * kan hoppa mellan poster utan att tappa något. Läser alltid färska data från DataStore (drag i vyerna sparas direkt i storen).
  */
-export function ItemPanel({ store, projectId, itemId, dataVersion, autoSelectTitle = false, onClose, onChanged, onOpen }: {
+export function ItemPanel({ store, projectId, itemId, dataVersion, autoSelectTitle = false, focusField = null, onFocusDone, onClose, onChanged, onOpen }: {
   store: DataStore; projectId: string; itemId: string; autoSelectTitle?: boolean;
+  /** Flytta fokus till ett val när posten laddats (från högerklicksmenyn): gruppen, föregångare eller efterföljare. */
+  focusField?: "placement" | "pred" | "succ" | null; onFocusDone?: () => void;
   /** Ändras när data ändrats utanför panelen (t.ex. ett drag i vyn), så att panelen visar det som är sparat. */
   dataVersion?: unknown;
   onClose: () => void; onChanged: () => void; onOpen: (id: string) => void;
@@ -61,6 +63,17 @@ export function ItemPanel({ store, projectId, itemId, dataVersion, autoSelectTit
     const off = window.setTimeout(() => document.removeEventListener("focusin", back, true), 750);
     return () => { timers.forEach(window.clearTimeout); window.clearTimeout(off); document.removeEventListener("focusin", back, true); };
   }, [autoSelectTitle, data?.item.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Fokus på ett val (från menyn). Gantt-biblioteket tar fokus en kort stund efter ett klick, så det görs om några gånger.
+  useEffect(() => {
+    if (!focusField || !data) return;
+    const section = focusField === "placement" ? "placement" : focusField === "pred" ? "predecessors" : "successors";
+    const go = () => { const el = document.querySelector<HTMLElement>(`aside.panel [data-section="${section}"] select`); if (el && document.activeElement !== el) { el.focus(); el.scrollIntoView({ block: "center" }); } };
+    go();
+    const timers = [60, 200, 450].map((ms) => window.setTimeout(go, ms));
+    const done = window.setTimeout(() => onFocusDone?.(), 500);
+    return () => { timers.forEach(window.clearTimeout); window.clearTimeout(done); };
+  }, [focusField, data?.item.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const load = useCallback(async () => {
     try {
@@ -180,6 +193,7 @@ export function ItemPanel({ store, projectId, itemId, dataVersion, autoSelectTit
     return (
       <section className="panel-section" data-section={kind === "pred" ? "predecessors" : "successors"}>
         <h3>{kind === "pred" ? sv.panel.predecessors : sv.panel.successors}</h3>
+        <p className="panel-muted panel-hint">{sv.panel.depHint}</p>
         {rows.length === 0 ? <p className="panel-muted">{sv.panel.noneYet}</p> : (
           <ul className="panel-list">
             {rows.map(({ dep, other }) => (

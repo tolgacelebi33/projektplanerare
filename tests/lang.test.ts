@@ -34,7 +34,7 @@ describe("språk", () => {
     expect(b.map(([k]) => k)).toEqual(a.map(([k]) => k));
     for (const [k, v] of [...a, ...b]) expect(v.trim(), k).not.toBe("");
     // Texter som är lika på båda språken med flit (förkortningar, egennamn, internationella ord). Allt annat lika är en oöversatt text.
-    const allowed = ["lang.sv", "lang.en", "lang.svName", "lang.enName", "ex.header[0]", "ex.header[4]", "ex.header[6]", "ex.kindStatus", "zoom.label", "theme.standard", "filter.label", "add.epic", "view.gantt", "panel.type.epic", "panel.status", "panel.priorities.normal", "panel.start", "title"];
+    const allowed = ["lang.sv", "lang.en", "lang.svName", "lang.enName", "ex.header[0]", "ex.header[4]", "ex.header[6]", "ex.kindStatus", "zoom.label", "theme.standard", "filter.label", "view.gantt", "panel.status", "panel.priorities.normal", "panel.start", "title"];
     const same = a.filter(([, v], i) => b[i][1] === v).map(([k]) => k);
     expect(same).toEqual(allowed);
   });

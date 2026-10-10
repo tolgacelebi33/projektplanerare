@@ -265,7 +265,8 @@ body[data-overlay] .gantt_tooltip { display: none !important; }
 .dhx-host .row-check { display: inline-grid; place-items: center; width: 16px; height: 16px; margin: 0 8px 0 2px; padding: 0; vertical-align: middle; font-size: 11px; line-height: 1; border-radius: var(--radius-pill); border: var(--line-width) solid var(--line); background: transparent; color: var(--surface); cursor: pointer; }
 .dhx-host .row-check[aria-checked="true"] { background: var(--status-done-bg); border-color: var(--bar-outline-color); color: var(--status-done-fg); }
 .dhx-host .row-check:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
-.dhx-host .grid-title { display: inline-block; max-width: calc(100% - 28px); vertical-align: middle; }
+/* Maxbredd = radens bredd minus bocken (16 + 2 + 8 = 26 px). Tidigare 28 px klippte varje titel med 2 px, och ellipsen tog flera tecken ("Ny e..."). */
+.dhx-host .grid-title { display: inline-block; max-width: calc(100% - 26px); vertical-align: middle; }
 
 /* Rad för snabbtillägg under rutnätet */
 .gantt-wrap { display: flex; flex-direction: column; height: 100%; }
@@ -278,3 +279,29 @@ body[data-overlay] .gantt_tooltip { display: none !important; }
 .toolbar .search { font: inherit; font-size: var(--fs-md); color: var(--text); background: var(--surface-alt); border: var(--line-width) solid var(--line); border-radius: var(--radius-pill); padding: 4px 12px; width: 150px; box-sizing: border-box; }
 .toolbar .search::placeholder { color: var(--text-muted); }
 .toolbar .search:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+/* Platshållartext i fälten: egen token per tema (kontrast minst 4,5 mot fältet, testat i e2e/placeholder.spec.ts). Webbläsarens standardgrå (rgb 117) hade kontrast 1,7 i Standard och 1,8 i Mörkt. */
+.panel input::placeholder, .panel textarea::placeholder, .project-input::placeholder { color: var(--placeholder); opacity: 1; }
+
+/* Vänstra kolumnens bredd: dragfältet ligger över gränsen mellan rutnät och tidslinje */
+.gantt-wrap .gantt-main { position: relative; flex: 1 1 auto; min-height: 0; }
+.gantt-wrap .gantt-main .gantt-host { height: 100%; }
+.grid-resizer { position: absolute; top: 0; bottom: 0; width: 8px; z-index: 8; cursor: col-resize; touch-action: none; }
+.grid-resizer::after { content: ""; position: absolute; left: 3px; top: 0; bottom: 0; width: 2px; background: transparent; transition: background 0.12s; }
+.grid-resizer:hover::after, .grid-resizer[data-dragging="true"]::after, .grid-resizer:focus-visible::after { background: var(--accent); }
+.grid-resizer:focus-visible { outline: none; }
+/* Epic i rutnätet: liten ikon före titeln, så att en tom epic inte ser ut som en uppgift */
+.dhx-host .epic-glyph { display: inline-block; vertical-align: middle; margin: 0 6px 0 0; flex: 0 0 auto; }
+.dhx-host .epic-glyph + .grid-title { max-width: calc(100% - 46px); } /* bock 26 + ikon 14 + 6 */
+
+/* Grupprad: antal direkta poster, som byts mot "+" (lägg till en uppgift i gruppen) vid hovring eller fokus. Samma plats (24 px) så att titeln inte tappar utrymme. */
+.dhx-host .epic-glyph + .grid-title { max-width: calc(100% - 46px - 28px); } /* bock 26 + ikon 20 + antal/knapp 28 reserveras */
+.dhx-host .group-tools { position: relative; display: inline-block; width: 24px; height: 18px; margin-left: 4px; vertical-align: middle; }
+.dhx-host .group-count { position: absolute; inset: 0; display: grid; place-items: center; font-size: var(--fs-sm); line-height: 1; color: var(--text-muted); }
+.dhx-host .row-add { position: absolute; left: 3px; top: 0; display: grid; place-items: center; width: 18px; height: 18px; margin: 0; padding: 0; font-size: 14px; line-height: 1; border-radius: 4px; border: var(--line-width) solid var(--line); background: transparent; color: var(--text); cursor: pointer; visibility: hidden; }
+.dhx-host .gantt_row:hover .row-add, .dhx-host .row-add:focus-visible, .dhx-host .row-add.empty { visibility: visible; }
+.dhx-host .gantt_row:hover .group-count, .dhx-host .group-tools:focus-within .group-count { visibility: hidden; }
+.dhx-host .row-add:hover { background: var(--row-hover); }
+.dhx-host .row-add:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+/* Rader går att dra i rutnätet (byta ordning och grupp) */
+.dhx-host .gantt_grid_data .gantt_row { cursor: grab; }
+.dhx-host .gantt_grid_data .gantt_row .row-check, .dhx-host .gantt_grid_data .gantt_row .row-add, .dhx-host .gantt_grid_data .gantt_row .gantt_tree_icon { cursor: pointer; }

@@ -3,7 +3,7 @@ import { openApp } from "./helpers";
 
 type Row = { id: string; title: string; type: string; parent_id: string | null };
 const rows = (page: Page) => page.evaluate(() => (window as any).__store.listItems("proj_1")) as Promise<Row[]>;
-const add = async (page: Page, kind: "Uppgift" | "Milstolpe" | "Epic") => {
+const add = async (page: Page, kind: "Uppgift" | "Milstolpe" | "Grupp") => {
   await page.getByRole("group", { name: "Lägg till" }).getByRole("button", { name: `+ ${kind}` }).click();
   await expect(page.locator("aside.panel")).toBeVisible();
   await page.waitForTimeout(300);
@@ -17,7 +17,7 @@ test.beforeEach(async ({ page }) => {
 test("E1 + Epic skapar alltid en epic på översta nivån, även när en post inuti en annan epic är vald", async ({ page }) => {
   await openApp(page, "dhtmlx");
   const before = (await rows(page)).length;
-  await add(page, "Epic"); await add(page, "Milstolpe"); await add(page, "Uppgift"); await add(page, "Epic"); // som i rapporten
+  await add(page, "Grupp"); await add(page, "Milstolpe"); await add(page, "Uppgift"); await add(page, "Grupp"); // som i rapporten
   const all = await rows(page);
   const fresh = all.slice(before);
   expect(fresh.map((r) => r.type)).toEqual(["epic", "milestone", "task", "epic"]);
@@ -32,6 +32,6 @@ test("E2 en epic i en epic går fortfarande att skapa från högerklicksmenyn", 
   const nested = async () => (await rows(page)).filter((r) => r.type === "epic" && r.parent_id === "i12").length;
   const before = await nested();
   await page.locator('.gantt_row[data-task-id="i12"] .grid-title').click({ button: "right" });
-  await page.getByRole("menuitem", { name: "Ny epic i epicen" }).click();
+  await page.getByRole("menuitem", { name: "Ny grupp i gruppen" }).click();
   await expect.poll(nested).toBe(before + 1);
 });

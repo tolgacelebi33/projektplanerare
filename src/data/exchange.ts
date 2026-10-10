@@ -200,7 +200,7 @@ for (const k of Object.keys(ALIASES)) ALIASES[k] = ALIASES[k].map(norm);
 
 /** Synonymer per intern typ, status och prioritet (jämförs normaliserat). Etiketterna på båda språken läggs till. */
 const SYN = {
-  type: { epic: ["project", "projekt", "workpackage", "arbetspaket", "program", "initiative", "initiativ", "theme", "tema", "phase", "fas", "portfolio", "group", "grupp"], milestone: ["gate", "checkpoint"], task: ["activity", "aktivitet", "deliverable", "leverans", "story", "bug", "issue", "subtask", "delaktivitet", "item", "work"] },
+  type: { epic: ["grupp", "group", "section", "sektion", "project", "projekt", "workpackage", "arbetspaket", "program", "initiative", "initiativ", "theme", "tema", "phase", "fas", "portfolio", "group", "grupp"], milestone: ["gate", "checkpoint"], task: ["activity", "aktivitet", "deliverable", "leverans", "story", "bug", "issue", "subtask", "delaktivitet", "item", "work"] },
   status: { not_started: ["planned", "planerad", "todo", "backlog", "idea", "idé", "ny", "nytt", "new", "open", "unknown", "okänd", "proposed", "förslag"], in_progress: ["påbörjad", "started", "active", "aktiv", "doing", "ongoing", "testpågår"], done: ["klar", "complete", "completed", "closed", "avslutad", "färdig", "finished"], blocked: ["onhold", "paus", "paused", "waiting", "väntar", "stoppad"] },
   priority: { low: ["lägst", "minor", "trivial", "p4", "p5", "3", "4", "5"], normal: ["medium", "medel", "p2", "p3", "2"], high: ["p1", "1"], urgent: ["critical", "kritisk", "blocker", "highest", "högst", "p0", "0"] },
 } as const;

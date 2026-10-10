@@ -23,7 +23,7 @@ describe("hjälpfunktioner för skapa, flytta, ordna och ta bort", () => {
     expect([t.start, t.end, t.status, t.priority, t.progress, t.title]).toEqual(["2026-10-09", "2026-10-13", "not_started", "normal", 0, "Ny uppgift"]);
     const m = newItemDraft("milestone", items, by("i14"), ids, "2026-10-09");
     expect([m.start, m.end, m.title]).toEqual(["2026-04-13", "2026-04-13", "Ny milstolpe"]); // start från vald post, ett enda datum
-    expect(newItemDraft("epic", items, null, ids, "2026-10-09").title).toBe("Ny epic");
+    expect(newItemDraft("epic", items, null, ids, "2026-10-09").title).toBe("Ny grupp");
     expect(t.sort_order).toBe(Math.max(...items.map((i) => i.sort_order)) + 1);
   });
   it("en ny post är giltig i lagret (för varje sort av val)", async () => {
