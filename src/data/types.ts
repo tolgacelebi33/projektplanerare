@@ -33,6 +33,27 @@ export interface Comment {
   text: string;
   created_at: string; edited_at?: string;
 }
+/**
+ * Historik över vad som hänt med en post (loggen). Skrivs av lagret, aldrig för hand, och kan inte ändras. Strukturerad (inte färdig text), så att den
+ * visas på det språk som är valt. `field` är vad som ändrats, `from` och `to` värdena (status och prioritet som nyckel), `other` titeln på en annan post
+ * (beroenden), `dir` om den andra posten är föregångare (pred) eller efterföljare (succ).
+ */
+export type ActivityKind = "created" | "changed" | "moved" | "dep_added" | "dep_changed" | "dep_removed";
+export interface Activity {
+  id: string; workspace_id: string; project_id: string; item_id: string;
+  at: string;
+  /** Den som gjorde ändringen och namnet då (personen kan tas bort senare). Tomt namn: okänd. */
+  actor_id: string | null; actor_name: string;
+  kind: ActivityKind;
+  field?: string; from?: string; to?: string;
+  other?: string; dir?: "pred" | "succ"; dep_type?: DependencyType; lag?: number;
+  /** Ändringen gjordes av en regel (en efterföljare som flyttades, en grupps datum som räknades om) och inte direkt på posten. */
+  auto?: boolean;
+  /** Ändringen kom av Ångra eller Gör om. */
+  undo?: boolean;
+}
+export const ACTIVITY_LIMITS = { perItem: 300, total: 100_000 } as const;
+
 export const COMMENT_LIMITS = { text: 2000, perItem: 500, total: 50_000 } as const;
 
 export interface Baseline { saved_at: string; items: Record<string, { start: string; end: string }> }

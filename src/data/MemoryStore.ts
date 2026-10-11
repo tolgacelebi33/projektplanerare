@@ -5,7 +5,8 @@ import { extendSeries } from "./actions";
 import { PLACEHOLDER_RENAMES, placeholderOldName } from "./fixtures";
 import { countersFor, validCounters, type Counters, emptyCounters, itemCode, nextNumber, parseProjectCode, projectCode } from "./codes";
 import { applyPatch, isPatchList, json, makePatch, type Entry, type Patch } from "./patch";
-import { COMMENT_LIMITS } from "./types";
+import { ACTIVITY_LIMITS, COMMENT_LIMITS, type Activity } from "./types";
+import { depDraft, describeChange } from "./activity";
 import type { Baseline, Comment, Dependency, DependencyMode, FieldDef, Fixture, Item, Project, SavedView, User } from "./types";
 
 /** Allt lagret håller, för att kunna sparas och återställas. */
@@ -17,6 +18,8 @@ export interface Snapshot {
   counters?: Record<string, Counters>;
   /** Kommentarer. Ligger utanför ångra-historiken. */
   comments?: Comment[];
+  /** Loggen (historik över ändringar). Ligger utanför ångra-historiken. */
+  activity?: Activity[];
 }
 
 export interface MemoryStoreOptions {
@@ -49,6 +52,15 @@ export class MemoryStore implements DataStore {
   protected counters = new Map<string, Counters>();
   /** Kommentarer: ingen ångra-historik (Ångra tar aldrig bort en kommentar), och de finns kvar om en post tas bort (så att Ångra kan ge tillbaka posten med sina kommentarer). */
   protected comments: Comment[] = [];
+  /** Loggen: vad som hänt med posterna, vem och när. Skrivs av lagret vid varje ändring, ligger utanför ångra-historiken, och finns kvar om en post tas bort (visas inte medan den saknas). */
+  protected activity: Activity[] = [];
+  private activityCount = new Map<string, number>();
+  /** Den som gör ändringarna just nu (sätts av appen från "Skriv som"). Tomt namn visas som okänd. */
+  actor: { id: string | null; name: string } = { id: null, name: "" };
+  /** Av under en import som för med sig sin egen logg, så att den inte får en "skapad"-rad för varje post. */
+  logging = true;
+  private logBase = new Map<string, Item | undefined>(); // posternas läge vid förra loggningen: det som ändrats sedan dess loggas vid nästa skrivning
+  private direct = new Set<string>(); // poster som en skrivning gällde direkt (resten som ändras är följder: flyttade efterföljare, omräknade grupper)
   private calls = 0;
   /** Logg över skrivanrop, används av tester för att bevisa att UI går via storen. */
   readonly writes: { method: string; args: unknown[] }[] = [];
@@ -116,6 +128,7 @@ export class MemoryStore implements DataStore {
 
   private touch(kind: Kind, key: string, old: unknown): void {
     if (this.suppress) return;
+    if (kind === "items" && !this.logBase.has(key)) this.logBase.set(key, old as Item | undefined);
     if (!this.touched) { // första ändringen sedan senaste skrivningen: hör den till samma steg eller börjar ett nytt?
       this.touched = true;
       const continuing = this.stepOpen && this.stepPushed && this.undoStack.length > 0 && (this.holding > 0 || performance.now() - this.lastCommitAt <= MemoryStore.GROUP_MS);
@@ -149,7 +162,34 @@ export class MemoryStore implements DataStore {
     return { projects: out.projects, items: out.items, dependencies: out.deps, users: [] };
   }
 
+  private userNameOf = (id: string | null): string => (id ? this.users.find((u) => u.id === id)?.name ?? "" : "");
+  private titleOf = (id: string | null): string => (id ? this.items.get(id)?.title ?? "" : "");
+
+  /** Lägger till en rad i loggen (och håller gränserna: högst 300 per post, 100 000 totalt, äldst först bort). */
+  private log(item: Item | undefined, d: Omit<Activity, "id" | "workspace_id" | "project_id" | "item_id" | "at" | "actor_id" | "actor_name">, extra: { auto?: boolean; undo?: boolean; at?: string } = {}): void {
+    if (!item) return;
+    this.seq += 1;
+    this.activity.push({ id: `a_new${this.seq}`, workspace_id: item.workspace_id, project_id: item.project_id, item_id: item.id, at: extra.at ?? new Date().toISOString(), actor_id: this.actor.id, actor_name: this.actor.name, ...d, ...(extra.auto ? { auto: true } : {}), ...(extra.undo ? { undo: true } : {}) });
+    const n = (this.activityCount.get(item.id) ?? 0) + 1;
+    this.activityCount.set(item.id, n);
+    if (n > ACTIVITY_LIMITS.perItem) { const at = this.activity.findIndex((a) => a.item_id === item.id); if (at >= 0) { this.activity.splice(at, 1); this.activityCount.set(item.id, n - 1); } }
+    if (this.activity.length > ACTIVITY_LIMITS.total) { const gone = this.activity.splice(0, this.activity.length - ACTIVITY_LIMITS.total); for (const g of gone) this.activityCount.set(g.item_id, Math.max(0, (this.activityCount.get(g.item_id) ?? 1) - 1)); }
+  }
+  private rebuildActivityCount() { this.activityCount = new Map(); for (const a of this.activity) this.activityCount.set(a.item_id, (this.activityCount.get(a.item_id) ?? 0) + 1); }
+
+  /** Loggar det som ändrats sedan förra skrivningen: det som en skrivning gällde direkt, och det som blev följden (flyttade efterföljare, omräknade grupper, markerat som automatiskt). */
+  private flushActivity(): void {
+    const base = this.logBase, direct = this.direct;
+    this.logBase = new Map(); this.direct = new Set();
+    if (!this.logging) return;
+    for (const [id, before] of base) {
+      const after = this.items.get(id);
+      for (const d of describeChange(before, after, this.userNameOf, this.titleOf)) this.log(after, d, { auto: !direct.has(id) });
+    }
+  }
+
   private commit(resetHistory = false): void {
+    this.flushActivity();
     const now = performance.now();
     if (resetHistory) { this.undoStack = []; this.redoStack = []; this.closeStep(); }
     else if (this.touched) {
@@ -195,9 +235,17 @@ export class MemoryStore implements DataStore {
     const now = this.snapshot();
     const target = applyPatch(now, patch);
     to.push(makePatch(target, now)); // från målläget tillbaka till nuläget, för att kunna gå åt andra hållet
-    const seq = this.seq, projectSeq = this.projectSeq, counters = this.counters, comments = this.comments;
+    const seq = this.seq, projectSeq = this.projectSeq, counters = this.counters, comments = this.comments, activity = this.activity;
+    const was = new Map(this.items);
+    this.logBase = new Map(); this.direct = new Set();
     this.restore(target);
     this.comments = comments; // Ångra och Gör om rör aldrig kommentarerna
+    this.activity = activity; this.rebuildActivityCount(); // och loggen står kvar, med själva Ångra som nya rader
+    for (const [id, after] of this.items) { // vad Ångra eller Gör om ändrade, i loggen
+      const before = was.get(id);
+      if (before === after) continue;
+      for (const d of describeChange(before, after, this.userNameOf, this.titleOf)) this.log(after, d, { undo: true });
+    }
     this.projectSeq = Math.max(projectSeq, this.projectSeq); // projektnummer och räkneverk går aldrig tillbaka, inte heller vid ångra
     for (const [pid, c] of counters) {
       const cur = this.counters.get(pid);
@@ -224,6 +272,7 @@ export class MemoryStore implements DataStore {
       project_seq: this.projectSeq,
       counters: Object.fromEntries(this.counters),
       comments: this.comments,
+      activity: this.activity,
     };
   }
 
@@ -235,6 +284,7 @@ export class MemoryStore implements DataStore {
     this.users = snap.users.map((u) => ({ ...u }));
     this.seq = snap.seq;
     this.comments = (snap.comments ?? []).map((c) => ({ ...c }));
+    this.activity = (snap.activity ?? []).map((a) => ({ ...a })); this.rebuildActivityCount();
     this.projectSeq = snap.project_seq ?? 0;
     this.counters = new Map();
     for (const [pid, c] of Object.entries(snap.counters ?? {})) if (this.projects.has(pid) && validCounters(c)) this.counters.set(pid, { ...c });
@@ -369,6 +419,7 @@ export class MemoryStore implements DataStore {
     this.projects.delete(id);
     this.counters.delete(id);
     this.comments = this.comments.filter((c) => c.project_id !== id);
+    this.activity = this.activity.filter((a) => a.project_id !== id); this.rebuildActivityCount();
     this.writes.push({ method: "deleteProject", args: [id] });
     this.commit(true);
   }
@@ -379,6 +430,7 @@ export class MemoryStore implements DataStore {
   async createItem(item: Omit<Item, "id">) {
     await this.tick("createItem");
     const created: Item = { ...item, id: this.nextId("i") };
+    this.direct.add(created.id);
     delete created.code; // koden delas alltid ut här, aldrig av den som skapar
     const proj = this.projects.get(created.project_id);
     let counters: Counters | null = null;
@@ -406,6 +458,7 @@ export class MemoryStore implements DataStore {
     const cur = this.items.get(id);
     if (!cur) throw new RuleError("not_found", `Item ${id} finns inte`);
     if (patch.code !== undefined && patch.code !== cur.code) throw new RuleError("code_fixed", "Koden kan inte ändras");
+    this.direct.add(id);
     const next: Item = { ...cur, ...patch };
     // Regel: när status blir Klar sätts framsteget till 100 (om framsteg inte ändras i samma skrivning)
     if (this.rules.doneSetsProgress && patch.status === "done" && cur.status !== "done" && patch.progress === undefined && cur.type !== "epic") next.progress = 100;
@@ -492,6 +545,19 @@ export class MemoryStore implements DataStore {
     this.commit();
     return before - this.comments.length;
   }
+  /** Loggen för ett projekts poster (de som finns), äldst först. */
+  async listActivity(projectId: string): Promise<Activity[]> {
+    await this.tick("listActivity");
+    return this.activity.filter((a) => a.project_id === projectId && this.items.has(a.item_id)).map((a) => ({ ...a })).sort((a, b) => (a.at < b.at ? -1 : a.at > b.at ? 1 : a.id < b.id ? -1 : 1));
+  }
+  /** Lägger in loggrader från en fil (import, återställning): oförändrade, med personens namn som det stod. Anropas bara av importen. */
+  addActivityRaw(item_id: string, a: Omit<Activity, "id" | "workspace_id" | "project_id" | "item_id">): void {
+    const item = this.items.get(item_id);
+    if (!item) return;
+    this.seq += 1;
+    this.activity.push({ ...a, id: `a_new${this.seq}`, workspace_id: item.workspace_id, project_id: item.project_id, item_id });
+    this.activityCount.set(item_id, (this.activityCount.get(item_id) ?? 0) + 1);
+  }
   async listDependencies(projectId: string) {
     await this.tick("listDependencies");
     return [...this.deps.values()].filter((d) => this.items.get(d.from_item_id)?.project_id === projectId);
@@ -501,6 +567,7 @@ export class MemoryStore implements DataStore {
     const created: Dependency = { ...dep, id: this.nextId("d") };
     validateDependency(created, this.items, [...this.deps.values()]);
     this.deps.set(created.id, created);
+    this.logDep("dep_added", created);
     this.afterDatesChanged([created.from_item_id]); // ett nytt beroende som redan bryts flyttar efterföljaren
     this.writes.push({ method: "createDependency", args: [dep] });
     this.commit();
@@ -515,13 +582,24 @@ export class MemoryStore implements DataStore {
     if (next.lag === 0) delete next.lag;
     validateDependency(next, this.items, [...this.deps.values()].filter((d) => d.id !== id));
     this.deps.set(id, next);
+    this.logDep("dep_changed", next);
     this.afterDatesChanged([next.from_item_id]);
     this.writes.push({ method: "updateDependency", args: [id, patch] });
     this.commit();
     return { ...next };
   }
+  /** Ett beroende syns i loggen på båda posterna: hos efterföljaren är den andra en föregångare, hos föregångaren en efterföljare. */
+  private logDep(kind: "dep_added" | "dep_changed" | "dep_removed", d: Dependency): void {
+    if (!this.logging) return;
+    const from = this.items.get(d.from_item_id), to = this.items.get(d.to_item_id);
+    if (!from || !to) return;
+    this.log(to, depDraft(kind, from.title, "pred", d.type, d.lag));
+    this.log(from, depDraft(kind, to.title, "succ", d.type, d.lag));
+  }
   async deleteDependency(id: string) {
     await this.tick("deleteDependency");
+    const gone = this.deps.get(id);
+    if (gone) this.logDep("dep_removed", gone);
     this.deps.delete(id);
     this.writes.push({ method: "deleteDependency", args: [id] });
     this.commit();

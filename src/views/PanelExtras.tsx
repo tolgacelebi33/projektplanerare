@@ -1,14 +1,12 @@
 import { useState } from "react";
-import { addLabel, addLog, allLabels, checklistCount, linkLabel, logStamp, newChecklistId, normalizeLink } from "../data/extras";
+import { addLabel, allLabels, checklistCount, linkLabel, newChecklistId, normalizeLink } from "../data/extras";
 import { labelColor } from "../data/extras";
 import type { Item } from "../data/types";
 import type { Features } from "../settings";
 import { sv } from "../i18n/sv";
 
 /** Etiketter, checklista, länkar och uppdateringslogg i panelen. Varje del kan stängas av under Inställningar. Ändringar går via `save` (en skrivning som ångras). */
-export function PanelExtras({ item, all, features, save, error, only = "rest" }: {
-  /** "rest": etiketter, checklista och länkar. "log": bara uppdateringsloggen (egen flik i panelen). */
-  only?: "rest" | "log";
+export function PanelExtras({ item, all, features, save, error }: {
   item: Item; all: Item[]; features: Features;
   save: (patch: Partial<Item>) => Promise<void>;
   error: (field: string) => React.ReactNode;
@@ -17,8 +15,7 @@ export function PanelExtras({ item, all, features, save, error, only = "rest" }:
   const [label, setLabel] = useState("");
   const [todo, setTodo] = useState("");
   const [url, setUrl] = useState(""); const [urlTitle, setUrlTitle] = useState(""); const [urlBad, setUrlBad] = useState(false);
-  const [note, setNote] = useState("");
-  const labels = item.labels ?? [], checklist = item.checklist ?? [], links = item.links ?? [], log = item.log ?? [];
+  const labels = item.labels ?? [], checklist = item.checklist ?? [], links = item.links ?? [];
   const { done, total } = checklistCount(checklist);
   const suggestions = allLabels(all).filter((l) => !labels.some((x) => x.toLowerCase() === l.toLowerCase()));
   const newLabel = async () => { const next = addLabel(labels, label); if (next) { await save({ labels: next }); } setLabel(""); };
@@ -28,10 +25,9 @@ export function PanelExtras({ item, all, features, save, error, only = "rest" }:
     if (!l) { setUrlBad(true); return; }
     setUrlBad(false); await save({ links: [...links, l] }); setUrl(""); setUrlTitle("");
   };
-  const newNote = async () => { const next = addLog(log, note); if (next) { await save({ log: next }); setNote(""); } };
   return (
     <>
-      {only === "rest" && features.labels && (
+      {features.labels && (
         <section className="panel-section" data-section="labels">
           <h3>{t.labels}</h3>
           {labels.length > 0 && (
@@ -53,7 +49,7 @@ export function PanelExtras({ item, all, features, save, error, only = "rest" }:
           {err(error, "labels")}
         </section>
       )}
-      {only === "rest" && features.checklist && (
+      {features.checklist && (
         <section className="panel-section" data-section="checklist">
           <h3>{t.checklist}{total > 0 && <span className="panel-muted"> {t.checklistCount(done, total)}</span>}</h3>
           {total > 0 && <div className="panel-meter" role="progressbar" aria-label={t.checklist} aria-valuemin={0} aria-valuemax={total} aria-valuenow={done}><div style={{ width: `${(done / total) * 100}%` }} /></div>}
@@ -76,7 +72,7 @@ export function PanelExtras({ item, all, features, save, error, only = "rest" }:
           {err(error, "checklist")}
         </section>
       )}
-      {only === "rest" && features.links && (
+      {features.links && (
         <section className="panel-section" data-section="links">
           <h3>{t.links}</h3>
           {links.length > 0 && (
@@ -98,25 +94,6 @@ export function PanelExtras({ item, all, features, save, error, only = "rest" }:
           </div>
           {urlBad && <p role="alert" className="panel-error">{t.badUrl}</p>}
           {err(error, "links")}
-        </section>
-      )}
-      {only === "log" && features.log && (
-        <section className="panel-section" data-section="log">
-          <h3>{t.log}</h3>
-          <textarea name="log-new" rows={2} value={note} maxLength={2000} placeholder={t.logPlaceholder} aria-label={t.addLog} onChange={(e) => setNote(e.target.value)} />
-          <div className="panel-row"><button type="button" className="mini" disabled={!note.trim()} onClick={() => void newNote()}>{t.addLogBtn}</button></div>
-          {log.length > 0 && (
-            <ul className="log">
-              {[...log].reverse().map((e, i) => (
-                <li key={`${e.at}-${i}`}>
-                  <div className="log-head"><time dateTime={e.at}>{logStamp(e.at)}</time>
-                    <button type="button" className="panel-x" aria-label={t.removeLog(logStamp(e.at))} onClick={() => void save({ log: log.filter((x) => x !== e) })}>×</button></div>
-                  <p>{e.text}</p>
-                </li>
-              ))}
-            </ul>
-          )}
-          {err(error, "log")}
         </section>
       )}
     </>

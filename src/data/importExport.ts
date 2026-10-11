@@ -12,7 +12,7 @@ export async function exportProject(store: MemoryStore, projectId: string, forma
   const project = (await store.listProjects()).find((p) => p.id === projectId);
   if (!project) throw new Error(sv.ex.projectGone);
   const [items, deps, users, comments] = await Promise.all([store.listItems(projectId), store.listDependencies(projectId), store.listUsers(), store.listComments(projectId)]);
-  const parsed = toParsed(project, items, deps, users, comments);
+  const parsed = toParsed(project, items, deps, users, comments, await store.listActivity(projectId));
   const date = todayISO();
   const base = `${fileSlug(project.name)}-${date}`;
   return format === "json"
@@ -41,6 +41,8 @@ export async function importParsed(store: MemoryStore, workspaceId: string, pars
   const originalFields = existing?.fields;
   const project = existing ?? await store.createProject({ workspace_id: workspaceId, name: (nameOverride ?? parsed.name).trim().slice(0, 100) || sv.ex.defaultName, dependency_mode: "none" });
   const createdItems: string[] = [], createdDeps: string[] = [];
+  const ownLog = !!parsed.activity?.length; // en fil med egen logg (export, kopia, säkerhetskopia) för med sin historik: inga nya "skapad"-rader
+  if (ownLog) store.logging = false;
   try {
     if (existing && originalMode !== "none") await store.updateProject(project.id, { dependency_mode: "none" });
     // Egna fält: ett nytt projekt får filens fält och vyer som de är. I ett befintligt projekt förs fälten samman på namn (samma typ återanvänds, rullistans val läggs ihop), och posternas värden flyttas till rätt fält.
@@ -102,6 +104,13 @@ export async function importParsed(store: MemoryStore, workspaceId: string, pars
         } catch { warnings.push(sv.ex.commentSkipped); }
       }
     }
+    if (parsed.activity?.length) {
+      for (const a of parsed.activity) {
+        const item = idMap.get(a.item);
+        if (!item) continue;
+        store.addActivityRaw(item, { at: a.at, actor_id: null, actor_name: a.actor ?? "", kind: a.kind, ...(a.field ? { field: a.field } : {}), ...(a.from !== undefined ? { from: a.from } : {}), ...(a.to !== undefined ? { to: a.to } : {}), ...(a.other ? { other: a.other } : {}), ...(a.dir ? { dir: a.dir } : {}), ...(a.dep_type ? { dep_type: a.dep_type } : {}), ...(a.lag ? { lag: a.lag } : {}), ...(a.auto ? { auto: true } : {}), ...(a.undo ? { undo: true } : {}) });
+      }
+    }
     const skippedDeps: string[] = [];
     for (const d of parsed.deps) {
       try { createdDeps.push((await store.createDependency({ workspace_id: workspaceId, from_item_id: idMap.get(d.from)!, to_item_id: idMap.get(d.to)!, type: d.type ?? "finish_to_start", ...(d.lag ? { lag: d.lag } : {}) })).id); }
@@ -125,7 +134,7 @@ export async function importParsed(store: MemoryStore, workspaceId: string, pars
       await store.updateProject(project.id, { dependency_mode: originalMode, fields: originalFields ?? [] }).catch(() => undefined);
     } else await store.deleteProject(project.id).catch(() => undefined);
     throw e;
-  }
+  } finally { if (ownLog) store.logging = true; }
 }
 
 /** Kopia av ett projekt (poster, hierarki, beroenden, läge) som ett nytt projekt. */
@@ -133,5 +142,5 @@ export async function duplicateProject(store: MemoryStore, workspaceId: string, 
   const project = (await store.listProjects()).find((p) => p.id === projectId);
   if (!project) throw new Error(sv.ex.projectGone);
   const [items, deps, users, comments] = await Promise.all([store.listItems(projectId), store.listDependencies(projectId), store.listUsers(), store.listComments(projectId)]);
-  return importParsed(store, workspaceId, toParsed(project, items, deps, users, comments), sv.ex.copy(project.name));
+  return importParsed(store, workspaceId, toParsed(project, items, deps, users, comments, await store.listActivity(projectId)), sv.ex.copy(project.name));
 }

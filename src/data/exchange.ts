@@ -7,7 +7,7 @@ import { sv } from "../i18n/sv";
 import { enDict, svDict } from "../i18n/sv";
 import { friendlyError } from "../i18n/errors";
 import { DEPENDENCY_TYPES, MAX_LAG, type DependencyType } from "./types";
-import type { Baseline, Comment, Dependency, DependencyMode, FieldDef, ISODate, Item, ItemType, Priority, Project, Recurrence, SavedView, Status, User } from "./types";
+import type { Activity, ActivityKind, Baseline, Comment, Dependency, DependencyMode, FieldDef, ISODate, Item, ItemType, Priority, Project, Recurrence, SavedView, Status, User } from "./types";
 
 /**
  * Export och import av projekt, utan beroende av lagring. JSON ger full återgivning (används också för att kopiera ett projekt).
@@ -43,6 +43,8 @@ export interface ParsedProject {
   /** Baslinjen (JSON), med postnycklar som i filens id. */
   baseline?: Baseline;
   /** Kommentarer (JSON): `item` och `id`/`parent` är filens id, författaren ett namn. */
+  /** Loggen (JSON): `item` är filens id, `actor` ett namn. */
+  activity?: { item: string; at: string; actor: string | null; kind: ActivityKind; field?: string; from?: string; to?: string; other?: string; dir?: "pred" | "succ"; dep_type?: DependencyType; lag?: number; auto?: boolean; undo?: boolean }[];
   comments?: { id: string; item: string; parent?: string; author: string | null; text: string; at: string; edited?: string }[];
 }
 
@@ -72,7 +74,7 @@ const TYPES: ItemType[] = ["epic", "milestone", "task"];
 export class ImportError extends Error {}
 
 /** Lagrets poster som en neutral beskrivning (ansvarig som namn, inga projekt- eller workspace-id). */
-export function toParsed(project: Pick<Project, "name" | "dependency_mode"> & Partial<Pick<Project, "fields" | "views" | "baseline">>, items: Item[], deps: Dependency[], users: User[], comments: Comment[] = []): ParsedProject {
+export function toParsed(project: Pick<Project, "name" | "dependency_mode"> & Partial<Pick<Project, "fields" | "views" | "baseline">>, items: Item[], deps: Dependency[], users: User[], comments: Comment[] = [], activity: Activity[] = []): ParsedProject {
   const name = new Map(users.map((u) => [u.id, u.name]));
   const ids = new Set(items.map((i) => i.id));
   return {
@@ -80,6 +82,7 @@ export function toParsed(project: Pick<Project, "name" | "dependency_mode"> & Pa
     dependency_mode: project.dependency_mode ?? "shift",
     ...(project.fields?.length ? { fields: project.fields } : {}), ...(project.views?.length ? { views: project.views } : {}),
     ...(project.baseline && Object.keys(project.baseline.items).length ? { baseline: { saved_at: project.baseline.saved_at, items: Object.fromEntries(Object.entries(project.baseline.items).filter(([k]) => ids.has(k))) } } : {}),
+    ...(activity.length ? { activity: activity.filter((a) => ids.has(a.item_id)).map((a) => ({ item: a.item_id, at: a.at, actor: a.actor_name || null, kind: a.kind, ...(a.field ? { field: a.field } : {}), ...(a.from !== undefined ? { from: a.from } : {}), ...(a.to !== undefined ? { to: a.to } : {}), ...(a.other ? { other: a.other } : {}), ...(a.dir ? { dir: a.dir } : {}), ...(a.dep_type ? { dep_type: a.dep_type } : {}), ...(a.lag ? { lag: a.lag } : {}), ...(a.auto ? { auto: true } : {}), ...(a.undo ? { undo: true } : {}) })) } : {}),
     ...(comments.length ? { comments: comments.filter((c) => ids.has(c.item_id)).map((c) => ({ id: c.id, item: c.item_id, ...(c.parent_id ? { parent: c.parent_id } : {}), author: (c.author_id ? name.get(c.author_id) : undefined) ?? (c.author_name || null), text: c.text, at: c.created_at, ...(c.edited_at ? { edited: c.edited_at } : {}) })) } : {}),
     items: items.map(({ workspace_id: _w, project_id: _p, assignee_id, ...rest }) => ({ ...rest, assignee: assignee_id ? name.get(assignee_id) ?? null : null })),
     deps: deps.filter((d) => ids.has(d.from_item_id) && ids.has(d.to_item_id)).map((d) => ({ from: d.from_item_id, to: d.to_item_id, ...(d.type !== "finish_to_start" ? { type: d.type } : {}), ...(d.lag ? { lag: d.lag } : {}) })),
@@ -90,7 +93,7 @@ export function toParsed(project: Pick<Project, "name" | "dependency_mode"> & Pa
 // ---------- JSON ----------
 
 export function toJson(p: ParsedProject, exportedAt: string): string {
-  return JSON.stringify({ format: FORMAT, version: 1, exported_at: exportedAt, project: { name: p.name, dependency_mode: p.dependency_mode, ...(p.fields?.length ? { fields: p.fields } : {}), ...(p.views?.length ? { views: p.views } : {}), ...(p.baseline ? { baseline: p.baseline } : {}) }, items: p.items, dependencies: p.deps, ...(p.comments?.length ? { comments: p.comments } : {}) }, null, 2);
+  return JSON.stringify({ format: FORMAT, version: 1, exported_at: exportedAt, project: { name: p.name, dependency_mode: p.dependency_mode, ...(p.fields?.length ? { fields: p.fields } : {}), ...(p.views?.length ? { views: p.views } : {}), ...(p.baseline ? { baseline: p.baseline } : {}) }, items: p.items, dependencies: p.deps, ...(p.comments?.length ? { comments: p.comments } : {}), ...(p.activity?.length ? { activity: p.activity } : {}) }, null, 2);
 }
 
 function shapeCheck(it: ParsedItem, n: number) {
@@ -169,6 +172,17 @@ export function parseJson(text: string): ParsedProject {
     dependency_mode: proj.dependency_mode === "none" ? "none" : "shift", items, deps, warnings: [],
   };
   if (Array.isArray(proj.fields)) { try { validateFieldDefs(proj.fields as FieldDef[]); } catch (er) { throw new ImportError(friendlyError(er)); } out.fields = proj.fields as FieldDef[]; }
+  if (Array.isArray(raw.activity)) {
+    const ids = new Set(items.map((i) => i.id));
+    const KINDS = ["created", "changed", "moved", "dep_added", "dep_changed", "dep_removed"];
+    const str = (v: unknown, n = 200) => (typeof v === "string" ? v.slice(0, n) : undefined);
+    out.activity = (raw.activity as unknown[]).flatMap((a, i) => {
+      if (!isObj(a) || typeof a.item !== "string" || !KINDS.includes(String(a.kind)) || typeof a.at !== "string" || Number.isNaN(Date.parse(a.at))) throw new ImportError(sv.ex.activityShape(i + 1));
+      if (!ids.has(a.item)) return [];
+      const dep = typeof a.dep_type === "string" && DEPENDENCY_TYPES.includes(a.dep_type as DependencyType) ? (a.dep_type as DependencyType) : undefined;
+      return [{ item: a.item, at: a.at, actor: str(a.actor, 60) ?? null, kind: a.kind as ActivityKind, ...(str(a.field, 40) ? { field: str(a.field, 40) } : {}), ...(str(a.from) !== undefined ? { from: str(a.from) } : {}), ...(str(a.to) !== undefined ? { to: str(a.to) } : {}), ...(str(a.other) ? { other: str(a.other) } : {}), ...(a.dir === "pred" || a.dir === "succ" ? { dir: a.dir } : {}), ...(dep ? { dep_type: dep } : {}), ...(typeof a.lag === "number" && Number.isInteger(a.lag) && a.lag !== 0 && Math.abs(a.lag) <= MAX_LAG ? { lag: a.lag } : {}), ...(a.auto === true ? { auto: true } : {}), ...(a.undo === true ? { undo: true } : {}) }];
+    });
+  }
   if (Array.isArray(raw.comments)) {
     const ids = new Set(items.map((i) => i.id));
     out.comments = (raw.comments as unknown[]).flatMap((c, i) => {

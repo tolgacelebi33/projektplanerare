@@ -94,27 +94,7 @@ test("B4 länkar: https läggs till, farliga avvisas, länken öppnas säkert i 
   await expect.poll(async () => (await get(page, "i7")).links!.length).toBe(1);
 });
 
-test("B5 uppdateringslogg: ny rad med tid, senaste överst, ta bort, och senaste raden på kortet om det är valt", async ({ page }) => {
-  await open(page, "i7");
-  await page.locator("aside.panel").getByRole("tab", { name: "Logg" }).click(); // loggen är en egen flik i panelen
-  const s = sec(page, "log");
-  await s.getByLabel("Ny uppdatering").fill("Första"); await s.getByRole("button", { name: "Lägg till uppdatering" }).click();
-  await expect.poll(async () => (await get(page, "i7")).log?.length).toBe(1);
-  await page.clock.setFixedTime(new Date("2026-10-10T09:30:00+02:00"));
-  await s.getByLabel("Ny uppdatering").fill("Andra"); await s.getByRole("button", { name: "Lägg till uppdatering" }).click();
-  await expect.poll(async () => (await get(page, "i7")).log?.length).toBe(2);
-  const rows = await s.locator(".log li p").allTextContents();
-  expect(rows).toEqual(["Andra", "Första"]); // senaste överst
-  await expect(s.locator(".log li time").first()).toHaveText("2026-10-10 09:30");
-  await page.getByRole("group", { name: "Vy" }).getByRole("button", { name: "Board" }).click();
-  await expect(page.locator('article[data-id="i7"] .board-last')).toHaveCount(0);
-  await settingsBtn(page).click();
-  await openTab(page, "Boardvy");
-  await dlg(page).getByLabel("Senaste uppdatering").check();
-  await page.keyboard.press("Escape");
-  await expect(page.locator('article[data-id="i7"] .board-last')).toHaveText("Andra");
-  await open(page, "i7").catch(() => undefined);
-});
+// B5 (handskriven uppdateringslogg) är ersatt av den automatiska loggen, se activitylog.spec.ts
 
 test("B6 delar av posten kan stängas av i inställningarna, och det som skrivits finns kvar", async ({ page }) => {
   await open(page, "i7");
@@ -123,7 +103,7 @@ test("B6 delar av posten kan stängas av i inställningarna, och det som skrivit
   await settingsBtn(page).click();
   await openTab(page, "Posten");
   const parts = dlg(page);
-  for (const n of ["Etiketter", "Checklista", "Länkar", "Uppdateringar (logg)"]) await parts.getByLabel(n, { exact: true }).uncheck();
+  for (const n of ["Etiketter", "Checklista", "Länkar", "Logg (historik)"]) await parts.getByLabel(n, { exact: true }).uncheck();
   await page.keyboard.press("Escape");
   for (const n of ["labels", "checklist", "links", "log"]) await expect(sec(page, n)).toHaveCount(0);
   expect((await get(page, "i7")).labels).toEqual(["Kvar"]);

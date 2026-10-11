@@ -1,4 +1,4 @@
-import type { Baseline, Comment, DependencyMode, Dependency, FieldDef, Item, Project, SavedView, User } from "./types";
+import type { Activity, Baseline, Comment, DependencyMode, Dependency, FieldDef, Item, Project, SavedView, User } from "./types";
 
 /** UI pratar bara med detta gränssnitt. Alla anrop är asynkrona. */
 export interface DataStore {
@@ -19,6 +19,7 @@ export interface DataStore {
   createDependency(dep: Omit<Dependency, "id">): Promise<Dependency>;
   /** Meddelar när något ändrats (valfritt: lagret i minnet och i webbläsaren har det). */
   subscribe?(listener: () => void): () => void;
+  listActivity(projectId: string): Promise<Activity[]>;
   listComments(projectId: string): Promise<Comment[]>;
   addComment(input: { item_id: string; text: string; author_id: string | null; author_name?: string; parent_id?: string | null; created_at?: string }): Promise<Comment>;
   editComment(id: string, text: string): Promise<Comment>;

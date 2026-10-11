@@ -17,7 +17,7 @@ import { ContextMenu, type MenuItem } from "./views/ContextMenu";
 import { QuickAdd } from "./views/QuickAdd";
 import type { ISODate } from "./data/types";
 import { todayISO } from "./data/dates";
-import type { Item, ItemType, Priority, Project, Status, User } from "./data/types";
+import type { Activity, Item, ItemType, Priority, Project, Status, User } from "./data/types";
 import { PersistentStore } from "./data/PersistentStore";
 import { getApp } from "./store";
 import { useProjects } from "./useProjects";
@@ -397,6 +397,16 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
     const un = store.subscribe(load);
     return () => { on = false; un(); };
   }, [store, projects.projectId]);
+  const [lastActivity, setLastActivity] = useState<ReadonlyMap<string, Activity>>(new Map());
+  useEffect(() => {
+    const pid = projects.projectId;
+    if (!pid) return;
+    let on = true;
+    const load = () => void store.listActivity(pid).then((as) => { if (!on) return; const m = new Map<string, Activity>(); for (const a of as) m.set(a.item_id, a); setLastActivity(m); }).catch(() => undefined);
+    load();
+    const un = store.subscribe(load);
+    return () => { on = false; un(); };
+  }, [store, projects.projectId]);
   const [backupPreview, setBackupPreview] = useState<{ file: string; summary: BackupSummary } | null>(null);
   const [nagHidden, setNagHidden] = useState(false);
   const saveBackupFile = async (): Promise<string> => {
@@ -496,6 +506,8 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
   };
   const [users, setUsers] = useState<User[]>([]);
   const reloadUsers = async () => { setUsers(await store.listUsers()); };
+  // Den som gör ändringarna i loggen: vald "Skriv som", annars första personen (som kommentarsrutan)
+  useEffect(() => { const u = users.find((x) => x.id === settings.me) ?? users[0]; store.actor = u ? { id: u.id, name: u.name } : { id: null, name: "" }; }, [store, users, settings.me]);
   useEffect(() => { let on = true; void store.listUsers().then((u) => { if (on) setUsers(u); }).catch(() => undefined); return () => { on = false; }; }, [store]);
   /** Status, prioritet eller ansvarig ändrad direkt i en rad. */
   const editField = async (id: string, field: "status" | "priority" | "assignee", value: string) => {
@@ -743,7 +755,7 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
         {projects.projects && projects.projects.length === 0 && (
           <div className="empty-state"><p>{sv.project.none}</p><button type="button" className="btn btn-primary" onClick={() => void projects.create(sv.project.defaultName)}>{sv.project.createFirst}</button></div>
         )}
-        {state.kind === "ready" && projects.projectId && view === "board" && <BoardView commentCounts={commentCounts} fields={fieldDefs} nextIds={nextIds} groupBy={boardGroup} cardFields={settings.cardFields} highlightOverdue={settings.highlightOverdue} markUndated={settings.markUndated} items={listItems} allItems={state.items} users={users} colors={colors} openId={editId} selected={selected} onOpen={setEditId} onSelect={selectRow} onBackground={dropSelection} onDrop={(m, k, b) => void dropCards(m, k, b)} onMoveTo={moveCardTo} onContext={openMenu} />}
+        {state.kind === "ready" && projects.projectId && view === "board" && <BoardView lastActivity={lastActivity} commentCounts={commentCounts} fields={fieldDefs} nextIds={nextIds} groupBy={boardGroup} cardFields={settings.cardFields} highlightOverdue={settings.highlightOverdue} markUndated={settings.markUndated} items={listItems} allItems={state.items} users={users} colors={colors} openId={editId} selected={selected} onOpen={setEditId} onSelect={selectRow} onBackground={dropSelection} onDrop={(m, k, b) => void dropCards(m, k, b)} onMoveTo={moveCardTo} onContext={openMenu} />}
         {state.kind === "ready" && projects.projectId && view === "calendar" && <CalendarView items={shown.items} today={todayISO()} markUndated={settings.markUndated} colors={colors} openId={editId} onOpen={setEditId} onShift={(id, d) => void shiftItem(id, d)} />}
         {state.kind === "ready" && projects.projectId && view === "workload" && <WorkloadView items={shown.items} users={users} fieldDefs={fieldDefs} fieldId={settings.workloadField} cap={settings.workloadCap} today={todayISO()} onOpen={setEditId} />}
         {view === "week" && projects.projects && projects.projects.length > 0 && <MyWeekView groups={myWeekGroups(allData, todayISO())} users={users} multi={projects.projects.length > 1} onOpen={openInProject} />}

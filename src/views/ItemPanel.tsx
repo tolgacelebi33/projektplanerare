@@ -5,13 +5,14 @@ import { DEPENDENCY_TYPES, GROUP_COLORS, RECURRENCES, type GroupColor, type Recu
 import type { DataStore } from "../data/DataStore";
 import { diffDays, isISODate, todayISO } from "../data/dates";
 import { MAX_DESCRIPTION, MAX_TITLE, RuleError, isOverdue, validateItemShape } from "../data/rules";
-import type { Baseline, Comment, Dependency, FieldDef, Item, Priority, Status, User } from "../data/types";
+import type { Activity, Baseline, Comment, Dependency, FieldDef, Item, Priority, Status, User } from "../data/types";
 import { friendlyError } from "../i18n/errors";
 import { sv } from "../i18n/sv";
 import { STATUS_GLYPH } from "../proto/statusUi";
 import { DatePicker } from "./DatePicker";
 import { PanelExtras } from "./PanelExtras";
 import { CommentsTab } from "./CommentsTab";
+import { LogTab } from "./LogTab";
 import { PanelFields } from "./PanelFields";
 import { checklistPercent } from "../data/extras";
 import { DEFAULT_FEATURES, type Features } from "../settings";
@@ -47,9 +48,10 @@ export function ItemPanel({ me = "", onMe, baseline, fieldDefs = [], onDuplicate
   const [data, setData] = useState<Loaded | null>(null);
   const [tab, setTab] = useState<"details" | "comments" | "log">("details");
   const [comments, setComments] = useState<Comment[]>([]);
+  const [activity, setActivity] = useState<Activity[]>([]);
   useEffect(() => {
     let on = true;
-    const load = () => void store.listComments(projectId).then((c) => { if (on) setComments(c); }).catch(() => undefined);
+    const load = () => { void store.listComments(projectId).then((c) => { if (on) setComments(c); }).catch(() => undefined); void store.listActivity(projectId).then((a) => { if (on) setActivity(a); }).catch(() => undefined); };
     load();
     const un = store.subscribe?.(load);
     return () => { on = false; un?.(); };
@@ -354,7 +356,7 @@ export function ItemPanel({ me = "", onMe, baseline, fieldDefs = [], onDuplicate
         {err("description")}
         <PanelFields item={item} defs={fieldDefs} save={(patch) => depAction("fields", async () => { await store.updateItem(item.id, patch); })} />
         {err("fields")}
-        <PanelExtras only="rest" item={item} all={all} features={features} error={err}
+        <PanelExtras item={item} all={all} features={features} error={err}
           save={(patch) => depAction(Object.keys(patch)[0], async () => {
             const p = { ...patch };
             if (checklistProgress && p.checklist) { const pct = checklistPercent(p.checklist); if (pct !== null) p.progress = pct; } // checklistan styr framsteget
@@ -507,8 +509,7 @@ export function ItemPanel({ me = "", onMe, baseline, fieldDefs = [], onDuplicate
         )}
         {features.log && (
           <div role="tabpanel" id="panel-pane-log" aria-labelledby="panel-tab-log" hidden={view !== "log"} className="panel-pane">
-            <PanelExtras only="log" item={item} all={all} features={features} error={err}
-              save={(patch) => depAction(Object.keys(patch)[0], async () => { await store.updateItem(item.id, patch); })} />
+            <LogTab item={item} activity={activity} />
           </div>
         )}
       </div>

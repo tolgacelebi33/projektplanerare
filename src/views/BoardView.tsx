@@ -2,8 +2,9 @@ import { useRef, useState } from "react";
 import { todayISO } from "../data/dates";
 import { boardColumns, columnCards, type BoardGroup } from "../data/boardColumns";
 import { isOverdue } from "../data/rules";
-import { checklistCount, labelColor } from "../data/extras";
-import type { FieldDef, GroupColor, Item, User } from "../data/types";
+import { checklistCount, labelColor, logStamp } from "../data/extras";
+import { activityText } from "./activityText";
+import type { Activity, FieldDef, GroupColor, Item, User } from "../data/types";
 import { cardFieldValues } from "../data/fields";
 import type { CardFields } from "../settings";
 import { sv } from "../i18n/sv";
@@ -16,7 +17,7 @@ const firstLine = (t: string, n = 110) => { const l = t.split("\n").find((x) => 
  * värdet och ordningen, eller använd valet på kortet. Ctrl/Cmd-klick markerar flera kort och Shift-klick en följd, och ett klick på tom yta släpper både markering
  * och öppnad post. Grupper är inga kort: de syns som sökväg och som en smal färgkant på korten. Vad som visas på korten styrs av `cardFields`.
  */
-export function BoardView({ commentCounts, fields = [], nextIds, groupBy = "status", cardFields, highlightOverdue = true, markUndated = true, items, allItems, users, colors, openId, selected, onOpen, onSelect, onBackground, onDrop, onMoveTo, onContext }: {
+export function BoardView({ lastActivity, commentCounts, fields = [], nextIds, groupBy = "status", cardFields, highlightOverdue = true, markUndated = true, items, allItems, users, colors, openId, selected, onOpen, onSelect, onBackground, onDrop, onMoveTo, onContext }: {
   /** Id för nästa tillfälle i varje serie (märks med "Nästa"). */
   nextIds?: ReadonlySet<string>;
   /** Projektets egna fält (för kolumner per fält och fält som visas på korten). */
@@ -24,6 +25,8 @@ export function BoardView({ commentCounts, fields = [], nextIds, groupBy = "stat
   groupBy?: BoardGroup; cardFields: CardFields; highlightOverdue?: boolean; markUndated?: boolean;
   /** Antal kommentarer per post (id), för räknaren på korten. */
   commentCounts?: ReadonlyMap<string, number>;
+  /** Senaste loggraden per post (id), för "Senaste uppdatering" på korten. */
+  lastActivity?: ReadonlyMap<string, Activity>;
   items: Item[]; allItems: Item[]; users: User[]; colors: ReadonlyMap<string, GroupColor | "none">;
   openId: string | null; selected: ReadonlySet<string>;
   onOpen: (id: string) => void;
@@ -154,7 +157,7 @@ export function BoardView({ commentCounts, fields = [], nextIds, groupBy = "stat
                     {cardFields.progress && i.progress > 0 && <span>{i.progress} %</span>}
                     {cardFields.assignee && who && <span className="board-who" title={who} aria-label={who}>{initials(who)}</span>}
                   </div>
-                  {cardFields.lastUpdate && (i.log?.length ?? 0) > 0 && <div className="board-last">{firstLine(i.log![i.log!.length - 1].text, 80)}</div>}
+                  {cardFields.lastUpdate && lastActivity?.get(i.id) && <div className="board-last">{firstLine(`${logStamp(lastActivity.get(i.id)!.at).slice(5)} ${activityText(lastActivity.get(i.id)!)}`, 90)}</div>}
                   <select className="board-status" aria-label={`${groupLabel} för ${i.title}`} value={mine} onChange={(e) => onMoveTo(i.id, e.target.value)}>
                     {cols.map((c) => <option key={c.key || "__none"} value={c.key}>{c.label}</option>)}
                   </select>
