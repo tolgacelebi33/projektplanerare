@@ -6,7 +6,7 @@ import { FIELD_LIMITS, LIMITS, type FieldValue } from "./types";
 import { sv } from "../i18n/sv";
 import { enDict, svDict } from "../i18n/sv";
 import { friendlyError } from "../i18n/errors";
-import type { Dependency, DependencyMode, FieldDef, Item, ItemType, Priority, Project, Recurrence, SavedView, Status, User } from "./types";
+import type { Dependency, DependencyMode, FieldDef, ISODate, Item, ItemType, Priority, Project, Recurrence, SavedView, Status, User } from "./types";
 
 /**
  * Export och import av projekt, utan beroende av lagring. JSON ger full återgivning (används också för att kopiera ett projekt).
@@ -19,6 +19,15 @@ export const MAX_IMPORT_ITEMS = 5000;
 export const MAX_IMPORT_BYTES = 5_000_000;
 
 export interface ParsedItem extends Omit<Item, "workspace_id" | "project_id" | "assignee_id"> { assignee: string | null }
+/** Vad importen hittade och hur den tolkade det, för förhandsgranskningen innan något läggs in. */
+export interface ImportReport {
+  /** Rubrikerna i filen och vad de tolkades som (null för JSON, som inte har kolumner). `as` är en nyckel i ordlistan (ex.colMeaning). */
+  columns: { header: string; as: string }[] | null;
+  counts: Record<ItemType, number>;
+  groups: { name: string; items: number }[];
+  series: { title: string; recur: Recurrence; count: number; first: ISODate; last: ISODate }[];
+  undated: number;
+}
 export interface ParsedProject {
   name: string;
   dependency_mode: DependencyMode;
@@ -29,6 +38,24 @@ export interface ParsedProject {
   views?: SavedView[];
   /** Saker som importerades med avvikelse (okänd ansvarig m.m.) */
   warnings: string[];
+  report?: ImportReport;
+}
+
+/** Sammanfattning av det som ska läggas in (antal per typ, grupper med innehåll, serier, poster utan riktigt datum). */
+export function buildReport(p: Pick<ParsedProject, "items">, columns: ImportReport["columns"]): ImportReport {
+  const counts: Record<ItemType, number> = { epic: 0, milestone: 0, task: 0 };
+  for (const i of p.items) counts[i.type]++;
+  const kids = new Map<string, number>();
+  const byId = new Map(p.items.map((i) => [i.id, i]));
+  for (const i of p.items) if (i.type !== "epic") for (let c: ParsedItem | undefined = i.parent_id ? byId.get(i.parent_id) : undefined; c; c = c.parent_id ? byId.get(c.parent_id) : undefined) kids.set(c.id, (kids.get(c.id) ?? 0) + 1);
+  const groups = p.items.filter((i) => i.type === "epic").map((i) => ({ name: i.title, items: kids.get(i.id) ?? 0 }));
+  const bySeries = new Map<string, ParsedItem[]>();
+  for (const i of p.items) if (i.series) bySeries.set(i.series, [...(bySeries.get(i.series) ?? []), i]);
+  const series = [...bySeries.values()].map((m) => {
+    const d = m.map((i) => i.start).sort();
+    return { title: m[0].title, recur: m[0].recur ?? "weekly", count: m.length, first: d[0], last: d[d.length - 1] };
+  });
+  return { columns, counts, groups, series, undated: p.items.filter((i) => i.undated).length };
 }
 
 const MAX_TITLE_LEN = 200;
@@ -135,6 +162,7 @@ export function parseJson(text: string): ParsedProject {
   if (Array.isArray(proj.fields)) { try { validateFieldDefs(proj.fields as FieldDef[]); } catch (er) { throw new ImportError(friendlyError(er)); } out.fields = proj.fields as FieldDef[]; }
   if (Array.isArray(proj.views)) { try { validateSavedViews(proj.views as SavedView[]); } catch (er) { throw new ImportError(friendlyError(er)); } out.views = proj.views as SavedView[]; }
   structureCheck(out);
+  out.report = buildReport(out, null);
   return out;
 }
 
@@ -499,6 +527,11 @@ export function parseRows(rows: string[][], name: string, today: string = todayI
   const out: ParsedProject = { name: name.replace(/\.[^.]+$/, "").replace(/_/g, " ").trim().slice(0, 100) || sv.ex.defaultName, dependency_mode: "shift", items, deps, warnings };
   if (fieldDefs.length) { out.fields = fieldDefs.map((f) => f.def); warnings.push(sv.ex.fieldsMade(fieldDefs.length)); }
   structureCheck(out);
+  const meaning = (i: number): string => {
+    const key = Object.keys(col).find((k) => col[k] === i);
+    return key ?? (asField.has(i) ? "field" : "description");
+  };
+  out.report = buildReport(out, rows[0].map((h, i) => ({ header: h.trim(), as: meaning(i) })).filter((c) => c.header));
   return out;
 }
 

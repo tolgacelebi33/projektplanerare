@@ -1,6 +1,6 @@
 import { Suspense, lazy, useEffect, useMemo, useRef, useState } from "react";
 import { downloadText } from "./download";
-import { MAX_IMPORT_BYTES, ImportError, parseUpload } from "./data/exchange";
+import { MAX_IMPORT_BYTES, ImportError, parseUpload, type ParsedProject } from "./data/exchange";
 import { duplicateProject, exportProject, importParsed, type ExportFormat, type ImportResult } from "./data/importExport";
 import { collapseSeries, bulkDelete, bulkMove, bulkStatus, canMove, createSeries, inOneStep, deleteSubtree, descendants, epicChoices, filterActive, filterView, hidePastSeries, duplicateItem, nextOccurrenceIds, moveTargets, newItemDraft, planMove, rangeIds, selectionRoots, swapWithSibling, type BulkResult } from "./data/actions";
 import { BulkBar } from "./views/BulkBar";
@@ -36,6 +36,7 @@ import type { Zoom } from "./proto/zoom";
 import { ItemPanel } from "./views/ItemPanel";
 import { YearWheel } from "./views/YearWheel";
 import { BoardView } from "./views/BoardView";
+import { ImportPreview } from "./views/ImportPreview";
 import { CalendarView } from "./views/CalendarView";
 import { MyWeekView } from "./views/MyWeekView";
 import { WorkloadView } from "./views/WorkloadView";
@@ -70,6 +71,7 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
   const setSettings = (s: Settings) => { saveSettings(s); setSettingsState(s); };
   const [settingsOpen, setSettingsOpen] = useState(false);
   const settingsRef = useRef(settings); settingsRef.current = settings;
+  useEffect(() => { store.rules = settings.rules; }, [store, settings.rules]);
   const [zoom, setZoom] = useState<Zoom>(uiCarry.zoom ?? settings.startZoom);
   const [query, setQuery] = useState("");
   const [hideDone, setHideDone] = useState(false);
@@ -372,9 +374,14 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
     const out = await exportProject(store, projects.projectId, format);
     downloadText(out.filename, out.mime, out.text);
   };
+  const [preview, setPreview] = useState<{ file: string; parsed: ParsedProject; into: boolean } | null>(null);
   const doImport = async (file: File, into = false) => {
     if (file.size > MAX_IMPORT_BYTES) throw new ImportError(sv.ex.fileTooBig);
     const parsed = await parseUpload(file, { extraAsFields: settingsRef.current.importExtraAsFields });
+    if (settingsRef.current.importPreview) { setPreview({ file: file.name, parsed, into: into && !!projects.projectId }); return; } // läggs in först när man bekräftar
+    await commitImport(parsed, into);
+  };
+  const commitImport = async (parsed: ParsedProject, into = false) => {
     if (into && projects.projectId) {
       // In i det här projektet: inget nytt projekt, vyn hämtas om och den första nya raden visas
       const res = await inOneStep(store, () => importParsed(store, workspaceId, parsed, undefined, projects.projectId!));
@@ -693,6 +700,7 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
       )}
       </div>
       {fieldsOpen && project && <FieldsDialog fields={fieldDefs} onSave={(f) => projects.setFields(project.id, f)} onRemove={async (id) => { await removeFieldDef(store, project, id); await projects.reload(project.id); await refresh(); }} onClose={() => setFieldsOpen(false)} />}
+      {preview && <ImportPreview fileName={preview.file} parsed={preview.parsed} destination={{ into: preview.into ? project?.name ?? "" : null, name: preview.parsed.name }} onCancel={() => setPreview(null)} onConfirm={() => { const p = preview; setPreview(null); void commitImport(p.parsed, p.into).catch((e) => setWriteError(friendlyError(e))); }} />}
       {settingsOpen && <SettingsDialog fieldDefs={fieldDefs} settings={settings} people={{ users, onAdd: async (n) => { await store.addUser(n); await reloadUsers(); }, onRename: async (id, n) => { await store.renameUser(id, n); await reloadUsers(); await refresh(); }, onRemove: async (id) => { const n = await store.removeUser(id); await reloadUsers(); await refresh(); setAttrFilter((f) => ({ ...f, assignees: f.assignees.filter((x) => x !== id) })); return n; } }} onChange={setSettings} onClose={() => setSettingsOpen(false)} />}
       {recurOpen && <RecurringDialog key={recurInit ? "from" : "new"} today={todayISO()} initial={recurInit ?? undefined} onCreate={(a) => void addSeries(a)} onClose={() => setRecurOpen(false)} />}
       {menu && <ContextMenu x={menu.x} y={menu.y} items={menuItems} confirm={confirmRemove} onPick={(id) => void pickMenu(id)} onClose={() => setMenu(null)} />}

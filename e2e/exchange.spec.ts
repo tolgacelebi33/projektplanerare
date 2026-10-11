@@ -90,6 +90,7 @@ test("X6 efter import går Ångra inte att använda för att rulla tillbaka post
   await expect(bar(page)).toBeVisible();
   const csv = "Titel;Start;Slut\nEtt;2026-10-05;2026-10-07\nTvå;2026-10-08;2026-10-09\n";
   await bar(page).getByLabel("Importfil").setInputFiles({ name: "ark.csv", mimeType: "text/csv", buffer: Buffer.from(csv, "utf8") });
+  await page.getByRole("dialog", { name: "Förhandsgranska import" }).getByRole("button", { name: "Importera" }).click(); // förhandsgranskningen är på som standard
   await expect(projectSelect(page).locator("option:checked")).toHaveText("ark");
   await expect(page.getByRole("button", { name: "Ångra" })).toBeDisabled();
   await page.reload();

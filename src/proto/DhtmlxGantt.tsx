@@ -186,6 +186,7 @@ export function DhtmlxGantt({ store, items, deps, zoom, onError, onPersisted, re
       return `<span class="bar-glyph" aria-hidden="true">${glyph}</span>${sr}${title}`;
     };
     gantt.templates.rightside_text = (_s, _e, t) => {
+      if ((t as unknown as TaskRow).sm) return ""; // serie som en rad: rombena ligger till höger, titeln står i listan och i verktygstipset
       if (fits(t)) return "";
       const { glyph, title } = label(t as never);
       return `<span class="bar-glyph" aria-hidden="true">${glyph}</span>${title}`;

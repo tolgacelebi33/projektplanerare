@@ -589,6 +589,14 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--text); }
 .series-mark:hover, .series-mark:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .occ-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; max-height: 160px; overflow-y: auto; }
 .occ-list .panel-link[aria-current="true"] { font-weight: var(--weight-strong); text-decoration: underline; }
+.modal.import-preview { width: min(640px, calc(100vw - 24px)); max-height: min(720px, calc(100vh - 32px)); display: flex; flex-direction: column; overflow: hidden; }
+.preview-body { overflow-y: auto; display: grid; gap: 8px; align-content: start; min-height: 0; font-size: var(--fs-md); }
+.preview-body p { margin: 0; }
+.preview-body h3 { margin: 6px 0 2px; font-family: var(--font-title); font-size: 12px; font-weight: 400; letter-spacing: 0.06em; }
+.preview-body ul { margin: 0; padding-left: 18px; display: grid; gap: 2px; }
+.preview-cols { border-collapse: collapse; width: 100%; font-size: var(--fs-md); }
+.preview-cols th, .preview-cols td { text-align: left; padding: 4px 8px; border-bottom: var(--line-width) solid var(--grid-line); }
+.preview-cols thead th { font-family: var(--font-title); font-weight: 400; font-size: 12px; }
 .panel-kind-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .code-tag { font-family: var(--font-title); font-size: 11px; letter-spacing: 0.04em; padding: 0 6px; border: var(--line-width) solid var(--line); border-radius: var(--radius-pill); white-space: nowrap; user-select: all; }
 .grid-code { font-family: var(--font-title); font-size: 11px; letter-spacing: 0.03em; white-space: nowrap; }

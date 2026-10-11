@@ -4,7 +4,7 @@ import type { FieldDef, User } from "../data/types";
 import { sv } from "../i18n/sv";
 
 /** Inställningar: ändras direkt och sparas i webbläsaren. Esc, Stäng eller klick utanför stänger. */
-const TABS = ["list", "board", "views", "item", "people", "start", "touch", "info"] as const;
+const TABS = ["list", "board", "views", "item", "rules", "people", "start", "touch", "info"] as const;
 type Tab = (typeof TABS)[number];
 const KEYS = ["N", "M", "G", "/", "T", "1, 2, 3", "?", "Cmd/Ctrl + Z", "Cmd/Ctrl + Shift + Z, Cmd/Ctrl + Y", "Alt + ↑ / ↓", "Esc"]; // samma på alla språk, texterna står i ordlistan i samma ordning
 const TAB0_KEY = "projektplanerare.settingsTab";
@@ -92,6 +92,12 @@ export function SettingsDialog({ fieldDefs = [], settings, people, onChange, onC
               {check(t.checklistProgress, t.checklistProgressHint, settings.checklistProgress, (v) => set("checklistProgress", v))}
               {check(t.hidePastSeries, t.hidePastSeriesHint, settings.hidePastSeries, (v) => set("hidePastSeries", v))}
               {check(t.importFields, t.importFieldsHint, settings.importExtraAsFields, (v) => set("importExtraAsFields", v))}
+              {check(t.importPreview, t.importPreviewHint, settings.importPreview, (v) => set("importPreview", v))}
+            </section>)}
+            {tab === "rules" && (<section>
+              <p className="panel-muted">{t.rulesIntro}</p>
+              {check(t.rules.doneSetsProgress, t.rules.doneSetsProgressHint, settings.rules.doneSetsProgress, (v) => onChange({ ...settings, rules: { ...settings.rules, doneSetsProgress: v } }))}
+              {check(t.rules.seriesNext, t.rules.seriesNextHint, settings.rules.seriesNext, (v) => onChange({ ...settings, rules: { ...settings.rules, seriesNext: v } }))}
             </section>)}
             {tab === "people" && people && <PeopleTab api={people} />}
             {tab === "start" && (<section>

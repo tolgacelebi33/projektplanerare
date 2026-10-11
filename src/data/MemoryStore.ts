@@ -1,6 +1,7 @@
 import type { DataStore } from "./DataStore";
 import { RuleError, rederiveEpics, shiftSuccessors, validateDependency, validateFieldDefs, validateItemShape, validateParent, validateSavedViews } from "./rules";
 import { addDays } from "./dates";
+import { extendSeries } from "./actions";
 import { PLACEHOLDER_RENAMES, placeholderOldName } from "./fixtures";
 import { countersFor, validCounters, type Counters, emptyCounters, itemCode, nextNumber, parseProjectCode, projectCode } from "./codes";
 import { applyPatch, isPatchList, json, makePatch, type Entry, type Patch } from "./patch";
@@ -40,6 +41,8 @@ export class MemoryStore implements DataStore {
   protected seq = 0;
   /** Senast utdelade projektnummer. Går aldrig tillbaka, inte ens när projekt tas bort eller steg ångras. */
   protected projectSeq = 0;
+  /** Enkla regler som användaren slagit på i Inställningar (se settings.ts). Gäller alla skrivningar, så vyerna behöver inte veta om dem. */
+  rules: { doneSetsProgress: boolean; seriesNext: boolean } = { doneSetsProgress: false, seriesNext: false };
   protected counters = new Map<string, Counters>();
   private calls = 0;
   /** Logg över skrivanrop, används av tester för att bevisa att UI går via storen. */
@@ -393,6 +396,8 @@ export class MemoryStore implements DataStore {
     if (!cur) throw new RuleError("not_found", `Item ${id} finns inte`);
     if (patch.code !== undefined && patch.code !== cur.code) throw new RuleError("code_fixed", "Koden kan inte ändras");
     const next: Item = { ...cur, ...patch };
+    // Regel: när status blir Klar sätts framsteget till 100 (om framsteg inte ändras i samma skrivning)
+    if (this.rules.doneSetsProgress && patch.status === "done" && cur.status !== "done" && patch.progress === undefined && cur.type !== "epic") next.progress = 100;
     if (cur.undated && (next.start !== cur.start || next.end !== cur.end) && patch.undated === undefined) delete next.undated; // nya datum: posten är schemalagd
     // I läget "shift" får en uppgift inte flyttas till att börja före att dess föregångare är klar (som Asana och monday i strikt läge).
     if (next.start !== cur.start && next.start < cur.start && cur.type !== "epic" && this.modeOf(cur.project_id) === "shift") {
@@ -414,6 +419,10 @@ export class MemoryStore implements DataStore {
     rederiveEpics(this.items, [cur.parent_id, next.parent_id]); // gammal och ny förälder (vid flytt), och dess förfäder
     this.writes.push({ method: "updateItem", args: [id, patch] });
     this.commit();
+    // Regel: när ett tillfälle i en serie blir klart skapas nästa efter det sista (samma ångra-steg, eftersom det sker direkt efter)
+    if (this.rules.seriesNext && cur.status !== "done" && next.status === "done" && next.series && next.recur) {
+      try { await extendSeries(this, [...this.items.values()].filter((i) => i.project_id === next.project_id), next, 1); } catch { /* serien är full eller regeln gick inte att tillämpa: statusändringen står kvar */ }
+    }
     return { ...next };
   }
   async deleteItem(id: string) {

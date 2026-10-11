@@ -10,6 +10,8 @@ export const SEL = {
 } as const;
 
 export async function openApp(page: Page, lib: Lib, opts: { fixture?: "small" | "large"; extra?: string } = {}) {
+  // Förhandsgranskningen vid import är på som standard. De flesta tester importerar direkt, så den stängs av här (om inget annat sparats), och egna tester slår på den.
+  await page.addInitScript(() => { try { const k = "projektplanerare.settings"; const o = JSON.parse(localStorage.getItem(k) ?? "{}") ?? {}; if (o.importPreview === undefined) { o.importPreview = false; localStorage.setItem(k, JSON.stringify(o)); } } catch { /* ignoreras */ } });
   await page.goto(`/?lib=${lib}&fixture=${opts.fixture ?? "small"}&latency=0${opts.extra ?? ""}`);
   await page.waitForSelector(SEL[lib].ready);
 }
