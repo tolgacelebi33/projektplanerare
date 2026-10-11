@@ -314,12 +314,21 @@ export function ItemPanel({ critical, me = "", onMe, baseline, fieldDefs = [], o
             </select>
           </label>
           {!epic && (
-            <fieldset className="panel-wide co-assignees" data-section="co-assignees">
-              <legend>{sv.panel.coAssignees}</legend>
-              {users.filter((u) => u.id !== item.assignee_id).length === 0 ? <span className="panel-muted">{sv.panel.noOthers}</span> : users.filter((u) => u.id !== item.assignee_id).map((u) => (
-                <label key={u.id} className="co-option"><input type="checkbox" checked={(item.assignees ?? []).includes(u.id)} onChange={(e) => void commit("assignees", { assignees: e.target.checked ? [...(item.assignees ?? []), u.id] : (item.assignees ?? []).filter((x) => x !== u.id) })} /><span>{u.name}</span></label>
-              ))}
-            </fieldset>
+            <div className="panel-wide co-assignees" data-section="co-assignees">
+              <span className="co-label">{sv.panel.coAssignees}</span>
+              <ul className="co-chips">
+                {(item.assignees ?? []).map((id) => users.find((u) => u.id === id)).filter((u): u is User => !!u).map((u) => (
+                  <li key={u.id} className="chip co-chip"><span>{u.name}</span>
+                    <button type="button" aria-label={sv.panel.removeCo(u.name)} onClick={() => void commit("assignees", { assignees: (item.assignees ?? []).filter((x) => x !== u.id) })}>×</button></li>
+                ))}
+              </ul>
+              {users.filter((u) => u.id !== item.assignee_id && !(item.assignees ?? []).includes(u.id)).length > 0 && (
+                <select className="co-add" aria-label={sv.panel.addCo} value="" onChange={(e) => { if (e.target.value) void commit("assignees", { assignees: [...(item.assignees ?? []), e.target.value] }); }}>
+                  <option value="">{sv.panel.addCoOption}</option>
+                  {users.filter((u) => u.id !== item.assignee_id && !(item.assignees ?? []).includes(u.id)).map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
+                </select>
+              )}
+            </div>
           )}
           {!epic && (
             <label className="panel-field">

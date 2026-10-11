@@ -385,7 +385,7 @@ export const svDict = {
     successors: "Efterföljare",
     addPredecessor: "Lägg till föregångare...",
     addSuccessor: "Lägg till efterföljare...",
-    coAssignees: "Fler ansvariga", noOthers: "Det finns inga fler personer att välja.", estimate: "Uppskattning (timmar)",
+    coAssignees: "Fler ansvariga", addCo: "Lägg till ansvarig", addCoOption: "+ Person", removeCo: (n: string) => `Ta bort ${n} som ansvarig`, estimate: "Uppskattning (timmar)",
     removeDep: (t: string) => `Ta bort beroende av ${t}`,
     depTypes: { finish_to_start: "Slut till start", start_to_start: "Start till start", finish_to_finish: "Slut till slut", start_to_finish: "Start till slut" } as Record<string, string>, depTypeOf: (t: string) => `Typ av beroende för ${t}`, depLagOf: (t: string) => `Fördröjning i dagar för ${t}`, depDays: "dagar",
     noneYet: "Inga",

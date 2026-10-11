@@ -675,10 +675,12 @@ span.health-chip { cursor: default; }
 .templates-list .tpl-name { flex: 1 1 200px; min-width: 0; }
 .tpl-save { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
 .tpl-save input { flex: 1 1 160px; min-width: 0; }
-.co-assignees { border: var(--line-width) solid var(--grid-line); border-radius: 8px; padding: 6px 10px; margin: 0; display: flex; flex-wrap: wrap; gap: 4px 16px; }
-.co-assignees legend { font-family: var(--font-title); font-size: 11px; letter-spacing: 0.06em; padding: 0 6px; }
-.co-option { display: inline-flex; gap: 6px; align-items: center; cursor: pointer; font-size: var(--fs-md); }
-.co-option input { width: auto; }
+.co-assignees { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; margin: 0; }
+.co-label { font-family: var(--font-title); font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; }
+.co-chips { list-style: none; margin: 0; padding: 0; display: contents; }
+.co-chip { display: inline-flex; align-items: center; gap: 4px; padding-right: 2px; }
+.co-chip button { border: 0; background: transparent; color: inherit; cursor: pointer; font: inherit; padding: 0 5px; }
+.co-add { width: auto; font-size: 12px; padding: 3px 8px; }
 .people-cap { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; color: var(--text-muted); }
 .people-list .people-cap input { flex: none; width: 70px; }
 .wl-cap { font-size: 11px; }

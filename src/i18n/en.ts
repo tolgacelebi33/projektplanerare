@@ -380,7 +380,7 @@ export const enDict: Dict = {
     successors: "Successors",
     addPredecessor: "Add predecessor...",
     addSuccessor: "Add successor...",
-    coAssignees: "More assignees", noOthers: "There are no other people to choose.", estimate: "Estimate (hours)",
+    coAssignees: "More assignees", addCo: "Add assignee", addCoOption: "+ Person", removeCo: (n: string) => `Remove ${n} as assignee`, estimate: "Estimate (hours)",
     removeDep: (t: string) => `Remove dependency on ${t}`,
     depTypes: { finish_to_start: "Finish to start", start_to_start: "Start to start", finish_to_finish: "Finish to finish", start_to_finish: "Start to finish" } as Record<string, string>, depTypeOf: (t: string) => `Dependency type for ${t}`, depLagOf: (t: string) => `Lag in days for ${t}`, depDays: "days",
     noneYet: "None",

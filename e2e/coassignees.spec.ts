@@ -18,14 +18,15 @@ test.beforeEach(async ({ page }) => {
 test("CA1 flera ansvariga väljs i panelen, den ansvarige står inte bland de andra, och uppskattningen sparas och tas bort", async ({ page }) => {
   await open(page, "i7"); // Maria Holm är ansvarig
   const co = panel(page).locator('[data-section="co-assignees"]');
-  await expect(co.getByRole("checkbox")).toHaveCount(2); // Anna och Erik, inte Maria
-  await co.getByLabel("Anna Lind").check();
-  await co.getByLabel("Erik Berg").check();
+  const add = co.getByRole("combobox", { name: "Lägg till ansvarig" });
+  await expect(add.locator("option")).toHaveText(["+ Person", "Anna Lind", "Erik Berg"]); // inte Maria, som är ansvarig
+  await add.selectOption({ label: "Anna Lind" });
+  await add.selectOption({ label: "Erik Berg" });
   await expect.poll(async () => (await item(page, "i7")).assignees).toEqual(["u_anna", "u_erik"]);
   await panel(page).locator('select[name="assignee"]').selectOption("u_erik"); // en av de andra blir ansvarig
   await expect.poll(async () => (await item(page, "i7")).assignees).toEqual(["u_anna"]);
-  await expect(co.getByRole("checkbox")).toHaveCount(2);
-  await co.getByLabel("Anna Lind").uncheck();
+  await expect(co.locator(".co-chip")).toHaveCount(1); // Anna
+  await co.getByRole("button", { name: "Ta bort Anna Lind som ansvarig" }).click();
   await expect.poll(async () => (await item(page, "i7")).assignees).toBeUndefined();
   const est = panel(page).locator('input[name="estimate"]');
   await est.fill("12.5"); await est.press("Enter");
