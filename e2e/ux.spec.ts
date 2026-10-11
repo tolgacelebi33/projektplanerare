@@ -184,7 +184,7 @@ test("UX11 flaggan följer med i JSON-export och import, och återkommande rader
 });
 
 test("UX12 ett klick på tom tidslinje bredvid en stapel stänger också panelen (även när raderna fyller skärmen)", async ({ page }) => {
-  await page.setViewportSize({ width: 1500, height: 1100 }); // raderna ska ligga i DOM (listan är virtualiserad och verktygsraderna tar plats)
+  await page.setViewportSize({ width: 1500, height: 1300 }); // raderna ska ligga i DOM (listan är virtualiserad och verktygsraderna tar plats)
   await openApp(page, "dhtmlx");
   await page.locator('.gantt_row[data-task-id="i7"] .grid-title').click();
   await expect(panel(page)).toBeVisible();
