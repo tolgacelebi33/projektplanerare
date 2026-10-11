@@ -1,14 +1,15 @@
 import { useEffect, useRef, useState } from "react";
-import { COLUMN_ORDER, type ColumnId } from "../columns";
+import { COLUMN_ORDER, type ColumnId, type StaticColumnId } from "../columns";
+import type { FieldDef } from "../data/types";
 import { sv } from "../i18n/sv";
 
-const NAME: Record<ColumnId, () => string> = {
+const NAME: Record<StaticColumnId, () => string> = {
   status: () => sv.panel.status, assignee: () => sv.panel.assignee, priority: () => sv.panel.priority,
   start: () => sv.panel.start, end: () => sv.grid.end, progress: () => sv.panel.progress,
 };
 
 /** Knapp som öppnar en liten ruta för att välja vilka kolumner rutnätet visar. Stängs av Esc eller klick utanför. */
-export function ColumnPicker({ columns, onToggle }: { columns: ColumnId[]; onToggle: (c: ColumnId) => void }) {
+export function ColumnPicker({ columns, fieldDefs = [], onToggle }: { columns: ColumnId[]; fieldDefs?: FieldDef[]; onToggle: (c: ColumnId) => void }) {
   const [open, setOpen] = useState(false);
   const root = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -28,6 +29,12 @@ export function ColumnPicker({ columns, onToggle }: { columns: ColumnId[]; onTog
             <label key={c} className="col-picker-row">
               <input type="checkbox" checked={columns.includes(c)} onChange={() => onToggle(c)} />
               <span>{NAME[c]()}</span>
+            </label>
+          ))}
+          {fieldDefs.map((d) => (
+            <label key={d.id} className="col-picker-row">
+              <input type="checkbox" checked={columns.includes(`f:${d.id}`)} onChange={() => onToggle(`f:${d.id}`)} />
+              <span>{d.name}</span>
             </label>
           ))}
         </div>

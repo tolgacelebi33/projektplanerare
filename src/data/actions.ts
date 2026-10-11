@@ -89,8 +89,10 @@ export interface ViewFilter {
   overdue?: boolean; thisWeek?: boolean; noAssignee?: boolean; undated?: boolean; today?: string;
   /** Etiketter: en post visas om den har någon av de valda. */
   labels?: string[];
+  /** Egna rullistefält: val per fält-id, en post visas om den har något av de valda i varje valt fält. */
+  fields?: Record<string, string[]>;
 }
-const quickOn = (f: ViewFilter) => !!(f.overdue || f.thisWeek || f.noAssignee || f.undated || f.labels?.length);
+const quickOn = (f: ViewFilter) => !!(f.overdue || f.thisWeek || f.noAssignee || f.undated || f.labels?.length || Object.values(f.fields ?? {}).some((v) => v.length));
 export const filterActive = (f: ViewFilter): boolean =>
   f.query.trim() !== "" || f.hideDone || !!f.statuses?.length || !!f.priorities?.length || !!f.assignees?.length || quickOn(f);
 
@@ -107,7 +109,7 @@ export function filterView(items: Item[], deps: Dependency[], f: ViewFilter): { 
   const week = today ? weekRange(today) : null;
   const byId = new Map(items.map((i) => [i.id, i]));
   const show = new Set<string>();
-  for (const i of items) {
+  nextItem: for (const i of items) {
     if (q && !i.title.toLowerCase().includes(q) && !i.description.toLowerCase().includes(q)) continue;
     // En grupps egen status, prioritet och ansvarig är inte det man filtrerar på: den visas bara om något i den matchar (eller om sökningen träffar dess namn)
     if (i.type === "epic") { if (attr) continue; }
@@ -120,6 +122,11 @@ export function filterView(items: Item[], deps: Dependency[], f: ViewFilter): { 
       if (f.thisWeek && (!week || i.end < week.start || i.start > week.end)) continue;
       if (f.noAssignee && i.assignee_id !== null) continue;
       if (f.undated && !i.undated) continue;
+      for (const [fid, vals] of Object.entries(f.fields ?? {})) {
+        if (!vals.length) continue;
+        const v = i.fields?.[fid];
+        if (typeof v !== "string" || !vals.some((x) => x.toLowerCase() === v.toLowerCase())) continue nextItem;
+      }
       if (f.labels?.length && !(i.labels ?? []).some((l) => f.labels!.some((x) => x.toLowerCase() === l.toLowerCase()))) continue;
     }
     for (let cur: Item | undefined = i; cur && !show.has(cur.id); cur = cur.parent_id ? byId.get(cur.parent_id) : undefined) show.add(cur.id);

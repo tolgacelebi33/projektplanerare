@@ -1,8 +1,9 @@
 import { sv } from "../i18n/sv";
 import { boardRankOrder, planMove, treeOrderIds } from "./actions";
-import type { Item, Priority, Status, User } from "./types";
+import type { FieldDef, Item, Priority, Status, User } from "./types";
 
-export type BoardGroup = "status" | "assignee" | "priority" | "group";
+/** Vad boardens kolumner är. `field:<id>` är ett eget rullistefält. */
+export type BoardGroup = "status" | "assignee" | "priority" | "group" | `field:${string}`;
 
 /** En kolumn i boarden. `patch` är det som ändras på ett kort som släpps i kolumnen, och `parent` (bara för grupper) att kortet flyttas till den gruppen. */
 export interface BoardColumn {
@@ -14,6 +15,8 @@ export interface BoardColumn {
   status?: Status;
   belongs: (i: Item) => boolean;
   patch: Partial<Item>;
+  /** För kolumner som ändrar något per kort (egna fält): det som ändras på just det kortet. Används i stället för `patch`. */
+  apply?: (it: Item) => Partial<Item>;
   parent?: string | null;
 }
 
@@ -28,7 +31,14 @@ export function topGroupId(byId: Map<string, Item>, i: Item): string | null {
   return top;
 }
 
-export function boardColumns(groupBy: BoardGroup, items: Item[], users: User[]): BoardColumn[] {
+export function boardColumns(groupBy: BoardGroup, items: Item[], users: User[], fields: FieldDef[] = []): BoardColumn[] {
+  const fdef = groupBy.startsWith("field:") ? fields.find((f) => f.id === groupBy.slice(6) && f.type === "select") : undefined;
+  if (fdef) {
+    const val = (i: Item) => { const v = i.fields?.[fdef.id]; return typeof v === "string" ? (fdef.options ?? []).find((o) => o.toLowerCase() === v.toLowerCase()) ?? null : null; };
+    const without = (it: Item) => { const { [fdef.id]: _g, ...rest } = it.fields ?? {}; void _g; return Object.keys(rest).length ? rest : undefined; };
+    return [...(fdef.options ?? []).map((o) => ({ key: o, label: o, belongs: (i: Item) => val(i) === o, patch: {} as Partial<Item>, apply: (it: Item) => ({ fields: { ...(it.fields ?? {}), [fdef.id]: o } }) })),
+      { key: "", label: sv.cols.none, belongs: (i: Item) => val(i) === null, patch: {} as Partial<Item>, apply: (it: Item) => ({ fields: without(it) }) }];
+  }
   if (groupBy === "assignee") {
     return [...users.map((u) => ({ key: u.id, label: u.name, belongs: (i: Item) => i.assignee_id === u.id, patch: { assignee_id: u.id } as Partial<Item> })),
       { key: "", label: sv.cols.none, belongs: (i: Item) => i.assignee_id === null || !users.some((u) => u.id === i.assignee_id), patch: { assignee_id: null } }];
@@ -63,7 +73,7 @@ export function planColumnDrop(items: Item[], movedIds: string[], col: BoardColu
   order.forEach((it, idx) => {
     const patch: Partial<Item> = {};
     if (it.board_rank !== (idx + 1) * 10) patch.board_rank = (idx + 1) * 10;
-    if (moving.has(it.id)) for (const [k, v] of Object.entries(col.patch)) if ((it as unknown as Record<string, unknown>)[k] !== v) (patch as Record<string, unknown>)[k] = v;
+    if (moving.has(it.id)) for (const [k, v] of Object.entries(col.apply ? col.apply(it) : col.patch)) if (JSON.stringify((it as unknown as Record<string, unknown>)[k]) !== JSON.stringify(v)) (patch as Record<string, unknown>)[k] = v;
     if (Object.keys(patch).length) out.push({ id: it.id, patch });
   });
   return out;

@@ -1,5 +1,5 @@
 import { isISODate, dayNumber, addDays, diffDays } from "./dates";
-import { GROUP_COLORS, LIMITS, RECURRENCES, type Dependency, type Item, type Status } from "./types";
+import { FIELD_LIMITS, FIELD_TYPES, GROUP_COLORS, LIMITS, RECURRENCES, type FieldDef, type SavedView, type Dependency, type Item, type Status } from "./types";
 
 export class RuleError extends Error {
   constructor(public code: string, message: string, public data?: Record<string, string>) {
@@ -161,6 +161,13 @@ export function isSafeUrl(url: string): boolean {
 /** Etiketter, checklista, länkar och logg: form och gränser. */
 function validateExtras(item: Item): void {
   const bad = (code: string, msg: string) => { throw new RuleError(code, msg); };
+  if (item.fields !== undefined) {
+    if (!item.fields || typeof item.fields !== "object" || Array.isArray(item.fields) || Object.keys(item.fields).length > FIELD_LIMITS.fields) bad("bad_fields", `Högst ${FIELD_LIMITS.fields} egna fält`);
+    for (const [k, v] of Object.entries(item.fields)) {
+      if (!k || k.length > 60) bad("bad_fields", "Ogiltigt fält-id");
+      if (!(v === null || (typeof v === "number" && Number.isFinite(v)) || (typeof v === "string" && v.length <= FIELD_LIMITS.text))) bad("bad_fields", `Ogiltigt värde i ett eget fält (text högst ${FIELD_LIMITS.text} tecken)`);
+    }
+  }
   if (item.labels !== undefined) {
     if (!Array.isArray(item.labels) || item.labels.length > LIMITS.labels) bad("bad_labels", `Högst ${LIMITS.labels} etiketter`);
     const seen = new Set<string>();
@@ -189,5 +196,39 @@ function validateExtras(item: Item): void {
   if (item.log !== undefined) {
     if (!Array.isArray(item.log) || item.log.length > LIMITS.log) bad("bad_log", `Högst ${LIMITS.log} rader i loggen`);
     for (const e of item.log) if (!e || typeof e.at !== "string" || Number.isNaN(Date.parse(e.at)) || typeof e.text !== "string" || !e.text.trim() || e.text.length > LIMITS.logText) bad("bad_log", `Ogiltig rad i loggen (text högst ${LIMITS.logText} tecken, inte tom)`);
+  }
+}
+
+/** Definitionerna av egna fält: unika id och namn, giltig typ, rullistor med val, och gränser. */
+export function validateFieldDefs(defs: FieldDef[]): void {
+  const bad = (msg: string) => { throw new RuleError("bad_field_defs", msg); };
+  if (!Array.isArray(defs) || defs.length > FIELD_LIMITS.fields) bad(`Högst ${FIELD_LIMITS.fields} egna fält`);
+  const ids = new Set<string>(), names = new Set<string>();
+  for (const d of defs) {
+    if (!d || typeof d.id !== "string" || !d.id || d.id.length > 60 || ids.has(d.id)) bad("Ogiltigt eller dubbelt fält-id");
+    ids.add(d.id);
+    if (typeof d.name !== "string" || !d.name.trim() || d.name.length > FIELD_LIMITS.name || names.has(d.name.trim().toLowerCase())) bad(`Fältnamnet måste vara unikt, inte tomt och högst ${FIELD_LIMITS.name} tecken`);
+    names.add(d.name.trim().toLowerCase());
+    if (!FIELD_TYPES.includes(d.type)) bad("Ogiltig typ för eget fält");
+    if (d.type === "select") {
+      if (!Array.isArray(d.options) || d.options.length === 0 || d.options.length > FIELD_LIMITS.options) bad(`En rullista behöver 1 till ${FIELD_LIMITS.options} val`);
+      const seen = new Set<string>();
+      for (const o of d.options!) { if (typeof o !== "string" || !o.trim() || o.length > FIELD_LIMITS.option || seen.has(o.toLowerCase())) bad(`Valen måste vara unika, inte tomma och högst ${FIELD_LIMITS.option} tecken`); seen.add(o.toLowerCase()); }
+    } else if (d.options !== undefined) bad("Bara en rullista har val");
+    if (d.card !== undefined && typeof d.card !== "boolean") bad("Ogiltigt värde för visa på kort");
+  }
+}
+
+/** Sparade vyer: namn, form och gränser (innehållet är bara val som UI tolkar, och okända värden ignoreras där). */
+export function validateSavedViews(views: SavedView[]): void {
+  const bad = (msg: string) => { throw new RuleError("bad_views", msg); };
+  if (!Array.isArray(views) || views.length > FIELD_LIMITS.views) bad(`Högst ${FIELD_LIMITS.views} sparade vyer`);
+  const ids = new Set<string>(), names = new Set<string>();
+  for (const v of views) {
+    if (!v || typeof v.id !== "string" || !v.id || ids.has(v.id)) bad("Ogiltigt eller dubbelt vy-id");
+    ids.add(v.id);
+    if (typeof v.name !== "string" || !v.name.trim() || v.name.length > FIELD_LIMITS.viewName || names.has(v.name.trim().toLowerCase())) bad(`Vynamnet måste vara unikt, inte tomt och högst ${FIELD_LIMITS.viewName} tecken`);
+    names.add(v.name.trim().toLowerCase());
+    if (!["gantt", "wheel", "board"].includes(v.view) || !["day", "week", "month"].includes(v.zoom) || typeof v.boardGroup !== "string" || !Array.isArray(v.columns) || !v.filter || typeof v.filter !== "object") bad("Ogiltig sparad vy");
   }
 }

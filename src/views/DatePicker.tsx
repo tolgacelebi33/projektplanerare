@@ -12,7 +12,7 @@ export function DatePicker({ name, value, onValue, onCommit }: {
   /** Texten ändrades till ett giltigt datum (sparas direkt). */
   onValue: (v: string) => void;
   /** Fältet lämnades eller ett datum valdes: `null` om texten inte gick att tolka. */
-  onCommit: (v: string | null) => void;
+  onCommit: (v: string | null) => void; // "" = fältet rensades
 }) {
   const [text, setText] = useState(value);
   const [open, setOpen] = useState(false);
@@ -43,6 +43,7 @@ export function DatePicker({ name, value, onValue, onCommit }: {
 
   const choose = (d: string) => { setOpen(false); setText(d); setBad(false); onValue(d); onCommit(d); (root.current?.querySelector("input") as HTMLInputElement | null)?.focus(); };
   const commitText = () => {
+    if (!text.trim()) { setBad(false); onCommit(""); return; } // tomt fält: rensa
     const d = parseTypedDate(text);
     if (d) { setText(d); setBad(false); if (d !== value) onValue(d); onCommit(d); } else { setBad(true); setText(value); onCommit(null); }
   };

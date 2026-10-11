@@ -2,7 +2,8 @@ import { sv } from "../i18n/sv";
 import { todayISO } from "./dates";
 import { fileSlug, templateCsv, toCsv, toJson, toParsed, type ParsedProject } from "./exchange";
 import type { MemoryStore } from "./MemoryStore";
-import type { Project } from "./types";
+import { newFieldId } from "./fields";
+import type { FieldDef, Item, Project } from "./types";
 
 export type ExportFormat = "json" | "csv" | "template";
 
@@ -37,10 +38,32 @@ export async function importParsed(store: MemoryStore, workspaceId: string, pars
   if (into && !existing) throw new Error(sv.ex.projectGone);
   const originalMode = existing?.dependency_mode ?? "shift";
   const sortBase = into ? (await store.listItems(into)).reduce((m, i) => Math.max(m, i.sort_order), 0) : 0;
+  const originalFields = existing?.fields;
   const project = existing ?? await store.createProject({ workspace_id: workspaceId, name: (nameOverride ?? parsed.name).trim().slice(0, 100) || sv.ex.defaultName, dependency_mode: "none" });
   const createdItems: string[] = [], createdDeps: string[] = [];
   try {
     if (existing && originalMode !== "none") await store.updateProject(project.id, { dependency_mode: "none" });
+    // Egna fält: ett nytt projekt får filens fält och vyer som de är. I ett befintligt projekt förs fälten samman på namn (samma typ återanvänds, rullistans val läggs ihop), och posternas värden flyttas till rätt fält.
+    const fieldMap = new Map<string, string>();
+    if (parsed.fields?.length) {
+      if (!existing) { for (const d of parsed.fields) fieldMap.set(d.id, d.id); await store.updateProject(project.id, { fields: parsed.fields, ...(parsed.views?.length ? { views: parsed.views } : {}) }); }
+      else {
+        const have: FieldDef[] = (existing.fields ?? []).map((d) => ({ ...d }));
+        for (const d of parsed.fields) {
+          const same = have.find((h) => h.name.trim().toLowerCase() === d.name.trim().toLowerCase() && h.type === d.type);
+          if (same) {
+            fieldMap.set(d.id, same.id);
+            if (same.type === "select") for (const o of d.options ?? []) if (!(same.options ?? []).some((x) => x.toLowerCase() === o.toLowerCase())) same.options = [...(same.options ?? []), o];
+          } else {
+            let name = d.name, n = 2;
+            while (have.some((h) => h.name.trim().toLowerCase() === name.trim().toLowerCase())) name = `${d.name} ${n++}`.slice(0, 40);
+            const nd: FieldDef = { ...d, name, id: have.some((h) => h.id === d.id) ? newFieldId() : d.id };
+            have.push(nd); fieldMap.set(d.id, nd.id);
+          }
+        }
+        await store.updateProject(project.id, { fields: have });
+      }
+    }
     // föräldrar före barn
     const byId = new Map(parsed.items.map((i) => [i.id, i]));
     const depth = (id: string): number => { let d = 0; for (let c = byId.get(id); c?.parent_id; c = byId.get(c.parent_id)) d++; return d; };
@@ -48,6 +71,7 @@ export async function importParsed(store: MemoryStore, workspaceId: string, pars
     const idMap = new Map<string, string>();
     for (const it of ordered) {
       const { id, assignee, parent_id, ...rest } = it;
+      if (rest.fields) { const mapped: NonNullable<Item["fields"]> = {}; for (const [k, v] of Object.entries(rest.fields)) { const nk = fieldMap.get(k); if (nk) mapped[nk] = v; } rest.fields = Object.keys(mapped).length ? mapped : undefined; }
       // Flera ansvariga kan stå i samma cell (A; B eller A/B). Första som är en känd användare blir ansvarig, resten (och okända) hamnar i beskrivningen.
       let assignee_id: string | null = null;
       const left: string[] = [];
@@ -79,7 +103,7 @@ export async function importParsed(store: MemoryStore, workspaceId: string, pars
       // Rulla tillbaka: de nya beroendena, sedan de nya posterna (barn före föräldrar), och projektets beroendeläge
       for (const id of createdDeps) await store.deleteDependency(id).catch(() => undefined);
       for (const id of [...createdItems].reverse()) await store.deleteItem(id).catch(() => undefined);
-      await store.updateProject(project.id, { dependency_mode: originalMode }).catch(() => undefined);
+      await store.updateProject(project.id, { dependency_mode: originalMode, fields: originalFields ?? [] }).catch(() => undefined);
     } else await store.deleteProject(project.id).catch(() => undefined);
     throw e;
   }

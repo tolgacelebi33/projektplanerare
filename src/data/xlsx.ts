@@ -1,4 +1,4 @@
-import { ImportError, parseRows, trimToHeader, type ParsedProject } from "./exchange";
+import { ImportError, parseRows, trimToHeader, type ParseOpts, type ParsedProject } from "./exchange";
 import { sv } from "../i18n/sv";
 
 type Cell = string | number | boolean | Date | null | undefined;
@@ -23,13 +23,13 @@ export function sheetsToRows(sheets: { sheet: string; data: Cell[][] }[]): { she
   throw new ImportError(sv.ex.xlsxEmpty);
 }
 
-export async function parseXlsx(file: Blob, name: string): Promise<ParsedProject> {
+export async function parseXlsx(file: Blob, name: string, opts: ParseOpts = {}): Promise<ParsedProject> {
   const { default: readExcelFile } = await import("read-excel-file/universal");
   let sheets: { sheet: string; data: Cell[][] }[];
   try { sheets = (await readExcelFile(file)) as { sheet: string; data: Cell[][] }[]; }
   catch { throw new ImportError(sv.ex.xlsxBroken); }
   const { sheet, rows, skipped } = sheetsToRows(sheets);
-  const parsed = parseRows(rows, name, undefined, { fractionProgress: true });
+  const parsed = parseRows(rows, name, undefined, { ...opts, fractionProgress: true });
   if (sheets.length > 1) parsed.warnings.unshift(sv.ex.xlsxSheet(sheet, sheets.length - 1, skipped.length ? skipped.join(", ") : ""));
   return parsed;
 }

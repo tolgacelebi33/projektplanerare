@@ -5,12 +5,13 @@ import { GROUP_COLORS, RECURRENCES, type GroupColor, type Recurrence } from "../
 import type { DataStore } from "../data/DataStore";
 import { isISODate, todayISO } from "../data/dates";
 import { MAX_DESCRIPTION, MAX_TITLE, RuleError, isOverdue, validateItemShape } from "../data/rules";
-import type { Dependency, Item, Priority, Status, User } from "../data/types";
+import type { Dependency, FieldDef, Item, Priority, Status, User } from "../data/types";
 import { friendlyError } from "../i18n/errors";
 import { sv } from "../i18n/sv";
 import { STATUS_GLYPH } from "../proto/statusUi";
 import { DatePicker } from "./DatePicker";
 import { PanelExtras } from "./PanelExtras";
+import { PanelFields } from "./PanelFields";
 import { checklistPercent } from "../data/extras";
 import { DEFAULT_FEATURES, type Features } from "../settings";
 
@@ -24,8 +25,10 @@ type SaveState = { kind: "idle" } | { kind: "saving" } | { kind: "saved" } | { k
  * Detaljpanel för en post, fast bredd, dockad till höger. Ändringar sparas per fält direkt (inget spara-steg), så att man
  * kan hoppa mellan poster utan att tappa något. Läser alltid färska data från DataStore (drag i vyerna sparas direkt i storen).
  */
-export function ItemPanel({ onDuplicate, onNewSeries, nextDate, features = DEFAULT_FEATURES, checklistProgress = false, store, projectId, itemId, dataVersion, autoSelectTitle = false, focusField = null, onFocusDone, onClose, onChanged, onOpen }: {
+export function ItemPanel({ fieldDefs = [], onDuplicate, onNewSeries, nextDate, features = DEFAULT_FEATURES, checklistProgress = false, store, projectId, itemId, dataVersion, autoSelectTitle = false, focusField = null, onFocusDone, onClose, onChanged, onOpen }: {
   features?: Features; checklistProgress?: boolean;
+  /** Projektets egna fält. */
+  fieldDefs?: FieldDef[];
   onDuplicate?: (id: string) => void; onNewSeries?: (item: Item, count: number) => void;
   /** Datum för nästa tillfälle i postens serie (om den ingår i en). */
   nextDate?: string | null;
@@ -323,6 +326,8 @@ export function ItemPanel({ onDuplicate, onNewSeries, nextDate, features = DEFAU
             onChange={(e) => setDescription(e.target.value)} onBlur={() => void commit("description", { description })} />
         </label>
         {err("description")}
+        <PanelFields item={item} defs={fieldDefs} save={(patch) => depAction("fields", async () => { await store.updateItem(item.id, patch); })} />
+        {err("fields")}
         <PanelExtras item={item} all={all} features={features} error={err}
           save={(patch) => depAction(Object.keys(patch)[0], async () => {
             const p = { ...patch };

@@ -1,9 +1,10 @@
 import { useEffect, useRef } from "react";
 import { DEFAULT_SETTINGS, type Settings } from "../settings";
+import type { FieldDef } from "../data/types";
 import { sv } from "../i18n/sv";
 
 /** Inställningar: ändras direkt och sparas i webbläsaren. Esc, Stäng eller klick utanför stänger. */
-export function SettingsDialog({ settings, onChange, onClose }: { settings: Settings; onChange: (s: Settings) => void; onClose: () => void }) {
+export function SettingsDialog({ fieldDefs = [], settings, onChange, onClose }: { fieldDefs?: FieldDef[]; settings: Settings; onChange: (s: Settings) => void; onClose: () => void }) {
   const root = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const esc = (e: KeyboardEvent) => { if (e.key === "Escape") { e.stopPropagation(); onClose(); } };
@@ -37,6 +38,7 @@ export function SettingsDialog({ settings, onChange, onClose }: { settings: Sett
           <label className="panel-field"><span>{t.boardGroup}</span>
             <select name="set-boardgroup" value={settings.boardGroup} onChange={(e) => set("boardGroup", e.target.value as Settings["boardGroup"])}>
               {(["status", "assignee", "priority", "group"] as const).map((g) => <option key={g} value={g}>{sv.board.groups[g]}</option>)}
+              {fieldDefs.filter((d) => d.type === "select").map((d) => <option key={d.id} value={`field:${d.id}`}>{d.name}</option>)}
             </select></label>
           <p className="panel-muted">{t.boardGroupHint}</p>
         </section>
@@ -49,6 +51,7 @@ export function SettingsDialog({ settings, onChange, onClose }: { settings: Sett
           </div>
           <p className="panel-muted">{t.featuresHint}</p>
           <label className="settings-check"><input type="checkbox" checked={settings.checklistProgress} onChange={(e) => set("checklistProgress", e.target.checked)} /><span>{t.checklistProgress}<small>{t.checklistProgressHint}</small></span></label>
+          <label className="settings-check"><input type="checkbox" checked={settings.importExtraAsFields} onChange={(e) => set("importExtraAsFields", e.target.checked)} /><span>{t.importFields}<small>{t.importFieldsHint}</small></span></label>
           <label className="settings-check"><input type="checkbox" checked={settings.hidePastSeries} onChange={(e) => set("hidePastSeries", e.target.checked)} /><span>{t.hidePastSeries}<small>{t.hidePastSeriesHint}</small></span></label>
         </section>
         <section>

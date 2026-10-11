@@ -524,3 +524,16 @@ body[data-overlay] .gantt_tooltip { display: none !important; }
 .card-chips .chip { padding: 0 8px 0 11px; font-size: 11px; }
 .board-last { font-size: 12px; color: var(--text-muted); font-style: italic; }
 @media (max-width: 560px) { .links-add { grid-template-columns: 1fr; } }
+.card-fields { margin: 0; display: flex; flex-wrap: wrap; gap: 2px 10px; font-size: 12px; }
+.card-fields div { display: inline-flex; gap: 4px; }
+.card-fields dt { color: var(--text-muted); }
+.card-fields dt::after { content: ":"; }
+.card-fields dd { margin: 0; }
+.views-pop { min-width: 260px; display: grid; gap: 8px; }
+.views-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.views-list li { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+.views-apply { flex: 1; text-align: left; font: inherit; font-size: 13px; padding: 4px 8px; border: var(--line-width) solid transparent; border-radius: 6px; background: transparent; color: var(--text); cursor: pointer; }
+.views-apply:hover { background: var(--surface-alt); }
+.views-apply[aria-pressed="true"] { border-color: var(--text); font-weight: var(--weight-strong); }
+.views-add { display: flex; gap: 6px; }
+.views-add input { flex: 1; min-width: 0; font: inherit; font-size: 13px; color: var(--text); background: var(--surface-alt); border: var(--line-width) solid var(--line); border-radius: 6px; padding: 4px 8px; }

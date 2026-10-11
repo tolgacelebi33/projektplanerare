@@ -3,7 +3,8 @@ import { todayISO } from "../data/dates";
 import { boardColumns, columnCards, type BoardGroup } from "../data/boardColumns";
 import { isOverdue } from "../data/rules";
 import { checklistCount, labelColor } from "../data/extras";
-import type { GroupColor, Item, User } from "../data/types";
+import type { FieldDef, GroupColor, Item, User } from "../data/types";
+import { cardFieldValues } from "../data/fields";
 import type { CardFields } from "../settings";
 import { sv } from "../i18n/sv";
 
@@ -15,9 +16,11 @@ const firstLine = (t: string, n = 110) => { const l = t.split("\n").find((x) => 
  * värdet och ordningen, eller använd valet på kortet. Ctrl/Cmd-klick markerar flera kort och Shift-klick en följd, och ett klick på tom yta släpper både markering
  * och öppnad post. Grupper är inga kort: de syns som sökväg och som en smal färgkant på korten. Vad som visas på korten styrs av `cardFields`.
  */
-export function BoardView({ nextIds, groupBy = "status", cardFields, highlightOverdue = true, markUndated = true, items, allItems, users, colors, openId, selected, onOpen, onSelect, onBackground, onDrop, onMoveTo, onContext }: {
+export function BoardView({ fields = [], nextIds, groupBy = "status", cardFields, highlightOverdue = true, markUndated = true, items, allItems, users, colors, openId, selected, onOpen, onSelect, onBackground, onDrop, onMoveTo, onContext }: {
   /** Id för nästa tillfälle i varje serie (märks med "Nästa"). */
   nextIds?: ReadonlySet<string>;
+  /** Projektets egna fält (för kolumner per fält och fält som visas på korten). */
+  fields?: FieldDef[];
   groupBy?: BoardGroup; cardFields: CardFields; highlightOverdue?: boolean; markUndated?: boolean;
   items: Item[]; allItems: Item[]; users: User[]; colors: ReadonlyMap<string, GroupColor | "none">;
   openId: string | null; selected: ReadonlySet<string>;
@@ -35,7 +38,8 @@ export function BoardView({ nextIds, groupBy = "status", cardFields, highlightOv
   const byId = new Map(allItems.map((i) => [i.id, i]));
   const path = (i: Item): string => { const out: string[] = []; for (let c = i.parent_id ? byId.get(i.parent_id) : undefined; c; c = c.parent_id ? byId.get(c.parent_id) : undefined) out.unshift(c.title); return out.join(" / "); };
   const today = todayISO();
-  const cols = boardColumns(groupBy, allItems, users);
+  const cols = boardColumns(groupBy, allItems, users, fields);
+  const groupLabel = groupBy.startsWith("field:") ? fields.find((f) => f.id === groupBy.slice(6))?.name ?? sv.board.groups.status : sv.board.groups[groupBy as "status"];
   const columns = cols.map((col) => ({ col, list: columnCards(items, col) }));
   const visible = columns.flatMap((c) => c.list.map((i) => i.id));
   const finish = () => { setDrag(null); setAt(null); setGhost(null); };
@@ -132,6 +136,9 @@ export function BoardView({ nextIds, groupBy = "status", cardFields, highlightOv
                       {i.labels!.map((l) => <li key={l} className="chip" style={{ "--chip": `var(--grp-${labelColor(l)})` } as React.CSSProperties}>{l}</li>)}
                     </ul>
                   )}
+                  {fields.some((f) => f.card) && cardFieldValues(i, fields).length > 0 && (
+                    <dl className="card-fields">{cardFieldValues(i, fields).map((f) => <div key={f.name}><dt>{f.name}</dt><dd>{f.value}</dd></div>)}</dl>
+                  )}
                   {cardFields.description && i.description.trim() && <div className="board-desc">{firstLine(i.description)}</div>}
                   <div className="board-meta">
                     {cardFields.date && (i.undated && markUndated ? <span className="board-undated">{sv.undated.tag}</span> : <span>{i.type === "milestone" ? i.end : `${i.start} – ${i.end}`}</span>)}
@@ -144,7 +151,7 @@ export function BoardView({ nextIds, groupBy = "status", cardFields, highlightOv
                     {cardFields.assignee && who && <span className="board-who" title={who} aria-label={who}>{initials(who)}</span>}
                   </div>
                   {cardFields.lastUpdate && (i.log?.length ?? 0) > 0 && <div className="board-last">{firstLine(i.log![i.log!.length - 1].text, 80)}</div>}
-                  <select className="board-status" aria-label={`${sv.board.groups[groupBy]} för ${i.title}`} value={mine} onChange={(e) => onMoveTo(i.id, e.target.value)}>
+                  <select className="board-status" aria-label={`${groupLabel} för ${i.title}`} value={mine} onChange={(e) => onMoveTo(i.id, e.target.value)}>
                     {cols.map((c) => <option key={c.key || "__none"} value={c.key}>{c.label}</option>)}
                   </select>
                 </article>

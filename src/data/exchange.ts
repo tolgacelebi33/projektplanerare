@@ -1,11 +1,12 @@
 import { addDays, isISODate, recurringDates, todayISO } from "./dates";
-import { RuleError, validateItemShape } from "./rules";
+import { RuleError, validateFieldDefs, validateItemShape, validateSavedViews } from "./rules";
 import { newChecklistId, normalizeLink } from "./extras";
-import { LIMITS } from "./types";
+import { importFieldValue, inferFieldDef, newFieldId } from "./fields";
+import { FIELD_LIMITS, LIMITS, type FieldValue } from "./types";
 import { sv } from "../i18n/sv";
 import { enDict, svDict } from "../i18n/sv";
 import { friendlyError } from "../i18n/errors";
-import type { Dependency, DependencyMode, Item, ItemType, Priority, Project, Recurrence, Status, User } from "./types";
+import type { Dependency, DependencyMode, FieldDef, Item, ItemType, Priority, Project, Recurrence, SavedView, Status, User } from "./types";
 
 /**
  * Export och import av projekt, utan beroende av lagring. JSON ger full återgivning (används också för att kopiera ett projekt).
@@ -23,6 +24,9 @@ export interface ParsedProject {
   dependency_mode: DependencyMode;
   items: ParsedItem[];
   deps: { from: string; to: string }[];
+  /** Projektets egna fält och sparade vyer (JSON, och kolumner som blev fält vid CSV-import). */
+  fields?: FieldDef[];
+  views?: SavedView[];
   /** Saker som importerades med avvikelse (okänd ansvarig m.m.) */
   warnings: string[];
 }
@@ -36,12 +40,13 @@ const TYPES: ItemType[] = ["epic", "milestone", "task"];
 export class ImportError extends Error {}
 
 /** Lagrets poster som en neutral beskrivning (ansvarig som namn, inga projekt- eller workspace-id). */
-export function toParsed(project: Pick<Project, "name" | "dependency_mode">, items: Item[], deps: Dependency[], users: User[]): ParsedProject {
+export function toParsed(project: Pick<Project, "name" | "dependency_mode"> & Partial<Pick<Project, "fields" | "views">>, items: Item[], deps: Dependency[], users: User[]): ParsedProject {
   const name = new Map(users.map((u) => [u.id, u.name]));
   const ids = new Set(items.map((i) => i.id));
   return {
     name: project.name,
     dependency_mode: project.dependency_mode ?? "shift",
+    ...(project.fields?.length ? { fields: project.fields } : {}), ...(project.views?.length ? { views: project.views } : {}),
     items: items.map(({ workspace_id: _w, project_id: _p, assignee_id, ...rest }) => ({ ...rest, assignee: assignee_id ? name.get(assignee_id) ?? null : null })),
     deps: deps.filter((d) => ids.has(d.from_item_id) && ids.has(d.to_item_id)).map((d) => ({ from: d.from_item_id, to: d.to_item_id })),
     warnings: [],
@@ -51,7 +56,7 @@ export function toParsed(project: Pick<Project, "name" | "dependency_mode">, ite
 // ---------- JSON ----------
 
 export function toJson(p: ParsedProject, exportedAt: string): string {
-  return JSON.stringify({ format: FORMAT, version: 1, exported_at: exportedAt, project: { name: p.name, dependency_mode: p.dependency_mode }, items: p.items, dependencies: p.deps }, null, 2);
+  return JSON.stringify({ format: FORMAT, version: 1, exported_at: exportedAt, project: { name: p.name, dependency_mode: p.dependency_mode, ...(p.fields?.length ? { fields: p.fields } : {}), ...(p.views?.length ? { views: p.views } : {}) }, items: p.items, dependencies: p.deps }, null, 2);
 }
 
 function shapeCheck(it: ParsedItem, n: number) {
@@ -109,6 +114,7 @@ export function parseJson(text: string): ParsedProject {
       ...(Array.isArray(x.checklist) ? { checklist: x.checklist as Item["checklist"] } : {}),
       ...(Array.isArray(x.links) ? { links: x.links as Item["links"] } : {}),
       ...(Array.isArray(x.log) ? { log: x.log as Item["log"] } : {}),
+      ...(isObj(x.fields) ? { fields: x.fields as Item["fields"] } : {}),
       ...(typeof x.series === "string" && x.series ? { series: x.series } : {}),
       ...(typeof x.recur === "string" ? { recur: x.recur as ParsedItem["recur"] } : {}),
     };
@@ -125,6 +131,8 @@ export function parseJson(text: string): ParsedProject {
     name: typeof proj.name === "string" && proj.name.trim() ? proj.name.trim().slice(0, 100) : sv.ex.defaultName,
     dependency_mode: proj.dependency_mode === "none" ? "none" : "shift", items, deps, warnings: [],
   };
+  if (Array.isArray(proj.fields)) { try { validateFieldDefs(proj.fields as FieldDef[]); } catch (er) { throw new ImportError(friendlyError(er)); } out.fields = proj.fields as FieldDef[]; }
+  if (Array.isArray(proj.views)) { try { validateSavedViews(proj.views as SavedView[]); } catch (er) { throw new ImportError(friendlyError(er)); } out.views = proj.views as SavedView[]; }
   structureCheck(out);
   return out;
 }
@@ -276,8 +284,8 @@ function parsePeriod(raw: string): { start: string; end: string } | null {
 /** Poster som saknar datum läggs från importdagen och en vecka framåt, så att de syns och går att dra bakåt eller framåt. */
 export const PLACEHOLDER_DAYS = 7;
 
-export function parseCsv(text: string, name: string, today: string = todayISO()): ParsedProject {
-  return parseRows(readCsv(text), name, today);
+export function parseCsv(text: string, name: string, today: string = todayISO(), opts: ParseOpts = {}): ParsedProject {
+  return parseRows(readCsv(text), name, today, opts);
 }
 
 /** Raderna ovanför rubrikraden tas bort (rubrikraden är den första inom de 15 första som har en titelkolumn). Finns ingen titelkolumn lämnas raderna orörda. */
@@ -290,7 +298,13 @@ export function trimToHeader(rows: string[][]): string[][] {
  * Tolkar rader (första raden är rubriker) till ett projekt. Delas av CSV och Excel.
  * `fractionProgress`: Excel lagrar procent som bråk (40 % är 0,4). Är alla värden i framstegskolumnen högst 1, och något över 0, tolkas de som bråk.
  */
-export function parseRows(rows: string[][], name: string, today: string = todayISO(), opts: { fractionProgress?: boolean } = {}): ParsedProject {
+export interface ParseOpts {
+  /** Excel lagrar procent som bråk (se parseRows). */
+  fractionProgress?: boolean;
+  /** Kolumner som inte känns igen blir egna fält (högst 20) i stället för text i beskrivningen. */
+  extraAsFields?: boolean;
+}
+export function parseRows(rows: string[][], name: string, today: string = todayISO(), opts: ParseOpts = {}): ParsedProject {
   if (rows.length < 2) throw new ImportError(sv.ex.csvNoRows);
   if (rows.length - 1 > MAX_IMPORT_ITEMS) throw new ImportError(sv.ex.tooManyRows(MAX_IMPORT_ITEMS));
   const head = rows[0].map((h) => norm(h));
@@ -314,6 +328,19 @@ export function parseRows(rows: string[][], name: string, today: string = todayI
   // Kolumner som inte känns igen sparas i beskrivningen i stället för att försvinna
   const knownCols = new Set(Object.values(col).filter((i) => i >= 0));
   const extraCols = rows[0].map((h, i) => ({ h: h.trim(), i })).filter((x) => x.h && !knownCols.has(x.i));
+  // Med valet "okända kolumner blir egna fält": typ och val ur kolumnens värden, och värdena ligger på posterna
+  const fieldDefs: { x: { h: string; i: number }; def: FieldDef }[] = [];
+  if (opts.extraAsFields) {
+    const used = new Set<string>();
+    for (const x of extraCols.slice(0, FIELD_LIMITS.fields)) {
+      const base = inferFieldDef(x.h, rows.slice(1).map((r) => uncell(r[x.i] ?? "")));
+      let nm = base.name, k = 2;
+      while (used.has(nm.toLowerCase())) nm = `${base.name} ${k++}`.slice(0, FIELD_LIMITS.name);
+      used.add(nm.toLowerCase());
+      fieldDefs.push({ x, def: { ...base, name: nm, id: newFieldId() } });
+    }
+  }
+  const asField = new Set(fieldDefs.map((f) => f.x.i));
   const TYPES_: ItemType[] = ["epic", "milestone", "task"];
   const items: ParsedItem[] = rows.slice(1).map((r, idx) => {
     const line = idx + 2; const err = (m: string) => new ImportError(sv.ex.row(line, m));
@@ -361,7 +388,9 @@ export function parseRows(rows: string[][], name: string, today: string = todayI
     add(sv.ex.meta.area, get(r, "area")); add(sv.ex.meta.contacts, get(r, "contacts")); add(sv.ex.meta.origStatus, get(r, "origstatus"));
     add(sv.ex.meta.basis, get(r, "basis")); add(sv.ex.meta.asOf, get(r, "asof")); add(sv.ex.meta.target, targetRaw);
     add(sv.ex.meta.completed, cd ?? ""); if (/^\d+$/.test(prioRaw)) add(sv.ex.meta.priorityInFile, prioRaw);
-    for (const x of extraCols) add(x.h, uncell(r[x.i] ?? "").trim());
+    for (const x of extraCols) if (!asField.has(x.i)) add(x.h, uncell(r[x.i] ?? "").trim());
+    const cf: Record<string, FieldValue> = {};
+    for (const f of fieldDefs) { const v = importFieldValue(f.def, uncell(r[f.x.i] ?? "")); if (v !== null) cf[f.def.id] = v; }
     const emin = get(r, "effmin"), emax = get(r, "effmax"); if (emin || emax) add(sv.ex.meta.effort, emin === emax || !emax ? emin : `${emin}-${emax}`);
     let description = getRaw(r, "description");
     if (title.length > MAX_TITLE_LEN) { shortened++; description = description ? `${title}\n\n${description}` : title; title = `${title.slice(0, MAX_TITLE_LEN - 1).trimEnd()}…`; }
@@ -385,6 +414,7 @@ export function parseRows(rows: string[][], name: string, today: string = todayI
       id: get(r, "id") || `rad${line}`, parent_id: null, type, title, start, end, status,
       assignee: get(r, "assignee") || null, description, priority, progress, sort_order: idx + 1,
       ...(labels.length ? { labels } : {}), ...(links.length ? { links } : {}), ...(checklist.length ? { checklist } : {}),
+      ...(Object.keys(cf).length ? { fields: cf } : {}),
     };
     try { validateItemShape({ ...it, workspace_id: "", project_id: "", assignee_id: null }); }
     catch (e) { throw err(friendlyError(e)); }
@@ -464,6 +494,7 @@ export function parseRows(rows: string[][], name: string, today: string = todayI
   const kindName = { type: sv.ex.kindType, status: sv.ex.kindStatus, priority: sv.ex.kindPriority, recur: sv.ex.kindRecur };
   for (const [key, n] of unknown) { const [kind, value] = key.split("|") as ["type" | "status" | "priority" | "recur", string]; warnings.push(sv.ex.unknownValue(kindName[kind], value, n, fallback[kind])); }
   const out: ParsedProject = { name: name.replace(/\.[^.]+$/, "").replace(/_/g, " ").trim().slice(0, 100) || sv.ex.defaultName, dependency_mode: "shift", items, deps, warnings };
+  if (fieldDefs.length) { out.fields = fieldDefs.map((f) => f.def); warnings.push(sv.ex.fieldsMade(fieldDefs.length)); }
   structureCheck(out);
   return out;
 }
@@ -473,22 +504,22 @@ export function templateCsv(): string {
   return "﻿" + [[...sv.ex.header], ...sv.ex.sample].map((r) => r.map(cell).join(";")).join("\r\n") + "\r\n";
 }
 
-export function parseFile(fileName: string, text: string): ParsedProject {
+export function parseFile(fileName: string, text: string, opts: ParseOpts = {}): ParsedProject {
   if (text.length > MAX_IMPORT_BYTES) throw new ImportError(sv.ex.fileTooBig);
   const lower = fileName.toLowerCase();
   if (lower.endsWith(".json")) return parseJson(text);
-  if (lower.endsWith(".csv") || lower.endsWith(".txt")) return parseCsv(text, fileName);
+  if (lower.endsWith(".csv") || lower.endsWith(".txt")) return parseCsv(text, fileName, undefined, opts);
   throw new ImportError(sv.ex.fileType);
 }
 
 /** Läser en uppladdad fil: Excel (.xlsx) som binärfil, övriga som text. */
-export async function parseUpload(file: File): Promise<ParsedProject> {
+export async function parseUpload(file: File, opts: ParseOpts = {}): Promise<ParsedProject> {
   if (file.size > MAX_IMPORT_BYTES) throw new ImportError(sv.ex.fileTooBig);
   if (file.name.toLowerCase().endsWith(".xlsx")) {
     const { parseXlsx } = await import("./xlsx"); // laddas först när en Excel-fil väljs
-    return parseXlsx(file, file.name);
+    return parseXlsx(file, file.name, opts);
   }
-  return parseFile(file.name, await file.text());
+  return parseFile(file.name, await file.text(), opts);
 }
 
 export function fileSlug(name: string): string {

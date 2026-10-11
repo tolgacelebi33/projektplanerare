@@ -1,8 +1,8 @@
 import type { DataStore } from "./DataStore";
-import { RuleError, rederiveEpics, shiftSuccessors, validateDependency, validateItemShape, validateParent } from "./rules";
+import { RuleError, rederiveEpics, shiftSuccessors, validateDependency, validateFieldDefs, validateItemShape, validateParent, validateSavedViews } from "./rules";
 import { addDays } from "./dates";
 import { applyPatch, isPatchList, json, makePatch, type Entry, type Patch } from "./patch";
-import type { Dependency, DependencyMode, Fixture, Item, Project, User } from "./types";
+import type { Dependency, DependencyMode, FieldDef, Fixture, Item, Project, SavedView, User } from "./types";
 
 /** Allt lagret håller, för att kunna sparas och återställas. */
 export interface Snapshot {
@@ -235,7 +235,7 @@ export class MemoryStore implements DataStore {
     this.commit(true);
     return proj;
   }
-  async updateProject(id: string, patch: { name?: string; dependency_mode?: DependencyMode }) {
+  async updateProject(id: string, patch: { name?: string; dependency_mode?: DependencyMode; fields?: FieldDef[]; views?: SavedView[] }) {
     await this.tick("updateProject");
     const cur = this.projects.get(id);
     if (!cur) throw new RuleError("not_found", `Projekt ${id} finns inte`);
@@ -243,7 +243,9 @@ export class MemoryStore implements DataStore {
     if (!name) throw new RuleError("empty_title", "Projektnamn saknas");
     if (name.length > 100) throw new RuleError("title_too_long", "Projektnamnet är för långt");
     if (patch.dependency_mode !== undefined && patch.dependency_mode !== "shift" && patch.dependency_mode !== "none") throw new RuleError("bad_mode", "Ogiltigt beroendeläge");
-    const next = { ...cur, name, dependency_mode: patch.dependency_mode ?? cur.dependency_mode ?? "shift" };
+    if (patch.fields !== undefined) validateFieldDefs(patch.fields);
+    if (patch.views !== undefined) validateSavedViews(patch.views);
+    const next: Project = { ...cur, name, dependency_mode: patch.dependency_mode ?? cur.dependency_mode ?? "shift", ...(patch.fields !== undefined ? { fields: patch.fields } : {}), ...(patch.views !== undefined ? { views: patch.views } : {}) };
     this.projects.set(id, next);
     this.writes.push({ method: "updateProject", args: [id, patch] });
     this.commit();

@@ -8,6 +8,9 @@ import { allLabels } from "./data/extras";
 import { boardColumns, planColumnDrop, planColumnMoves } from "./data/boardColumns";
 import { RecurringDialog } from "./views/RecurringDialog";
 import { SettingsDialog } from "./views/SettingsDialog";
+import { FieldsDialog } from "./views/FieldsDialog";
+import { SavedViews } from "./views/SavedViews";
+import { removeFieldDef } from "./data/fieldActions";
 import { loadSettings, saveSettings, type Settings } from "./settings";
 import { friendlyError } from "./i18n/errors";
 import { ContextMenu, type MenuItem } from "./views/ContextMenu";
@@ -22,7 +25,7 @@ import { ProjectBar } from "./views/ProjectBar";
 import { LANGS, setLang, storedLang, sv, type Lang } from "./i18n/sv";
 import { focusMedianOnNextProject, rememberScroll, uiCarry } from "./scrollCarry";
 import { clampGrid, loadGridWidth, saveGridWidth } from "./layout";
-import { COLUMN_WIDTH, loadColumns, saveColumns, type ColumnId } from "./columns";
+import { columnWidth, loadColumns, saveColumns, type ColumnId } from "./columns";
 import { ColumnPicker } from "./views/ColumnPicker";
 import { HelpDialog } from "./views/HelpDialog";
 import { effectiveColors } from "./data/colors";
@@ -163,7 +166,7 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
     if (!projects.projectId) return;
     try {
       const pid = projects.projectId;
-      const col = boardColumns(settings.boardGroup, await store.listItems(pid), users).find((c) => c.key === colKey);
+      const col = boardColumns(boardGroup, await store.listItems(pid), users, fieldDefs).find((c) => c.key === colKey);
       if (!col) return;
       await inOneStep(store, async () => {
         // Kolumner som är grupper: korten flyttas först till gruppen (ett i taget, eftersom varje flytt ändrar syskonens ordning)
@@ -202,6 +205,12 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
       return created.id;
     } catch (e) { setWriteError(friendlyError(e)); throw e; }
   };
+  const project = projects.projects?.find((p) => p.id === projects.projectId) ?? null;
+  const fieldDefs = project?.fields ?? [];
+  const [fieldsOpen, setFieldsOpen] = useState(false);
+  const savedViews = project?.views ?? [];
+  // En gruppering på ett fält som inte finns (i det här projektet) blir status
+  const boardGroup: Settings["boardGroup"] = settings.boardGroup.startsWith("field:") && !fieldDefs.some((d) => `field:${d.id}` === settings.boardGroup && d.type === "select") ? "status" : settings.boardGroup;
   const [recurOpen, setRecurOpen] = useState(false);
   const [recurInit, setRecurInit] = useState<{ title: string; kind: import("./data/types").Recurrence; count: number } | null>(null);
   const [toolsOpen, setToolsOpen] = useState(false); // smalt fönster: verktygsfälten är hopfällda tills man öppnar dem
@@ -219,6 +228,32 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
       setWriteError(sv.recur.done(made.length));
     } catch (e) { setWriteError(friendlyError(e)); reload(); }
   };
+  /** Allt som bestämmer hur projektet visas just nu, som en sparbar vy. */
+  const currentView = (): import("./data/types").SavedView => ({
+    id: "", name: "", view, zoom, boardGroup, columns: [...columns],
+    filter: { query, hideDone, statuses: attrFilter.statuses, priorities: attrFilter.priorities, assignees: attrFilter.assignees, labels: attrFilter.labels, fields: attrFilter.fields, quick: { ...quick } },
+  });
+  const saveView = async (name: string) => {
+    if (!project) return;
+    const cur = currentView();
+    const old = savedViews.find((v) => v.name.trim().toLowerCase() === name.trim().toLowerCase());
+    const next = old ? savedViews.map((v) => (v.id === old.id ? { ...cur, id: old.id, name: old.name } : v)) : [...savedViews, { ...cur, id: `v_${Date.now().toString(36)}${Math.floor(Math.random() * 1e6).toString(36)}`, name: name.trim() }];
+    await projects.setViews(project.id, next);
+  };
+  const applyView = (v: import("./data/types").SavedView) => {
+    const ids = new Set(fieldDefs.map((d) => d.id));
+    const cols = v.columns.filter((c) => !c.startsWith("f:") || ids.has(c.slice(2))) as ColumnId[];
+    const w = (list: ColumnId[]) => list.reduce((n, c) => n + columnWidth(c), 0);
+    changeGrid(gridRef.current + w(cols) - w(columns)); commitGrid();
+    setColumns(cols); saveColumns(cols);
+    setView(v.view); setZoom(v.zoom);
+    setQuery(v.filter.query); setHideDone(v.filter.hideDone);
+    setAttrFilter({ statuses: v.filter.statuses, priorities: v.filter.priorities, assignees: v.filter.assignees, labels: v.filter.labels ?? [], fields: Object.fromEntries(Object.entries(v.filter.fields ?? {}).filter(([k]) => ids.has(k))) });
+    setQuick({ overdue: !!v.filter.quick?.overdue, thisWeek: !!v.filter.quick?.thisWeek, noAssignee: !!v.filter.quick?.noAssignee, undated: !!v.filter.quick?.undated });
+    const bg = v.boardGroup.startsWith("field:") && !ids.has(v.boardGroup.slice(6)) ? "status" : v.boardGroup;
+    if (bg !== settings.boardGroup) setSettings({ ...settings, boardGroup: bg as Settings["boardGroup"] });
+  };
+  const removeView = async (id: string) => { if (project) await projects.setViews(project.id, savedViews.filter((v) => v.id !== id)); };
   /** Duplicerar en post (en grupp med hela sitt innehåll), och öppnar kopian med titeln markerad. */
   const doDuplicateItem = async (id: string) => {
     if (!projects.projectId || state.kind !== "ready") return;
@@ -279,7 +314,7 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
         return;
       }
       if (e.metaKey || e.ctrlKey || typing || state.kind !== "ready" || !projects.projectId) return;
-      if (menu || recurOpen || settingsOpen || t?.closest("[role=dialog], [role=menu], aside.panel")) return; // en öppen meny äger tangenterna även innan den hunnit ta fokus
+      if (menu || recurOpen || settingsOpen || fieldsOpen || t?.closest("[role=dialog], [role=menu], aside.panel")) return; // en öppen meny äger tangenterna även innan den hunnit ta fokus
       if (e.key === "Escape" && selected.size) { e.preventDefault(); selAnchor.current = null; setSelected(new Set()); return; }
       // Alt+pil upp eller ner: flytta den valda raden i sin grupp
       if (e.altKey) {
@@ -312,10 +347,11 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
   };
   const doImport = async (file: File, into = false) => {
     if (file.size > MAX_IMPORT_BYTES) throw new ImportError(sv.ex.fileTooBig);
-    const parsed = await parseUpload(file);
+    const parsed = await parseUpload(file, { extraAsFields: settingsRef.current.importExtraAsFields });
     if (into && projects.projectId) {
       // In i det här projektet: inget nytt projekt, vyn hämtas om och den första nya raden visas
-      const res = await importParsed(store, workspaceId, parsed, undefined, projects.projectId);
+      const res = await inOneStep(store, () => importParsed(store, workspaceId, parsed, undefined, projects.projectId!));
+      await projects.reload(projects.projectId);
       await refresh();
       if (res.firstItemId) setReveal(res.firstItemId);
       report(res);
@@ -357,9 +393,10 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
   const [columns, setColumns] = useState<ColumnId[]>(() => (typeof window !== "undefined" && window.innerWidth < 700 ? loadColumns().filter((c) => c !== "end") : loadColumns())); // telefon: bara titeln i listan, så att den går att läsa
   const toggleColumn = (c: ColumnId) => {
     const on = columns.includes(c);
-    const next = (["status", "assignee", "priority", "start", "end", "progress"] as ColumnId[]).filter((x) => (x === c ? !on : columns.includes(x)));
+    const staticIds = ["status", "assignee", "priority", "start", "end", "progress"] as ColumnId[];
+    const next = [...staticIds.filter((x) => (x === c ? !on : columns.includes(x))), ...(columns.filter((x) => x.startsWith("f:") && x !== c) as ColumnId[]), ...(c.startsWith("f:") && !on ? [c] : [])];
     setColumns(next); saveColumns(next);
-    changeGrid(gridRef.current + (on ? -COLUMN_WIDTH[c] : COLUMN_WIDTH[c])); commitGrid();
+    changeGrid(gridRef.current + (on ? -columnWidth(c) : columnWidth(c))); commitGrid();
   };
   const [users, setUsers] = useState<User[]>([]);
   useEffect(() => { let on = true; void store.listUsers().then((u) => { if (on) setUsers(u); }).catch(() => undefined); return () => { on = false; }; }, [store]);
@@ -478,8 +515,9 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
         {view === "board" && (
           <label className="project-deps keep-narrow">
             <span className="toolbar-label">{sv.board.groupBy}</span>
-            <select className="project-select project-select-sm" aria-label={sv.board.groupBy} value={settings.boardGroup} onChange={(e) => setSettings({ ...settings, boardGroup: e.target.value as Settings["boardGroup"] })}>
+            <select className="project-select project-select-sm" aria-label={sv.board.groupBy} value={boardGroup} onChange={(e) => setSettings({ ...settings, boardGroup: e.target.value as Settings["boardGroup"] })}>
               {(["status", "assignee", "priority", "group"] as const).map((g) => <option key={g} value={g}>{sv.board.groups[g]}</option>)}
+              {fieldDefs.filter((d) => d.type === "select").map((d) => <option key={d.id} value={`field:${d.id}`}>{d.name}</option>)}
             </select>
           </label>
         )}
@@ -524,7 +562,7 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
           <input type="search" className="search" aria-label={sv.filter.search} placeholder={sv.filter.placeholder} value={query}
             onChange={(e) => setQuery(e.target.value)} onKeyDown={(e) => { if (e.key === "Escape") setQuery(""); }} />
           <button type="button" className="mini" aria-pressed={hideDone} onClick={() => setHideDone((v) => !v)}>{sv.filter.hideDone}</button>
-          <FilterPicker filter={attrFilter} users={users} labels={labelList} onChange={setAttrFilter} />
+          <FilterPicker filter={attrFilter} users={users} labels={labelList} fieldDefs={fieldDefs} onChange={setAttrFilter} />
           {settings.quickFilters && (
             <div className="quick-filters" role="group" aria-label={sv.qf.label}>
               {(["overdue", "thisWeek", "noAssignee", "undated"] as const).map((k) => (
@@ -535,7 +573,9 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
           {filtering && state.kind === "ready" && <span className="toolbar-label" role="status">{sv.filter.count(shown.items.length, state.items.length)}</span>}
         </div>
         <span className="toolbar-sep" aria-hidden="true" />
-        <ColumnPicker columns={columns} onToggle={toggleColumn} />
+        <ColumnPicker columns={columns} fieldDefs={fieldDefs} onToggle={toggleColumn} />
+        <button type="button" className="mini" disabled={!project} onClick={() => setFieldsOpen(true)}>{sv.fields.button}</button>
+        {project && <SavedViews views={savedViews} current={currentView()} onApply={applyView} onSave={saveView} onRemove={removeView} />}
         {view === "gantt" && (<>
           <button type="button" className="mini" onClick={() => setCollapse((c) => ({ n: c.n + 1, open: false }))}>{sv.filter.collapseAll}</button>
           <button type="button" className="mini" onClick={() => setCollapse((c) => ({ n: c.n + 1, open: true }))}>{sv.filter.expandAll}</button>
@@ -564,12 +604,12 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
         {projects.projects && projects.projects.length === 0 && (
           <div className="empty-state"><p>{sv.project.none}</p><button type="button" className="btn btn-primary" onClick={() => void projects.create(sv.project.defaultName)}>{sv.project.createFirst}</button></div>
         )}
-        {state.kind === "ready" && projects.projectId && view === "board" && <BoardView nextIds={nextIds} groupBy={settings.boardGroup} cardFields={settings.cardFields} highlightOverdue={settings.highlightOverdue} markUndated={settings.markUndated} items={shown.items} allItems={state.items} users={users} colors={colors} openId={editId} selected={selected} onOpen={setEditId} onSelect={selectRow} onBackground={dropSelection} onDrop={(m, k, b) => void dropCards(m, k, b)} onMoveTo={moveCardTo} onContext={openMenu} />}
+        {state.kind === "ready" && projects.projectId && view === "board" && <BoardView fields={fieldDefs} nextIds={nextIds} groupBy={boardGroup} cardFields={settings.cardFields} highlightOverdue={settings.highlightOverdue} markUndated={settings.markUndated} items={shown.items} allItems={state.items} users={users} colors={colors} openId={editId} selected={selected} onOpen={setEditId} onSelect={selectRow} onBackground={dropSelection} onDrop={(m, k, b) => void dropCards(m, k, b)} onMoveTo={moveCardTo} onContext={openMenu} />}
         {state.kind === "ready" && projects.projectId && view === "wheel" && <YearWheel items={shown.items} year={effectiveYear} colors={colors} selectedId={editId} onOpen={setEditId} onContext={openMenu} />}
         {state.kind === "ready" && projects.projectId && view === "gantt" && (
           <div className="gantt-wrap">
           <div className="gantt-main">
-          <DhtmlxGantt key={`${theme}-${settings.touch}`} touchMode={settings.touch} selected={selected} onSelect={selectRow} colors={colors} collapse={collapse} gridWidth={gridWidth} columns={columns} users={users} onEditField={editField} revealId={reveal} todayToken={todayToken} onPersisted={() => void refresh()}
+          <DhtmlxGantt fieldDefs={fieldDefs} key={`${theme}-${settings.touch}`} touchMode={settings.touch} selected={selected} onSelect={selectRow} colors={colors} collapse={collapse} gridWidth={gridWidth} columns={columns} users={users} onEditField={editField} revealId={reveal} todayToken={todayToken} onPersisted={() => void refresh()}
             onNotice={setWriteError}
             onCreateAt={({ rowId, date }) => void addItem("task", { anchorId: rowId, start: date }).catch(() => undefined)}
             onRename={(id) => { setJustCreated(id); setEditId(id); }}
@@ -584,11 +624,12 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
        </Suspense>
       </main>
       {editId && (
-        <ItemPanel key="panel" onDuplicate={(id) => void doDuplicateItem(id)} onNewSeries={(it, n) => { if (it.recur) { setRecurInit({ title: it.title, kind: it.recur, count: n }); setRecurOpen(true); } }} nextDate={state.kind === "ready" ? (() => { const cur = state.items.find((i) => i.id === editId); if (!cur?.series) return null; const nx = nextOccurrenceIds(state.items, todayISO()); return state.items.find((i) => i.series === cur.series && nx.has(i.id))?.start ?? null; })() : null} features={settings.features} checklistProgress={settings.checklistProgress} store={store} projectId={projects.projectId!} itemId={editId} dataVersion={state.kind === "ready" ? state.items : undefined} autoSelectTitle={editId === justCreated} focusField={panelFocus} onFocusDone={() => setPanelFocus(null)}
+        <ItemPanel key="panel" fieldDefs={fieldDefs} onDuplicate={(id) => void doDuplicateItem(id)} onNewSeries={(it, n) => { if (it.recur) { setRecurInit({ title: it.title, kind: it.recur, count: n }); setRecurOpen(true); } }} nextDate={state.kind === "ready" ? (() => { const cur = state.items.find((i) => i.id === editId); if (!cur?.series) return null; const nx = nextOccurrenceIds(state.items, todayISO()); return state.items.find((i) => i.series === cur.series && nx.has(i.id))?.start ?? null; })() : null} features={settings.features} checklistProgress={settings.checklistProgress} store={store} projectId={projects.projectId!} itemId={editId} dataVersion={state.kind === "ready" ? state.items : undefined} autoSelectTitle={editId === justCreated} focusField={panelFocus} onFocusDone={() => setPanelFocus(null)}
           onClose={() => setEditId(null)} onChanged={() => void refresh()} onOpen={setEditId} />
       )}
       </div>
-      {settingsOpen && <SettingsDialog settings={settings} onChange={setSettings} onClose={() => setSettingsOpen(false)} />}
+      {fieldsOpen && project && <FieldsDialog fields={fieldDefs} onSave={(f) => projects.setFields(project.id, f)} onRemove={async (id) => { await removeFieldDef(store, project, id); await projects.reload(project.id); await refresh(); }} onClose={() => setFieldsOpen(false)} />}
+      {settingsOpen && <SettingsDialog fieldDefs={fieldDefs} settings={settings} onChange={setSettings} onClose={() => setSettingsOpen(false)} />}
       {recurOpen && <RecurringDialog key={recurInit ? "from" : "new"} today={todayISO()} initial={recurInit ?? undefined} onCreate={(a) => void addSeries(a)} onClose={() => setRecurOpen(false)} />}
       {menu && <ContextMenu x={menu.x} y={menu.y} items={menuItems} confirm={confirmRemove} onPick={(id) => void pickMenu(id)} onClose={() => setMenu(null)} />}
     </div>

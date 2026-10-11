@@ -1,17 +1,17 @@
 import { useEffect, useRef, useState } from "react";
-import type { Priority, Status, User } from "../data/types";
+import type { FieldDef, Priority, Status, User } from "../data/types";
 import { sv } from "../i18n/sv";
 
-export interface AttrFilter { statuses: Status[]; priorities: Priority[]; assignees: string[]; labels: string[] }
-export const noAttrFilter: AttrFilter = { statuses: [], priorities: [], assignees: [], labels: [] };
-export const attrCount = (f: AttrFilter) => f.statuses.length + f.priorities.length + f.assignees.length + f.labels.length;
+export interface AttrFilter { statuses: Status[]; priorities: Priority[]; assignees: string[]; labels: string[]; fields: Record<string, string[]> }
+export const noAttrFilter: AttrFilter = { statuses: [], priorities: [], assignees: [], labels: [], fields: {} };
+export const attrCount = (f: AttrFilter) => f.statuses.length + f.priorities.length + f.assignees.length + f.labels.length + Object.values(f.fields).reduce((n, v) => n + v.length, 0);
 
 const STATUSES: Status[] = ["not_started", "in_progress", "done", "blocked"];
 const PRIORITIES: Priority[] = ["urgent", "high", "normal", "low"];
 const toggle = <T,>(list: T[], v: T): T[] => (list.includes(v) ? list.filter((x) => x !== v) : [...list, v]);
 
 /** Filter på status, prioritet och ansvarig. Flera val inom en egenskap betyder "någon av", och egenskaperna kombineras med "och". Stängs av Esc eller klick utanför. */
-export function FilterPicker({ filter, users, labels = [], onChange }: { filter: AttrFilter; users: User[]; labels?: string[]; onChange: (f: AttrFilter) => void }) {
+export function FilterPicker({ filter, users, labels = [], fieldDefs = [], onChange }: { filter: AttrFilter; users: User[]; labels?: string[]; fieldDefs?: FieldDef[]; onChange: (f: AttrFilter) => void }) {
   const [open, setOpen] = useState(false);
   const root = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -37,6 +37,9 @@ export function FilterPicker({ filter, users, labels = [], onChange }: { filter:
           </fieldset>
           <fieldset><legend>{sv.panel.priority}</legend>{PRIORITIES.map((p) => box(p, sv.panel.priorities[p], filter.priorities.includes(p), () => onChange({ ...filter, priorities: toggle(filter.priorities, p) })))}</fieldset>
           {labels.length > 0 && <fieldset><legend>{sv.extras.labels}</legend>{labels.map((l) => box(`l-${l}`, l, filter.labels.includes(l), () => onChange({ ...filter, labels: toggle(filter.labels, l) })))}</fieldset>}
+          {fieldDefs.filter((d) => d.type === "select").map((d) => (
+            <fieldset key={d.id}><legend>{d.name}</legend>{(d.options ?? []).map((o) => box(`f-${d.id}-${o}`, o, (filter.fields[d.id] ?? []).includes(o), () => onChange({ ...filter, fields: { ...filter.fields, [d.id]: toggle(filter.fields[d.id] ?? [], o) } })))}</fieldset>
+          ))}
           <button type="button" className="mini" disabled={n === 0} onClick={() => onChange(noAttrFilter)}>{sv.filter.clear}</button>
         </div>
       )}
