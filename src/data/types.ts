@@ -37,6 +37,14 @@ export interface Item {
   color?: GroupColor | "none" | null;
   /** Plats i kolumnen i boardvyn (lägre först). Saknas: efter de med plats, i listans ordning. */
   board_rank?: number | null;
+  /** Etiketter (fri text, samma namn får samma färg). */
+  labels?: string[];
+  /** Checklista: delmoment som kan bockas av. */
+  checklist?: ChecklistEntry[];
+  /** Länkar (http, https eller mailto). */
+  links?: LinkEntry[];
+  /** Uppdateringslogg: dagbok för posten, äldst först. */
+  log?: LogEntry[];
   /** Datumen är platshållare från en import (posten saknade datum). Tas bort när datumen ändras eller användaren väljer att behålla dem. */
   undated?: boolean;
   /** Gemensamt id för posterna i en återkommande serie (en milstolpe som upprepas). Varje tillfälle är en egen post som kan göras klar för sig. */
@@ -64,3 +72,10 @@ export interface Fixture {
 
 export const RECURRENCES = ["weekly", "biweekly", "monthly", "quarterly"] as const;
 export type Recurrence = (typeof RECURRENCES)[number];
+
+export interface ChecklistEntry { id: string; text: string; done: boolean }
+export interface LinkEntry { title: string; url: string }
+export interface LogEntry { at: string; text: string }
+
+/** Gränser, så att en post aldrig blir ohanterligt stor och en importerad fil inte kan fylla lagringen. */
+export const LIMITS = { labels: 20, labelLength: 40, checklist: 100, checklistText: 200, links: 20, linkTitle: 100, linkUrl: 2000, log: 200, logText: 2000 } as const;

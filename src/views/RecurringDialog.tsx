@@ -6,15 +6,17 @@ import { sv } from "../i18n/sv";
 import { DatePicker } from "./DatePicker";
 
 /** Dialog för en återkommande milstolpe: titel, första datum, hur ofta och hur många gånger. Visar hur många och sista datum innan den skapas. */
-export function RecurringDialog({ today, onCreate, onClose }: {
+export function RecurringDialog({ today, initial, onCreate, onClose }: {
   today: string;
+  /** Förifyllt (när en ny serie skapas utifrån en befintlig). */
+  initial?: { title: string; kind: Recurrence; count: number };
   onCreate: (a: { title: string; first: string; kind: Recurrence; count: number }) => void;
   onClose: () => void;
 }) {
-  const [title, setTitle] = useState(sv.recur.defaultTitle);
+  const [title, setTitle] = useState(initial?.title ?? sv.recur.defaultTitle);
   const [first, setFirst] = useState(today);
-  const [kind, setKind] = useState<Recurrence>("monthly");
-  const [count, setCount] = useState("12");
+  const [kind, setKind] = useState<Recurrence>(initial?.kind ?? "monthly");
+  const [count, setCount] = useState(String(initial?.count ?? 12));
   const [err, setErr] = useState<string | null>(null);
   const root = useRef<HTMLDivElement>(null);
   const n = Math.max(1, Math.min(MAX_SERIES, Math.floor(Number(count)) || 1));

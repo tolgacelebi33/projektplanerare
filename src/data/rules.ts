@@ -1,5 +1,5 @@
 import { isISODate, dayNumber, addDays, diffDays } from "./dates";
-import { GROUP_COLORS, RECURRENCES, type Dependency, type Item, type Status } from "./types";
+import { GROUP_COLORS, LIMITS, RECURRENCES, type Dependency, type Item, type Status } from "./types";
 
 export class RuleError extends Error {
   constructor(public code: string, message: string, public data?: Record<string, string>) {
@@ -32,6 +32,7 @@ export function validateItemShape(item: Item): void {
     throw new RuleError("bad_progress", `Framsteg måste vara ett heltal 0-100: ${item.progress}`);
   if (item.color !== undefined && item.color !== null && item.color !== "none" && !GROUP_COLORS.includes(item.color)) throw new RuleError("bad_color", `Ogiltig färg: ${String(item.color)}`);
   if (item.board_rank !== undefined && item.board_rank !== null && !Number.isFinite(item.board_rank)) throw new RuleError("bad_rank", `Ogiltig plats i boarden: ${String(item.board_rank)}`);
+  validateExtras(item);
   if (item.undated !== undefined && typeof item.undated !== "boolean") throw new RuleError("bad_undated", "Ogiltigt värde för ej schemalagd");
   if (item.recur !== undefined && item.recur !== null && !RECURRENCES.includes(item.recur)) throw new RuleError("bad_recur", `Ogiltig upprepning: ${String(item.recur)}`);
   if (item.series !== undefined && item.series !== null && (typeof item.series !== "string" || !item.series)) throw new RuleError("bad_series", "Ogiltigt serie-id");
@@ -149,4 +150,44 @@ export function shiftSuccessors(items: Map<string, Item>, deps: Dependency[], fr
     }
   }
   return [...moved];
+}
+
+/** Länkar får bara vara http, https eller mailto (aldrig javascript: och liknande, som kunde köras när någon klickar). */
+export function isSafeUrl(url: string): boolean {
+  if (typeof url !== "string" || !url || url.length > LIMITS.linkUrl) return false;
+  try { return ["http:", "https:", "mailto:"].includes(new URL(url).protocol); } catch { return false; }
+}
+
+/** Etiketter, checklista, länkar och logg: form och gränser. */
+function validateExtras(item: Item): void {
+  const bad = (code: string, msg: string) => { throw new RuleError(code, msg); };
+  if (item.labels !== undefined) {
+    if (!Array.isArray(item.labels) || item.labels.length > LIMITS.labels) bad("bad_labels", `Högst ${LIMITS.labels} etiketter`);
+    const seen = new Set<string>();
+    for (const l of item.labels) {
+      if (typeof l !== "string" || !l.trim() || l !== l.trim() || l.length > LIMITS.labelLength) bad("bad_labels", `Ogiltig etikett (högst ${LIMITS.labelLength} tecken, inte tom)`);
+      if (seen.has(l.toLowerCase())) bad("bad_labels", `Etiketten "${l}" finns redan`);
+      seen.add(l.toLowerCase());
+    }
+  }
+  if (item.checklist !== undefined) {
+    if (!Array.isArray(item.checklist) || item.checklist.length > LIMITS.checklist) bad("bad_checklist", `Högst ${LIMITS.checklist} punkter i checklistan`);
+    const ids = new Set<string>();
+    for (const c of item.checklist) {
+      if (!c || typeof c.id !== "string" || !c.id || typeof c.text !== "string" || !c.text.trim() || c.text.length > LIMITS.checklistText || typeof c.done !== "boolean") bad("bad_checklist", `Ogiltig punkt i checklistan (text högst ${LIMITS.checklistText} tecken, inte tom)`);
+      if (ids.has(c.id)) bad("bad_checklist", "Två punkter i checklistan har samma id");
+      ids.add(c.id);
+    }
+  }
+  if (item.links !== undefined) {
+    if (!Array.isArray(item.links) || item.links.length > LIMITS.links) bad("bad_links", `Högst ${LIMITS.links} länkar`);
+    for (const l of item.links) {
+      if (!l || typeof l.title !== "string" || l.title.length > LIMITS.linkTitle) bad("bad_links", `Länktiteln är längre än ${LIMITS.linkTitle} tecken`);
+      if (!isSafeUrl(l.url)) bad("bad_link_url", "Länken måste börja med http://, https:// eller mailto:");
+    }
+  }
+  if (item.log !== undefined) {
+    if (!Array.isArray(item.log) || item.log.length > LIMITS.log) bad("bad_log", `Högst ${LIMITS.log} rader i loggen`);
+    for (const e of item.log) if (!e || typeof e.at !== "string" || Number.isNaN(Date.parse(e.at)) || typeof e.text !== "string" || !e.text.trim() || e.text.length > LIMITS.logText) bad("bad_log", `Ogiltig rad i loggen (text högst ${LIMITS.logText} tecken, inte tom)`);
+  }
 }

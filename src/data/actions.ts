@@ -87,8 +87,10 @@ export interface ViewFilter {
   statuses?: Status[]; priorities?: Priority[]; assignees?: string[];
   /** Snabbfilter. `today` behövs för Försenade och Denna vecka (ISO-datum). */
   overdue?: boolean; thisWeek?: boolean; noAssignee?: boolean; undated?: boolean; today?: string;
+  /** Etiketter: en post visas om den har någon av de valda. */
+  labels?: string[];
 }
-const quickOn = (f: ViewFilter) => !!(f.overdue || f.thisWeek || f.noAssignee || f.undated);
+const quickOn = (f: ViewFilter) => !!(f.overdue || f.thisWeek || f.noAssignee || f.undated || f.labels?.length);
 export const filterActive = (f: ViewFilter): boolean =>
   f.query.trim() !== "" || f.hideDone || !!f.statuses?.length || !!f.priorities?.length || !!f.assignees?.length || quickOn(f);
 
@@ -118,6 +120,7 @@ export function filterView(items: Item[], deps: Dependency[], f: ViewFilter): { 
       if (f.thisWeek && (!week || i.end < week.start || i.start > week.end)) continue;
       if (f.noAssignee && i.assignee_id !== null) continue;
       if (f.undated && !i.undated) continue;
+      if (f.labels?.length && !(i.labels ?? []).some((l) => f.labels!.some((x) => x.toLowerCase() === l.toLowerCase()))) continue;
     }
     for (let cur: Item | undefined = i; cur && !show.has(cur.id); cur = cur.parent_id ? byId.get(cur.parent_id) : undefined) show.add(cur.id);
   }
@@ -327,3 +330,55 @@ export async function changeRecurrence(store: DataStore, items: Item[], member: 
 
 /** Kör `fn` som ett enda ångra-steg om lagret stöder det. */
 export const inOneStep = <T,>(store: DataStore, fn: () => Promise<T>): Promise<T> => (store.batch ? store.batch(fn) : fn());
+
+/** Döljer tillfällen i en återkommande serie vars slutdatum passerat (de finns kvar i lagret). Beroenden följer med de som visas. */
+export function hidePastSeries(view: { items: Item[]; deps: Dependency[] }, today: string): { items: Item[]; deps: Dependency[] } {
+  const hide = new Set(view.items.filter((i) => i.series && i.end < today).map((i) => i.id));
+  if (!hide.size) return view;
+  return { items: view.items.filter((i) => !hide.has(i.id)), deps: view.deps.filter((d) => !hide.has(d.from_item_id) && !hide.has(d.to_item_id)) };
+}
+
+/** Id för nästa tillfälle i varje serie: det första (efter datum) som inte är klart och inte passerat. */
+export function nextOccurrenceIds(items: Item[], today: string): Set<string> {
+  const best = new Map<string, Item>();
+  for (const i of items) {
+    if (!i.series || i.status === "done" || i.end < today) continue;
+    const cur = best.get(i.series);
+    if (!cur || i.start < cur.start) best.set(i.series, i);
+  }
+  return new Set([...best.values()].map((i) => i.id));
+}
+
+/**
+ * Duplicerar en post. En grupp tas med hela sitt innehåll. Kopian läggs direkt efter originalet, får "(kopia)" i titeln och börjar som ej påbörjad
+ * (framsteg 0, checklistan avbockad, ingen logg, ingen serie), men behåller datum, ansvarig, etiketter, länkar och färg. Beroenden kopieras inte.
+ * Returnerar de nya posternas id (kopian av den valda posten först).
+ */
+export async function duplicateItem(store: DataStore, items: Item[], id: string, suffix: string): Promise<string[]> {
+  const root = items.find((i) => i.id === id);
+  if (!root) return [];
+  const subtree = [root, ...descendants(items, id)];
+  const order = new Map(treeOrderIds(items).map((x, i) => [x, i] as const));
+  subtree.sort((a, b) => (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0));
+  const map = new Map<string, string>();
+  const top = items.reduce((m, i) => Math.max(m, i.sort_order), 0);
+  for (const it of subtree) {
+    const { id: _id, board_rank: _r, series: _s, recur: _re, log: _l, ...rest } = it; void _id; void _r; void _s; void _re; void _l;
+    const copy: Omit<Item, "id"> = {
+      ...rest, parent_id: it.id === id ? it.parent_id : map.get(it.parent_id!) ?? null,
+      title: it.id === id ? `${it.title} ${suffix}`.slice(0, 200) : it.title,
+      status: "not_started", progress: 0, sort_order: it.id === id ? top + 1 : it.sort_order,
+      ...(it.checklist ? { checklist: it.checklist.map((c) => ({ ...c, id: `c_${Math.random().toString(36).slice(2, 10)}${c.id.slice(-3)}`, done: false })) } : {}),
+    };
+    if (it.type === "epic") { delete (copy as { undated?: boolean }).undated; }
+    const made = await store.createItem(copy);
+    map.set(it.id, made.id);
+  }
+  const rootCopy = map.get(id)!;
+  const after = await store.listItems(root.project_id);
+  const sibs = after.filter((i) => i.parent_id === root.parent_id).sort((a, b) => a.sort_order - b.sort_order).map((i) => i.id).filter((x) => x !== rootCopy);
+  const at = sibs.indexOf(id);
+  const visible = [...sibs.slice(0, at + 1), rootCopy, ...sibs.slice(at + 1)];
+  for (const u of planMove(after, rootCopy, root.parent_id, visible)) await store.updateItem(u.id, u.patch);
+  return subtree.map((i) => map.get(i.id)!);
+}

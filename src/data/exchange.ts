@@ -1,5 +1,7 @@
 import { addDays, isISODate, recurringDates, todayISO } from "./dates";
 import { RuleError, validateItemShape } from "./rules";
+import { newChecklistId, normalizeLink } from "./extras";
+import { LIMITS } from "./types";
 import { sv } from "../i18n/sv";
 import { enDict, svDict } from "../i18n/sv";
 import { friendlyError } from "../i18n/errors";
@@ -103,6 +105,10 @@ export function parseJson(text: string): ParsedProject {
       ...(x.color !== undefined ? { color: x.color as ParsedItem["color"] } : {}),
       ...(typeof x.board_rank === "number" ? { board_rank: x.board_rank } : {}),
       ...(x.undated === true ? { undated: true } : {}),
+      ...(Array.isArray(x.labels) ? { labels: x.labels as string[] } : {}),
+      ...(Array.isArray(x.checklist) ? { checklist: x.checklist as Item["checklist"] } : {}),
+      ...(Array.isArray(x.links) ? { links: x.links as Item["links"] } : {}),
+      ...(Array.isArray(x.log) ? { log: x.log as Item["log"] } : {}),
       ...(typeof x.series === "string" && x.series ? { series: x.series } : {}),
       ...(typeof x.recur === "string" ? { recur: x.recur as ParsedItem["recur"] } : {}),
     };
@@ -198,6 +204,9 @@ const ALIASES: Record<string, string[]> = {
   completed: ["completeddate", "klardatum", "doneat", "closedat", "resolved", "completedat"],
   target: ["targetperiod", "målperiod", "period"],
   // Följande har ingen egen plats i modellen och läggs som rader i beskrivningen
+  labels: ["etiketter", "etikett", "labels", "label", "taggar", "tagg", "tags", "tag"],
+  links: ["länk", "länkar", "link", "links", "url", "webbadress", "urls"],
+  checklist: ["checklista", "checklist", "delmoment", "deluppgifter", "subtasks", "todo"],
   recur: ["återkommer", "aterkommer", "upprepning", "upprepas", "recurrence", "repeat", "repeats", "frekvens", "intervall", "återkommande"],
   repeatcount: ["antaltillfällen", "tillfällen", "occurrences", "repeatcount", "antalupprepningar", "antalgånger"],
   category: ["kategori", "category", "grupp", "group", "avdelning"],
@@ -299,7 +308,7 @@ export function parseRows(rows: string[][], name: string, today: string = todayI
   const unknown = new Map<string, number>(); // "typ|värde" -> antal
   const note = (kind: string, value: string) => unknown.set(`${kind}|${value}`, (unknown.get(`${kind}|${value}`) ?? 0) + 1);
   const undatedIds: string[] = [];
-  let shortened = 0, dayFirst = 0;
+  let shortened = 0, dayFirst = 0, linksSkipped = 0;
   const parentRef: (string | null)[] = []; const predRef: string[][] = []; const catRef: string[] = [];
   const recurRef: ({ kind: Recurrence; count: number } | null)[] = []; let recurIgnored = 0;
   // Kolumner som inte känns igen sparas i beskrivningen i stället för att försvinna
@@ -359,11 +368,23 @@ export function parseRows(rows: string[][], name: string, today: string = todayI
     if (meta.length) description = [description.trimEnd(), meta.join("\n")].filter(Boolean).join("\n\n");
     description = description.slice(0, MAX_DESC_LEN);
 
+    // Etiketter, länkar och checklista från egna kolumner
+    const seenLabel = new Set<string>(); const labels: string[] = [];
+    for (const x of get(r, "labels").split(/[,;|\n]/)) { const l = x.trim().replace(/\s+/g, " ").slice(0, LIMITS.labelLength); if (l && !seenLabel.has(l.toLowerCase()) && labels.length < LIMITS.labels) { seenLabel.add(l.toLowerCase()); labels.push(l); } }
+    const links = [] as NonNullable<Item["links"]>;
+    for (const x of get(r, "links").split(/[\s|]+/).filter(Boolean)) { const l = normalizeLink(x, ""); if (l && links.length < LIMITS.links) links.push(l); else linksSkipped++; }
+    const checklist = [] as NonNullable<Item["checklist"]>;
+    for (const line of getRaw(r, "checklist").split(/\n|\|/)) {
+      const m = /^\s*(?:\[(x|X| )\]|(x|X|✓))?\s*(.*)$/.exec(line);
+      const text = (m?.[3] ?? "").trim().slice(0, LIMITS.checklistText);
+      if (text && checklist.length < LIMITS.checklist) checklist.push({ id: newChecklistId(), text, done: !!(m?.[1] === "x" || m?.[1] === "X" || m?.[2]) });
+    }
     parentRef.push(get(r, "parent") || null); catRef.push(get(r, "category"));
     predRef.push(get(r, "preds").split(/[,|;\n]/).map((x) => x.trim()).filter(Boolean));
     const it: ParsedItem = {
       id: get(r, "id") || `rad${line}`, parent_id: null, type, title, start, end, status,
       assignee: get(r, "assignee") || null, description, priority, progress, sort_order: idx + 1,
+      ...(labels.length ? { labels } : {}), ...(links.length ? { links } : {}), ...(checklist.length ? { checklist } : {}),
     };
     try { validateItemShape({ ...it, workspace_id: "", project_id: "", assignee_id: null }); }
     catch (e) { throw err(friendlyError(e)); }
@@ -402,6 +423,7 @@ export function parseRows(rows: string[][], name: string, today: string = todayI
     items.forEach((it, i) => { it.sort_order = i + 1; }); // tillfällena ligger direkt efter sin rad, i datumordning
     warnings.push(sv.ex.recurMade(series, total));
   }
+  if (linksSkipped) warnings.push(sv.ex.linksSkipped(linksSkipped));
   if (recurIgnored) warnings.push(sv.ex.recurIgnored(recurIgnored));
   // Kategori (eller Grupp) blir grupper: varje kategori en grupp, och raderna läggs i sin grupp om de inte redan har en förälder
   if (col.category >= 0) {

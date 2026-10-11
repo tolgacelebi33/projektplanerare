@@ -2,8 +2,9 @@ import { Suspense, lazy, useEffect, useMemo, useRef, useState } from "react";
 import { downloadText } from "./download";
 import { MAX_IMPORT_BYTES, ImportError, parseUpload } from "./data/exchange";
 import { duplicateProject, exportProject, importParsed, type ExportFormat, type ImportResult } from "./data/importExport";
-import { bulkDelete, bulkMove, bulkStatus, canMove, createSeries, inOneStep, deleteSubtree, descendants, epicChoices, filterActive, filterView, moveTargets, newItemDraft, planMove, rangeIds, selectionRoots, swapWithSibling, type BulkResult } from "./data/actions";
+import { bulkDelete, bulkMove, bulkStatus, canMove, createSeries, inOneStep, deleteSubtree, descendants, epicChoices, filterActive, filterView, hidePastSeries, duplicateItem, nextOccurrenceIds, moveTargets, newItemDraft, planMove, rangeIds, selectionRoots, swapWithSibling, type BulkResult } from "./data/actions";
 import { BulkBar } from "./views/BulkBar";
+import { allLabels } from "./data/extras";
 import { boardColumns, planColumnDrop, planColumnMoves } from "./data/boardColumns";
 import { RecurringDialog } from "./views/RecurringDialog";
 import { SettingsDialog } from "./views/SettingsDialog";
@@ -68,11 +69,17 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
   const [collapse, setCollapse] = useState({ n: 0, open: true });
   const [quick, setQuick] = useState({ overdue: false, thisWeek: false, noAssignee: false, undated: false });
   const shown = useMemo(
-    () => (state.kind === "ready" ? filterView(state.items, state.deps, { query, hideDone, ...attrFilter, ...quick, today: todayISO() }) : { items: [], deps: [] }),
-    [state, query, hideDone, attrFilter, quick],
+    () => {
+      if (state.kind !== "ready") return { items: [], deps: [] };
+      const v = filterView(state.items, state.deps, { query, hideDone, ...attrFilter, ...quick, today: todayISO() });
+      return settings.hidePastSeries ? hidePastSeries(v, todayISO()) : v;
+    },
+    [state, query, hideDone, attrFilter, quick, settings.hidePastSeries],
   );
   const viewFilter = { query, hideDone, ...attrFilter, ...quick, today: todayISO() };
   const filtering = filterActive(viewFilter);
+  const labelList = useMemo(() => (state.kind === "ready" ? allLabels(state.items) : []), [state]);
+  const nextIds = useMemo(() => (state.kind === "ready" ? nextOccurrenceIds(state.items, todayISO()) : new Set<string>()), [state]);
   const colors = useMemo(() => (state.kind === "ready" ? effectiveColors(state.items) : new Map<string, never>()), [state]);
   const [view, setView] = useState<"gantt" | "wheel" | "board">(uiCarry.view ?? (new URLSearchParams(window.location.search).get("view") ? VIEW0 : settings.startView));
   const [year, setYear] = useState<number | null>(uiCarry.year ?? null);
@@ -196,6 +203,7 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
     } catch (e) { setWriteError(friendlyError(e)); throw e; }
   };
   const [recurOpen, setRecurOpen] = useState(false);
+  const [recurInit, setRecurInit] = useState<{ title: string; kind: import("./data/types").Recurrence; count: number } | null>(null);
   const [toolsOpen, setToolsOpen] = useState(false); // smalt fönster: verktygsfälten är hopfällda tills man öppnar dem
   /** Skapar en återkommande milstolpe (en serie) i den aktiva gruppen, som övriga nya poster. */
   const addSeries = async (a: { title: string; first: ISODate; kind: import("./data/types").Recurrence; count: number }) => {
@@ -210,6 +218,16 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
       if (made[0]) setReveal(made[0].id);
       setWriteError(sv.recur.done(made.length));
     } catch (e) { setWriteError(friendlyError(e)); reload(); }
+  };
+  /** Duplicerar en post (en grupp med hela sitt innehåll), och öppnar kopian med titeln markerad. */
+  const doDuplicateItem = async (id: string) => {
+    if (!projects.projectId || state.kind !== "ready") return;
+    try {
+      const ids = await inOneStep(store, () => duplicateItem(store, state.items, id, sv.extras.copySuffix));
+      await refresh();
+      if (ids[0]) { setReveal(ids[0]); setJustCreated(ids[0]); setEditId(ids[0]); }
+      setWriteError(sv.extras.duplicated(ids.length));
+    } catch (e) { setWriteError(friendlyError(e)); }
   };
   /** Klar eller inte klar direkt i raden: klar blir ej påbörjad igen, allt annat blir klar. */
   const toggleDone = async (id: string) => {
@@ -380,6 +398,7 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
       ...(isEpic ? [] : [{ id: "pred", label: sv.menu.addPred }, { id: "succ", label: sv.menu.addSucc }]),
       { id: "up", label: sv.menu.moveUp, disabled: !canMove(state.items, menuItem.id, "up") },
       { id: "down", label: sv.menu.moveDown, disabled: !canMove(state.items, menuItem.id, "down") },
+      { id: "duplicate", label: sv.extras.duplicate },
       { id: "remove", label: sv.menu.remove, danger: true },
     ];
   })();
@@ -399,6 +418,7 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
     try {
       if (choice === "open" && target) setEditId(target.id);
       else if ((choice === "move-to" || choice === "pred" || choice === "succ") && target) { setPanelFocus(choice === "move-to" ? "placement" : choice); setEditId(target.id); }
+      else if (choice === "duplicate" && target) await doDuplicateItem(target.id);
       else if (choice === "task" || choice === "milestone") await addItem(choice, { anchorId: target?.id ?? null, start: m.date });
       else if (choice === "epic-in") await addItem("epic", { anchorId: target?.id ?? null, start: m.date });
       else if (choice === "epic") await addItem("epic", { anchorId: null, start: m.date });
@@ -492,7 +512,7 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
           {(["task", "milestone", "epic"] as ItemType[]).map((k) => (
             <button key={k} type="button" className="mini" disabled={!projects.projectId || state.kind !== "ready"} onClick={() => void addItem(k, k === "epic" ? { anchorId: null } : {}).catch(() => undefined)}>+ {sv.add[k]}</button>
           ))}
-          <button type="button" className="mini btn-series" disabled={!projects.projectId || state.kind !== "ready"} aria-label={sv.recur.button} title={sv.recur.button} onClick={() => setRecurOpen(true)}>{sv.recur.buttonShort}</button>
+          <button type="button" className="mini btn-series" disabled={!projects.projectId || state.kind !== "ready"} aria-label={sv.recur.button} title={sv.recur.button} onClick={() => { setRecurInit(null); setRecurOpen(true); }}>{sv.recur.buttonShort}</button>
         </div>
         <span className="toolbar-sep" aria-hidden="true" />
         <div className="add-group" role="group" aria-label={sv.history.label}>
@@ -504,7 +524,7 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
           <input type="search" className="search" aria-label={sv.filter.search} placeholder={sv.filter.placeholder} value={query}
             onChange={(e) => setQuery(e.target.value)} onKeyDown={(e) => { if (e.key === "Escape") setQuery(""); }} />
           <button type="button" className="mini" aria-pressed={hideDone} onClick={() => setHideDone((v) => !v)}>{sv.filter.hideDone}</button>
-          <FilterPicker filter={attrFilter} users={users} onChange={setAttrFilter} />
+          <FilterPicker filter={attrFilter} users={users} labels={labelList} onChange={setAttrFilter} />
           {settings.quickFilters && (
             <div className="quick-filters" role="group" aria-label={sv.qf.label}>
               {(["overdue", "thisWeek", "noAssignee", "undated"] as const).map((k) => (
@@ -544,7 +564,7 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
         {projects.projects && projects.projects.length === 0 && (
           <div className="empty-state"><p>{sv.project.none}</p><button type="button" className="btn btn-primary" onClick={() => void projects.create(sv.project.defaultName)}>{sv.project.createFirst}</button></div>
         )}
-        {state.kind === "ready" && projects.projectId && view === "board" && <BoardView groupBy={settings.boardGroup} cardFields={settings.cardFields} highlightOverdue={settings.highlightOverdue} markUndated={settings.markUndated} items={shown.items} allItems={state.items} users={users} colors={colors} openId={editId} selected={selected} onOpen={setEditId} onSelect={selectRow} onBackground={dropSelection} onDrop={(m, k, b) => void dropCards(m, k, b)} onMoveTo={moveCardTo} onContext={openMenu} />}
+        {state.kind === "ready" && projects.projectId && view === "board" && <BoardView nextIds={nextIds} groupBy={settings.boardGroup} cardFields={settings.cardFields} highlightOverdue={settings.highlightOverdue} markUndated={settings.markUndated} items={shown.items} allItems={state.items} users={users} colors={colors} openId={editId} selected={selected} onOpen={setEditId} onSelect={selectRow} onBackground={dropSelection} onDrop={(m, k, b) => void dropCards(m, k, b)} onMoveTo={moveCardTo} onContext={openMenu} />}
         {state.kind === "ready" && projects.projectId && view === "wheel" && <YearWheel items={shown.items} year={effectiveYear} colors={colors} selectedId={editId} onOpen={setEditId} onContext={openMenu} />}
         {state.kind === "ready" && projects.projectId && view === "gantt" && (
           <div className="gantt-wrap">
@@ -564,12 +584,12 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
        </Suspense>
       </main>
       {editId && (
-        <ItemPanel key="panel" store={store} projectId={projects.projectId!} itemId={editId} dataVersion={state.kind === "ready" ? state.items : undefined} autoSelectTitle={editId === justCreated} focusField={panelFocus} onFocusDone={() => setPanelFocus(null)}
+        <ItemPanel key="panel" onDuplicate={(id) => void doDuplicateItem(id)} onNewSeries={(it, n) => { if (it.recur) { setRecurInit({ title: it.title, kind: it.recur, count: n }); setRecurOpen(true); } }} nextDate={state.kind === "ready" ? (() => { const cur = state.items.find((i) => i.id === editId); if (!cur?.series) return null; const nx = nextOccurrenceIds(state.items, todayISO()); return state.items.find((i) => i.series === cur.series && nx.has(i.id))?.start ?? null; })() : null} features={settings.features} checklistProgress={settings.checklistProgress} store={store} projectId={projects.projectId!} itemId={editId} dataVersion={state.kind === "ready" ? state.items : undefined} autoSelectTitle={editId === justCreated} focusField={panelFocus} onFocusDone={() => setPanelFocus(null)}
           onClose={() => setEditId(null)} onChanged={() => void refresh()} onOpen={setEditId} />
       )}
       </div>
       {settingsOpen && <SettingsDialog settings={settings} onChange={setSettings} onClose={() => setSettingsOpen(false)} />}
-      {recurOpen && <RecurringDialog today={todayISO()} onCreate={(a) => void addSeries(a)} onClose={() => setRecurOpen(false)} />}
+      {recurOpen && <RecurringDialog key={recurInit ? "from" : "new"} today={todayISO()} initial={recurInit ?? undefined} onCreate={(a) => void addSeries(a)} onClose={() => setRecurOpen(false)} />}
       {menu && <ContextMenu x={menu.x} y={menu.y} items={menuItems} confirm={confirmRemove} onPick={(id) => void pickMenu(id)} onClose={() => setMenu(null)} />}
     </div>
   );

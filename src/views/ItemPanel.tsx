@@ -10,6 +10,9 @@ import { friendlyError } from "../i18n/errors";
 import { sv } from "../i18n/sv";
 import { STATUS_GLYPH } from "../proto/statusUi";
 import { DatePicker } from "./DatePicker";
+import { PanelExtras } from "./PanelExtras";
+import { checklistPercent } from "../data/extras";
+import { DEFAULT_FEATURES, type Features } from "../settings";
 
 const STATUSES: Status[] = ["not_started", "in_progress", "done", "blocked"];
 const PRIORITIES: Priority[] = ["low", "normal", "high", "urgent"];
@@ -21,7 +24,11 @@ type SaveState = { kind: "idle" } | { kind: "saving" } | { kind: "saved" } | { k
  * Detaljpanel för en post, fast bredd, dockad till höger. Ändringar sparas per fält direkt (inget spara-steg), så att man
  * kan hoppa mellan poster utan att tappa något. Läser alltid färska data från DataStore (drag i vyerna sparas direkt i storen).
  */
-export function ItemPanel({ store, projectId, itemId, dataVersion, autoSelectTitle = false, focusField = null, onFocusDone, onClose, onChanged, onOpen }: {
+export function ItemPanel({ onDuplicate, onNewSeries, nextDate, features = DEFAULT_FEATURES, checklistProgress = false, store, projectId, itemId, dataVersion, autoSelectTitle = false, focusField = null, onFocusDone, onClose, onChanged, onOpen }: {
+  features?: Features; checklistProgress?: boolean;
+  onDuplicate?: (id: string) => void; onNewSeries?: (item: Item, count: number) => void;
+  /** Datum för nästa tillfälle i postens serie (om den ingår i en). */
+  nextDate?: string | null;
   store: DataStore; projectId: string; itemId: string; autoSelectTitle?: boolean;
   /** Flytta fokus till ett val när posten laddats (från högerklicksmenyn): gruppen, föregångare eller efterföljare. */
   focusField?: "placement" | "pred" | "succ" | null; onFocusDone?: () => void;
@@ -316,6 +323,12 @@ export function ItemPanel({ store, projectId, itemId, dataVersion, autoSelectTit
             onChange={(e) => setDescription(e.target.value)} onBlur={() => void commit("description", { description })} />
         </label>
         {err("description")}
+        <PanelExtras item={item} all={all} features={features} error={err}
+          save={(patch) => depAction(Object.keys(patch)[0], async () => {
+            const p = { ...patch };
+            if (checklistProgress && p.checklist) { const pct = checklistPercent(p.checklist); if (pct !== null) p.progress = pct; } // checklistan styr framsteget
+            await store.updateItem(item.id, p);
+          })} />
 
         {epic && (
           <section className="panel-section" data-section="color">
@@ -378,7 +391,7 @@ export function ItemPanel({ store, projectId, itemId, dataVersion, autoSelectTit
           return (
             <section className="panel-section" data-section="series">
               <h3>{sv.recur.series}</h3>
-              <p className="panel-muted">{sv.recur.info(sv.recur.kinds[item.recur], mem.length)}</p>
+              <p className="panel-muted">{sv.recur.info(sv.recur.kinds[item.recur], mem.length)}{nextDate ? ` ${sv.extras.next(nextDate)}` : ""}</p>
               <label className="panel-field"><span>{sv.recur.renameAll}</span>
                 <div className="panel-row">
                   <input name="series-title" value={seriesTitle || item.title} maxLength={200} onChange={(e) => setSeriesTitle(e.target.value)} />
@@ -418,13 +431,17 @@ export function ItemPanel({ store, projectId, itemId, dataVersion, autoSelectTit
                   </div>
                 </div>
               )}
+              <div className="panel-row"><button type="button" className="mini" onClick={() => onNewSeries?.(item, mem.length)}>{sv.extras.newSeriesFrom}</button></div>
               {err("series")}
             </section>
           );
         })()}
         <section className="panel-section panel-danger" data-section="delete">
           {!confirmDelete ? (
-            <button type="button" className="mini" onClick={() => setConfirmDelete(true)}>{sv.panel.remove}</button>
+            <div className="panel-row">
+              <button type="button" className="mini" onClick={() => onDuplicate?.(item.id)}>{sv.extras.duplicate}</button>
+              <button type="button" className="mini" onClick={() => setConfirmDelete(true)}>{sv.panel.remove}</button>
+            </div>
           ) : (
             <div className="panel-confirm" role="alert">
               <p>{sv.panel.removeConfirm(item.title, subtreeCount)}</p>

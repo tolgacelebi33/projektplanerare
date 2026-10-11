@@ -41,6 +41,17 @@ export function SettingsDialog({ settings, onChange, onClose }: { settings: Sett
           <p className="panel-muted">{t.boardGroupHint}</p>
         </section>
         <section>
+          <h3>{t.featuresGroup}</h3>
+          <div className="settings-cards">
+            {(Object.keys(settings.features) as (keyof Settings["features"])[]).map((k) => (
+              <label key={k} className="settings-check"><input type="checkbox" checked={settings.features[k]} onChange={(e) => onChange({ ...settings, features: { ...settings.features, [k]: e.target.checked } })} /><span>{t.features[k]}</span></label>
+            ))}
+          </div>
+          <p className="panel-muted">{t.featuresHint}</p>
+          <label className="settings-check"><input type="checkbox" checked={settings.checklistProgress} onChange={(e) => set("checklistProgress", e.target.checked)} /><span>{t.checklistProgress}<small>{t.checklistProgressHint}</small></span></label>
+          <label className="settings-check"><input type="checkbox" checked={settings.hidePastSeries} onChange={(e) => set("hidePastSeries", e.target.checked)} /><span>{t.hidePastSeries}<small>{t.hidePastSeriesHint}</small></span></label>
+        </section>
+        <section>
           <h3>{t.startGroup}</h3>
           <div className="modal-row settings-row">
             <label className="panel-field"><span>{t.startView}</span>

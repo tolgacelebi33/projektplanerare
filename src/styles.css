@@ -504,3 +504,23 @@ body[data-overlay] .gantt_tooltip { display: none !important; }
 .quick-filters .mini[aria-pressed="true"] { background: var(--text); color: var(--surface); border-color: var(--text); }
 .settings-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 14px; }
 @media (max-width: 560px) { .settings-cards { grid-template-columns: 1fr; } }
+
+/* Etiketter, checklista, länkar och logg */
+.chips { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { display: inline-flex; align-items: center; gap: 4px; padding: 1px 4px 1px 8px; border: var(--line-width) solid var(--line); border-radius: var(--radius-pill); font-size: 12px; box-shadow: inset 4px 0 0 var(--chip, var(--line)); padding-left: 12px; }
+.chip-x { border: 0; background: transparent; color: inherit; cursor: pointer; font-size: 14px; line-height: 1; padding: 0 4px; }
+.checklist, .links, .log { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.checklist li { display: flex; align-items: center; gap: 8px; }
+.checklist input[type="checkbox"] { width: auto; flex: none; }
+.checklist .check-text { flex: 1; min-width: 0; }
+.checklist .check-text[data-done="true"] { text-decoration: line-through; opacity: 0.7; }
+.links li { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.links a { color: var(--text); text-decoration: underline; text-underline-offset: 2px; word-break: break-all; }
+.links-add { display: grid; grid-template-columns: 1fr 1fr auto; gap: 6px; }
+.log li { border-left: 2px solid var(--line); padding-left: 10px; }
+.log-head { display: flex; align-items: center; justify-content: space-between; font-size: 12px; color: var(--text-muted); }
+.log p { margin: 2px 0 0; white-space: pre-wrap; font-size: var(--fs-md); }
+.card-chips { display: flex; flex-wrap: wrap; gap: 4px; list-style: none; margin: 0; padding: 0; }
+.card-chips .chip { padding: 0 8px 0 11px; font-size: 11px; }
+.board-last { font-size: 12px; color: var(--text-muted); font-style: italic; }
+@media (max-width: 560px) { .links-add { grid-template-columns: 1fr; } }

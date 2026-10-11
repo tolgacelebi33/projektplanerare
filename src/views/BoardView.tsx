@@ -2,6 +2,7 @@ import { useRef, useState } from "react";
 import { todayISO } from "../data/dates";
 import { boardColumns, columnCards, type BoardGroup } from "../data/boardColumns";
 import { isOverdue } from "../data/rules";
+import { checklistCount, labelColor } from "../data/extras";
 import type { GroupColor, Item, User } from "../data/types";
 import type { CardFields } from "../settings";
 import { sv } from "../i18n/sv";
@@ -14,7 +15,9 @@ const firstLine = (t: string, n = 110) => { const l = t.split("\n").find((x) => 
  * värdet och ordningen, eller använd valet på kortet. Ctrl/Cmd-klick markerar flera kort och Shift-klick en följd, och ett klick på tom yta släpper både markering
  * och öppnad post. Grupper är inga kort: de syns som sökväg och som en smal färgkant på korten. Vad som visas på korten styrs av `cardFields`.
  */
-export function BoardView({ groupBy = "status", cardFields, highlightOverdue = true, markUndated = true, items, allItems, users, colors, openId, selected, onOpen, onSelect, onBackground, onDrop, onMoveTo, onContext }: {
+export function BoardView({ nextIds, groupBy = "status", cardFields, highlightOverdue = true, markUndated = true, items, allItems, users, colors, openId, selected, onOpen, onSelect, onBackground, onDrop, onMoveTo, onContext }: {
+  /** Id för nästa tillfälle i varje serie (märks med "Nästa"). */
+  nextIds?: ReadonlySet<string>;
   groupBy?: BoardGroup; cardFields: CardFields; highlightOverdue?: boolean; markUndated?: boolean;
   items: Item[]; allItems: Item[]; users: User[]; colors: ReadonlyMap<string, GroupColor | "none">;
   openId: string | null; selected: ReadonlySet<string>;
@@ -124,15 +127,23 @@ export function BoardView({ groupBy = "status", cardFields, highlightOverdue = t
                   onContextMenu={(e) => { e.preventDefault(); if (noClick.current) return; onContext({ id: i.id, x: e.clientX, y: e.clientY, date: null }); }}>
                   <div className="board-title">{i.title}</div>
                   {path(i) && <div className="board-path">{path(i)}</div>}
+                  {cardFields.labels && (i.labels?.length ?? 0) > 0 && (
+                    <ul className="card-chips" aria-label={sv.extras.labels}>
+                      {i.labels!.map((l) => <li key={l} className="chip" style={{ "--chip": `var(--grp-${labelColor(l)})` } as React.CSSProperties}>{l}</li>)}
+                    </ul>
+                  )}
                   {cardFields.description && i.description.trim() && <div className="board-desc">{firstLine(i.description)}</div>}
                   <div className="board-meta">
                     {cardFields.date && (i.undated && markUndated ? <span className="board-undated">{sv.undated.tag}</span> : <span>{i.type === "milestone" ? i.end : `${i.start} – ${i.end}`}</span>)}
-                    {cardFields.series && i.series && i.recur && <span className="board-series" title={sv.recur.series}>{"↻"} {sv.recur.kinds[i.recur]}</span>}
+                    {cardFields.series && i.series && i.recur && <span className="board-series" title={sv.recur.series}>{"↻"} {sv.recur.kinds[i.recur]}{nextIds?.has(i.id) ? ` · ${sv.extras.nextBadge}` : ""}</span>}
+                    {cardFields.checklist && (i.checklist?.length ?? 0) > 0 && <span title={sv.extras.checklist}>{((c) => sv.extras.checklistOnCard(c.done, c.total))(checklistCount(i.checklist))}</span>}
+                    {cardFields.links && (i.links?.length ?? 0) > 0 && <span>{sv.extras.linksOnCard(i.links!.length)}</span>}
                     {highlightOverdue && isOverdue(i, today) && <span className="board-over">{sv.overdue}</span>}
                     {cardFields.priority && i.priority !== "normal" && <span>{sv.panel.priorities[i.priority]}</span>}
                     {cardFields.progress && i.progress > 0 && <span>{i.progress} %</span>}
                     {cardFields.assignee && who && <span className="board-who" title={who} aria-label={who}>{initials(who)}</span>}
                   </div>
+                  {cardFields.lastUpdate && (i.log?.length ?? 0) > 0 && <div className="board-last">{firstLine(i.log![i.log!.length - 1].text, 80)}</div>}
                   <select className="board-status" aria-label={`${sv.board.groups[groupBy]} för ${i.title}`} value={mine} onChange={(e) => onMoveTo(i.id, e.target.value)}>
                     {cols.map((c) => <option key={c.key || "__none"} value={c.key}>{c.label}</option>)}
                   </select>

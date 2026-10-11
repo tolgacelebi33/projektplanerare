@@ -88,7 +88,7 @@ test.describe("högerklick", () => {
     await page.evaluate(() => { (window as any).__prevented = []; window.addEventListener("contextmenu", (e) => (window as any).__prevented.push(e.defaultPrevented)); });
     await page.locator('.gantt_row[data-task-id="i7"] .grid-title').click({ button: "right" });
     await expect(menu(page)).toBeVisible();
-    expect(await texts(page)).toEqual(["Öppna", "Ny uppgift bredvid", "Ny milstolpe bredvid", "Ny grupp överst", "Flytta till grupp...", "Lägg till föregångare...", "Lägg till efterföljare...", "Flytta upp", "Flytta ner", "Ta bort..."]);
+    expect(await texts(page)).toEqual(["Öppna", "Ny uppgift bredvid", "Ny milstolpe bredvid", "Ny grupp överst", "Flytta till grupp...", "Lägg till föregångare...", "Lägg till efterföljare...", "Flytta upp", "Flytta ner", "Duplicera", "Ta bort..."]);
     expect(await page.evaluate(() => (window as any).__prevented)).toContain(true);
     await page.keyboard.press("Escape");
     await expect(menu(page)).toHaveCount(0);
@@ -102,7 +102,7 @@ test.describe("högerklick", () => {
     await page.setViewportSize({ width: 1500, height: 1100 }); // tom yta under sista raden trots snabbtilläggsraden
     await openApp(page, "dhtmlx");
     await page.locator('.gantt_row[data-task-id="i12"] .grid-title').click({ button: "right" });
-    expect(await texts(page)).toEqual(["Öppna", "Ny uppgift i gruppen", "Ny milstolpe i gruppen", "Ny grupp i gruppen", "Ny grupp överst", "Flytta till grupp...", "Flytta upp", "Flytta ner", "Ta bort..."]);
+    expect(await texts(page)).toEqual(["Öppna", "Ny uppgift i gruppen", "Ny milstolpe i gruppen", "Ny grupp i gruppen", "Ny grupp överst", "Flytta till grupp...", "Flytta upp", "Flytta ner", "Duplicera", "Ta bort..."]);
     await page.keyboard.press("Escape");
     const last = await rowBox(page, "i20"); const chart = (await page.locator(".gantt_task").boundingBox())!;
     await page.mouse.click(chart.x + 400, last.y + last.height + 15, { button: "right" });
