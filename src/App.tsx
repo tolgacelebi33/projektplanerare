@@ -41,6 +41,7 @@ import { BaselineBar } from "./views/BaselineBar";
 import { BackupRestore } from "./views/BackupRestore";
 import { StatusDialog } from "./views/StatusDialog";
 import { StatusesDialog } from "./views/StatusesDialog";
+import { TemplatesDialog } from "./views/TemplatesDialog";
 import { defOf, statusDefs, statusPatch } from "./data/statuses";
 import { dueSummary, type DueSummary } from "./data/reminders";
 import { CommandPalette, type PaletteCommand } from "./views/CommandPalette";
@@ -81,6 +82,8 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [statusOpen, setStatusOpen] = useState(false);
   const [statusesOpen, setStatusesOpen] = useState(false);
+  const [templatesOpen, setTemplatesOpen] = useState(false);
+  const [templates, setTemplates] = useState<import("./data/types").Template[]>([]);
   const [statusUpdates, setStatusUpdates] = useState<import("./data/types").StatusUpdate[]>([]);
   const [paletteData, setPaletteData] = useState<{ project: Project; items: Item[] }[] | null>(null);
   const settingsRef = useRef(settings); settingsRef.current = settings;
@@ -192,6 +195,13 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
     return () => { on = false; un(); };
   }, [store]);
   const latestHealth = useMemo(() => { const mine = statusUpdates.filter((u) => u.project_id === projects.projectId); return mine.length ? mine[mine.length - 1].health : null; }, [statusUpdates, projects.projectId]);
+  useEffect(() => {
+    let on = true;
+    const load = () => void store.listTemplates().then((t) => { if (on) setTemplates(t); }).catch(() => undefined);
+    load();
+    const un = store.subscribe(load);
+    return () => { on = false; un(); };
+  }, [store]);
   const openInProject = (pid: string, iid: string) => {
     if (pid === projects.projectId) { setEditId(iid); setReveal(iid); return; }
     pendingOpen.current = iid; projects.select(pid);
@@ -277,14 +287,14 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
   const [recurInit, setRecurInit] = useState<{ title: string; kind: import("./data/types").Recurrence; count: number } | null>(null);
   const [toolsOpen, setToolsOpen] = useState(false); // smalt fönster: verktygsfälten är hopfällda tills man öppnar dem
   /** Skapar en återkommande milstolpe (en serie) i den aktiva gruppen, som övriga nya poster. */
-  const addSeries = async (a: { title: string; first: ISODate; kind: import("./data/types").Recurrence; count: number }) => {
+  const addSeries = async (a: { title: string; first: ISODate; kind: import("./data/types").Recurrence; count: number; type?: "milestone" | "task"; days?: number }) => {
     if (!projects.projectId || state.kind !== "ready") return;
     setRecurOpen(false);
     try {
       const anchor = editId ?? activeGroup;
       const selected = anchor ? state.items.find((i) => i.id === anchor) ?? null : null;
       const draft = newItemDraft("milestone", state.items, selected, { projectId: projects.projectId, workspaceId }, todayISO(), a.first);
-      const made = await inOneStep(store, () => createSeries(store, draft, a.kind, a.count, a.title));
+      const made = await inOneStep(store, () => createSeries(store, draft, a.kind, a.count, a.title, { type: a.type, days: a.days }));
       await refresh();
       if (made[0]) setReveal(made[0].id);
       setWriteError(sv.recur.done(made.length));
@@ -655,6 +665,7 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
     { id: "task", label: sv.palette.cmd.newTask, run: () => void addItem("task").catch(() => undefined) },
     { id: "milestone", label: sv.palette.cmd.newMilestone, run: () => void addItem("milestone").catch(() => undefined) },
     { id: "group", label: sv.palette.cmd.newGroup, run: () => void addItem("epic", { anchorId: null }).catch(() => undefined) },
+    { id: "template", label: sv.palette.cmd.fromTemplate, run: () => setTemplatesOpen(true) },
     { id: "series", label: sv.palette.cmd.newSeries, run: () => { setRecurInit(null); setRecurOpen(true); } },
     { id: "gantt", label: sv.palette.cmd.viewGantt, run: () => setView("gantt") },
     { id: "wheel", label: sv.palette.cmd.viewWheel, run: () => setView("wheel") },
@@ -760,6 +771,7 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
           {(["task", "milestone", "epic"] as ItemType[]).map((k) => (
             <button key={k} type="button" className="mini" disabled={!projects.projectId || state.kind !== "ready"} onClick={() => void addItem(k, k === "epic" ? { anchorId: null } : {}).catch(() => undefined)}>+ {sv.add[k]}</button>
           ))}
+          <button type="button" className="mini btn-tpl" disabled={!projects.projectId || state.kind !== "ready"} onClick={() => setTemplatesOpen(true)}>{sv.templates.button}</button>
           <button type="button" className="mini btn-series" disabled={!projects.projectId || state.kind !== "ready"} aria-label={sv.recur.button} title={sv.recur.button} onClick={() => { setRecurInit(null); setRecurOpen(true); }}>{sv.recur.buttonShort}</button>
         </div>
         <span className="toolbar-sep" aria-hidden="true" />
@@ -877,6 +889,9 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
       </div>
       {fieldsOpen && project && <FieldsDialog fields={fieldDefs} onSave={(f) => projects.setFields(project.id, f)} onRemove={async (id) => { await removeFieldDef(store, project, id); await projects.reload(project.id); await refresh(); }} onClose={() => setFieldsOpen(false)} />}
       {preview && <ImportPreview fileName={preview.file} parsed={preview.parsed} destination={{ into: preview.into ? project?.name ?? "" : null, name: preview.parsed.name }} onCancel={() => setPreview(null)} onConfirm={() => { const p = preview; setPreview(null); void commitImport(p.parsed, p.into).catch((e) => setWriteError(friendlyError(e))); }} />}
+      {templatesOpen && project && <TemplatesDialog templates={templates} today={todayISO()} group={targetGroup ? { id: targetGroup.id, title: targetGroup.title } : null} onClose={() => setTemplatesOpen(false)}
+        onDelete={async (id) => { await store.deleteTemplate(id); }}
+        onCreate={async (id, o) => { const ids = await inOneStep(store, () => store.createFromTemplate(id, { project_id: project.id, parent_id: o.parentId, start: o.start, title: o.title })); await refresh(); if (ids[0]) { setReveal(ids[0]); setEditId(ids[0]); } setWriteError(sv.templates.made(ids.length)); }} />}
       {statusesOpen && project && <StatusesDialog statuses={statusList} custom={!!project.statuses} counts={statusCounts} onClose={() => setStatusesOpen(false)} onSave={async (defs) => { await projects.setStatuses(project.id, defs); await refresh(); }} />}
       {statusOpen && project && <StatusDialog project={project} updates={statusUpdates} onClose={() => setStatusOpen(false)} onPublish={async (h, t) => { await store.addStatusUpdate({ project_id: project.id, health: h, text: t }); }} />}
       {paletteOpen && <CommandPalette data={paletteData ?? []} loading={paletteData === null} commands={paletteCommands} onClose={() => setPaletteOpen(false)}

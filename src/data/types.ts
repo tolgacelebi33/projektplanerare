@@ -66,6 +66,19 @@ export interface StatusUpdate {
 }
 export const STATUS_UPDATE_LIMITS = { text: 1000, perProject: 200 } as const;
 
+/**
+ * Mall: en post, eller en grupp med hela sitt innehåll, som kan skapas igen på ett annat datum. Datumen sparas som avstånd från rotens start.
+ * Status, framsteg, ansvarig, kommentarer och logg följer inte med (en ny kopia börjar om). Beroenden mellan posterna i mallen följer med.
+ */
+export interface TemplateNode {
+  key: string; parent: string | null; type: ItemType; title: string;
+  offset: number; len: number; priority: Priority; description: string;
+  color?: GroupColor | "none" | null; labels?: string[]; checklist?: string[];
+}
+export interface TemplateDep { from: string; to: string; type: DependencyType; lag?: number }
+export interface Template { id: string; workspace_id: string; name: string; created_at: string; nodes: TemplateNode[]; deps: TemplateDep[] }
+export const TEMPLATE_LIMITS = { count: 50, nodes: 500, name: 60 } as const;
+
 export const COMMENT_LIMITS = { text: 2000, perItem: 500, total: 50_000 } as const;
 
 export interface Baseline { saved_at: string; items: Record<string, { start: string; end: string }> }

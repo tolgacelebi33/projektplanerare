@@ -10,14 +10,17 @@ export function RecurringDialog({ today, initial, onCreate, onClose }: {
   today: string;
   /** Förifyllt (när en ny serie skapas utifrån en befintlig). */
   initial?: { title: string; kind: Recurrence; count: number };
-  onCreate: (a: { title: string; first: string; kind: Recurrence; count: number }) => void;
+  onCreate: (a: { title: string; first: string; kind: Recurrence; count: number; type: "milestone" | "task"; days: number }) => void;
   onClose: () => void;
 }) {
   const [title, setTitle] = useState(initial?.title ?? sv.recur.defaultTitle);
   const [first, setFirst] = useState(today);
   const [kind, setKind] = useState<Recurrence>(initial?.kind ?? "monthly");
   const [count, setCount] = useState(String(initial?.count ?? 12));
+  const [type, setType] = useState<"milestone" | "task">("milestone");
+  const [days, setDays] = useState("1");
   const [err, setErr] = useState<string | null>(null);
+  const span = Math.max(1, Math.min(365, Math.floor(Number(days)) || 1));
   const root = useRef<HTMLDivElement>(null);
   const n = Math.max(1, Math.min(MAX_SERIES, Math.floor(Number(count)) || 1));
   const dates = isISODate(first) ? recurringDates(first, kind, n) : [];
@@ -32,7 +35,7 @@ export function RecurringDialog({ today, initial, onCreate, onClose }: {
   const submit = () => {
     if (!title.trim()) { setErr(sv.recur.emptyTitle); return; }
     if (!isISODate(first)) { setErr(sv.recur.badDate); return; }
-    onCreate({ title: title.trim(), first, kind, count: n });
+    onCreate({ title: title.trim(), first, kind, count: n, type, days: span });
   };
   return (
     <div className="modal-back" onPointerDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
@@ -41,6 +44,18 @@ export function RecurringDialog({ today, initial, onCreate, onClose }: {
         <label className="panel-field"><span>{sv.recur.name}</span>
           <input name="recur-title" value={title} maxLength={200} onChange={(e) => { setTitle(e.target.value); setErr(null); }} />
         </label>
+        <div className="modal-row">
+          <label className="panel-field"><span>{sv.recur.type}</span>
+            <select name="recur-type" value={type} onChange={(e) => setType(e.target.value as "milestone" | "task")}>
+              <option value="milestone">{sv.add.milestone}</option><option value="task">{sv.add.task}</option>
+            </select>
+          </label>
+          {type === "task" && (
+            <label className="panel-field"><span>{sv.recur.days}</span>
+              <input name="recur-days" type="number" min={1} max={365} step={1} value={days} onChange={(e) => setDays(e.target.value)} />
+            </label>
+          )}
+        </div>
         <div className="modal-row">
           <label className="panel-field"><span>{sv.recur.first}</span>
             <DatePicker name="first" value={first} onValue={(v) => { setFirst(v); setErr(null); }} onCommit={(v) => { if (v) setFirst(v); }} />
@@ -54,7 +69,7 @@ export function RecurringDialog({ today, initial, onCreate, onClose }: {
             <input name="recur-count" type="number" min={1} max={MAX_SERIES} step={1} value={count} onChange={(e) => setCount(e.target.value)} />
           </label>
         </div>
-        {dates.length > 0 && <p className="panel-muted" role="status">{sv.recur.summary(dates.length, dates[0], dates[dates.length - 1])}{Number(count) > MAX_SERIES ? ` ${sv.recur.max(MAX_SERIES)}` : ""}</p>}
+        {dates.length > 0 && <p className="panel-muted" role="status">{type === "task" ? sv.recur.summaryTask(dates.length, dates[0], dates[dates.length - 1], span) : sv.recur.summary(dates.length, dates[0], dates[dates.length - 1])}{Number(count) > MAX_SERIES ? ` ${sv.recur.max(MAX_SERIES)}` : ""}</p>}
         {err && <p role="alert" className="modal-err">{err}</p>}
         <div className="panel-row modal-actions">
           <button type="button" className="mini mini-primary" onClick={submit}>{sv.recur.create}</button>

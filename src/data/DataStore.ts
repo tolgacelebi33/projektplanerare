@@ -1,4 +1,4 @@
-import type { StatusDef, Activity, Baseline, ProjectHealth, StatusUpdate, Comment, DependencyMode, Dependency, FieldDef, Item, Project, SavedView, User } from "./types";
+import type { Template, StatusDef, Activity, Baseline, ProjectHealth, StatusUpdate, Comment, DependencyMode, Dependency, FieldDef, Item, Project, SavedView, User } from "./types";
 
 /** UI pratar bara med detta gränssnitt. Alla anrop är asynkrona. */
 export interface DataStore {
@@ -21,6 +21,10 @@ export interface DataStore {
   subscribe?(listener: () => void): () => void;
   listStatusUpdates(): Promise<StatusUpdate[]>;
   addStatusUpdate(input: { project_id: string; health: ProjectHealth; text: string; at?: string; actor_name?: string }): Promise<StatusUpdate>;
+  listTemplates(): Promise<Template[]>;
+  saveTemplate(input: { name: string; item_id: string }): Promise<Template>;
+  deleteTemplate(id: string): Promise<void>;
+  createFromTemplate(templateId: string, opts: { project_id: string; parent_id: string | null; start: string; title?: string }): Promise<string[]>;
   listActivity(projectId: string): Promise<Activity[]>;
   listComments(projectId: string): Promise<Comment[]>;
   addComment(input: { item_id: string; text: string; author_id: string | null; author_name?: string; parent_id?: string | null; created_at?: string }): Promise<Comment>;

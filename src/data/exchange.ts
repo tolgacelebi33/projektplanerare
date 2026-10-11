@@ -1,4 +1,4 @@
-import { addDays, isISODate, recurringDates, todayISO } from "./dates";
+import { addDays, diffDays, isISODate, recurringDates, todayISO } from "./dates";
 import { RuleError, validateStatusDefs, validateBaseline, validateCommentText, validateFieldDefs, validateItemShape, validateSavedViews } from "./rules";
 import { newChecklistId, normalizeLink } from "./extras";
 import { importFieldValue, inferFieldDef, newFieldId } from "./fields";
@@ -448,8 +448,8 @@ export function parseRows(rows: string[][], name: string, today: string = todayI
     if (recRaw) {
       const k = lookupRecur(recRaw);
       if (!k) note("recur", recRaw);
-      else if (typeRaw && type !== "milestone") recurIgnored++;
-      else { const c = Number(get(r, "repeatcount").replace(",", ".")); recur = { kind: k, count: Number.isFinite(c) && c >= 1 ? Math.min(120, Math.floor(c)) : 12 }; type = "milestone"; }
+      else if (typeRaw && type === "epic") recurIgnored++; // en grupp upprepas inte (en milstolpe eller en uppgift gör det)
+      else { const c = Number(get(r, "repeatcount").replace(",", ".")); recur = { kind: k, count: Number.isFinite(c) && c >= 1 ? Math.min(120, Math.floor(c)) : 12 }; if (!(typeRaw && type === "task")) type = "milestone"; } // en rad som uttryckligen är en uppgift blir en serie uppgifter, annars milstolpar som förut
     }
     recurRef.push(recur);
     const statusRaw = get(r, "status");
@@ -539,7 +539,7 @@ export function parseRows(rows: string[][], name: string, today: string = todayI
       if (!rc) return;
       const dates = recurringDates(it.start, rc.kind, rc.count);
       it.series = `s_${it.id}`; it.recur = rc.kind;
-      dates.slice(1).forEach((d, k) => { const copy = { ...it, id: `${it.id}~${k + 2}`, start: d, end: d }; out.push(copy); catById.set(copy.id, catById.get(it.id) ?? ""); });
+      dates.slice(1).forEach((d, k) => { const copy = { ...it, id: `${it.id}~${k + 2}`, start: d, end: addDays(d, diffDays(it.start, it.end)) }; out.push(copy); catById.set(copy.id, catById.get(it.id) ?? ""); });
       series++; total += dates.length;
     });
     items.length = 0; items.push(...out);

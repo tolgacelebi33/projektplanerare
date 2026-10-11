@@ -466,11 +466,11 @@ body[data-overlay] .gantt_tooltip { display: none !important; }
   .project-row { display: none; }
   .toolbar > *:not(.keep-narrow) { display: none; }
   .toolbar .add-group { flex-wrap: wrap; }
-  .toolbar .add-group .btn-series { display: none; } /* återkommande milstolpe finns bland verktygen */
+  .toolbar .add-group .btn-series, .toolbar .add-group .btn-tpl { display: none; } /* återkommande milstolpe finns bland verktygen */
   .tools-open .project-row { display: flex; }
   .tools-open .toolbar > *:not(.keep-narrow) { display: revert; }
   .tools-open .toolbar > .toolbar-sep { display: none; }
-  .tools-open .toolbar .add-group .mini, .tools-open .toolbar .add-group .btn-series { display: inline-block; }
+  .tools-open .toolbar .add-group .mini, .tools-open .toolbar .add-group .btn-series, .tools-open .toolbar .add-group .btn-tpl { display: inline-block; }
   .tools-open .app-header ~ * { max-height: none; }
   .project-bar { gap: 6px; }
   .lib-tag { margin-left: 0; }
@@ -669,6 +669,12 @@ span.health-chip { cursor: default; }
 .statuses-list input, .statuses-add input { flex: 1; min-width: 0; }
 .statuses-count { min-width: 22px; text-align: right; font-size: 12px; }
 .statuses-add select { width: auto; }
+.modal.templates-dialog { width: min(600px, calc(100vw - 24px)); max-height: 86vh; overflow-y: auto; }
+.templates-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.templates-list li { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; padding: 6px 0; border-top: var(--line-width) solid var(--grid-line); }
+.templates-list .tpl-name { flex: 1 1 200px; min-width: 0; }
+.tpl-save { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.tpl-save input { flex: 1 1 160px; min-width: 0; }
 .panel-kind-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .code-tag { font-family: var(--font-title); font-size: 11px; letter-spacing: 0.04em; padding: 0 6px; border: var(--line-width) solid var(--line); border-radius: var(--radius-pill); white-space: nowrap; user-select: all; }
 .grid-code { font-family: var(--font-title); font-size: 11px; letter-spacing: 0.03em; white-space: nowrap; }

@@ -119,7 +119,7 @@ export const enDict: Dict = {
     recurMade: (series: number, total: number) => `${series} recurring milestones became ${total} occurrences (one milestone per date).`,
     fieldsMade: (n: number) => `${n} columns that were not recognised became custom fields.`,
     linksSkipped: (n: number) => `${n} links were skipped (only http, https and mailto are allowed).`,
-    recurIgnored: (n: number) => `${n} rows with a repetition are not milestones and were not repeated (repetition applies to milestones).`,
+    recurIgnored: (n: number) => `${n} rows with a repetition are groups and were not repeated (repetition applies to milestones and tasks).`,
     unknownValue: (kind: string, value: string, n: number, fallback: string) => `Unknown ${kind} "${value}" (${n} items) became "${fallback}".`,
     sample: [
       ["1", "Group", "Website launch", "", "2026-10-12", "2026-11-27", "In progress", "", "High", "", "Collects all work for the launch.", "", ""],
@@ -169,6 +169,7 @@ export const enDict: Dict = {
     button: "+ Recurring milestone...", buttonShort: "+ Recurring...", dialog: "Recurring milestone", name: "Title", defaultTitle: "Maintenance", first: "First date", every: "Repeats", count: "Number of occurrences",
     occurrences: "Occurrences in the series",
     kinds: { weekly: "Every week", biweekly: "Every other week", monthly: "Every month", quarterly: "Every 3 months" },
+    type: "Type", days: "Length (days)", summaryTask: (n: number, first: string, last: string, d: number) => `${n} tasks of ${d} ${d === 1 ? "day" : "days"} each, from ${first} to ${last}. Each occurrence is its own task that you can tick off and move separately.`,
     summary: (n: number, first: string, last: string) => `${n} milestones, from ${first} to ${last}. Each occurrence is its own milestone that you can tick off separately.`,
     max: (n: number) => `At most ${n} occurrences.`, create: "Create", cancel: "Cancel", badDate: "Choose a valid first date.", emptyTitle: "Enter a title.",
     series: "Recurring", info: (kind: string, n: number) => `${kind}. ${n} occurrences in the series.`, extend: "Add more", extendCount: "Number to add",
@@ -223,7 +224,7 @@ export const enDict: Dict = {
   palette: {
     title: "Search and commands", placeholder: "Search items, projects or type a command...", results: "Results", items: "Items", projects: "Projects", commands: "Commands", none: "No results.", loading: "Loading...",
     hint: "Arrow up and down selects, Enter opens, Esc closes.", button: "Search", buttonHint: "Search everywhere and run commands (Cmd/Ctrl + K)",
-    cmd: { newTask: "New task", newMilestone: "New milestone", newGroup: "New group", newSeries: "New recurring milestone", viewGantt: "Show Gantt", viewWheel: "Show Year wheel", viewBoard: "Show Board", today: "Go to today", undo: "Undo", redo: "Redo", settings: "Open settings", help: "Open help", backup: "Save backup", export: "Export the project (JSON)" },
+    cmd: { newTask: "New task", newMilestone: "New milestone", newGroup: "New group", newSeries: "New recurring milestone", fromTemplate: "Create from template", viewGantt: "Show Gantt", viewWheel: "Show Year wheel", viewBoard: "Show Board", today: "Go to today", undo: "Undo", redo: "Redo", settings: "Open settings", help: "Open help", backup: "Save backup", export: "Export the project (JSON)" },
   },
   health: {
     labels: { on_track: "On track", at_risk: "At risk", off_track: "Off track", on_hold: "On hold", done: "Done" }, none: "No status", hint: "The status of the project. Click to update and see the history.",
@@ -244,6 +245,12 @@ export const enDict: Dict = {
     nameOf: (n: string) => `Name: ${n}`, up: (n: string) => `Move up ${n}`, down: (n: string) => `Move down ${n}`, remove: (n: string) => `Remove ${n}`, removeBtn: "Remove", lastInCategory: "There must be at least one status in each category",
     countHint: "Number of items with the status. If the status is removed they get the first status of the category.", newName: "Name of new status", newCategory: "Category of new status", add: "Add", save: "Save", cancel: "Cancel", close: "Close",
     reset: "Back to the default statuses", confirmReset: "Back to the four default statuses? Items with a custom status get the default status of the category.", resetYes: "Reset",
+  },
+  templates: {
+    title: "Create from template", button: "From template...", close: "Close", none: "There are no templates yet. Open an item or a group and choose Save as template.", start: "Start date", where: "Where", top: "At the top", inGroup: (g: string) => `In the group ${g}`,
+    newTitle: "New title (optional)", newTitleHint: "Same title as the template", count: (n: number) => `${n} ${n === 1 ? "item" : "items"}`, create: "Create", createFrom: (n: string) => `Create from the template ${n}`, removeBtn: "Remove", remove: (n: string) => `Remove the template ${n}`,
+    confirmDelete: (n: string) => `Remove the template ${n}?`, deleteYes: "Remove", cancel: "Cancel", hint: "A template saves the item or group with all its contents, the dates as distances and the dependencies between the items. Status, progress, assignees, comments and log are not included.",
+    save: "Save as template...", saveName: "Name of the template", saveGo: "Save template", saved: (n: string) => `The template ${n} was saved.`, made: (n: number) => `Created ${n} ${n === 1 ? "item" : "items"} from the template.`,
   },
   settings: {
     button: "Settings", title: "Settings",

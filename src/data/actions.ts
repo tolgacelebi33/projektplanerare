@@ -1,6 +1,6 @@
 import type { DataStore } from "./DataStore";
 import { sv } from "../i18n/sv";
-import { addDays, recurringDates, weekRange } from "./dates";
+import { addDays, diffDays, recurringDates, weekRange } from "./dates";
 import { isOverdue } from "./rules";
 import type { Dependency, Item, ItemType, Priority, Recurrence, Status } from "./types";
 
@@ -279,12 +279,14 @@ export function seriesMembers(items: Item[], item: Pick<Item, "series">): Item[]
 const newSeriesId = () => `s_${Date.now().toString(36)}${Math.floor(Math.random() * 1e6).toString(36)}`;
 
 /** Skapar en återkommande milstolpe: ett tillfälle per datum, alla i samma grupp och med samma serie-id. `base` är ett utkast från `newItemDraft`. Returnerar de skapade posterna. */
-export async function createSeries(store: DataStore, base: Omit<Item, "id">, kind: Recurrence, count: number, title: string): Promise<Item[]> {
+/** `opts.type` task ger en serie uppgifter med `days` dagars längd (standard en milstolpe, som förut). */
+export async function createSeries(store: DataStore, base: Omit<Item, "id">, kind: Recurrence, count: number, title: string, opts: { type?: "milestone" | "task"; days?: number } = {}): Promise<Item[]> {
   const n = Math.max(1, Math.min(MAX_SERIES, Math.floor(count)));
   const series = newSeriesId();
   const made: Item[] = [];
   const dates = recurringDates(base.start, kind, n);
-  for (let i = 0; i < dates.length; i++) made.push(await store.createItem({ ...base, title, type: "milestone", start: dates[i], end: dates[i], sort_order: base.sort_order + i, series, recur: kind }) as Item);
+  const type = opts.type === "task" ? "task" : "milestone", span = type === "task" ? Math.max(1, Math.min(365, Math.floor(opts.days ?? 1))) - 1 : 0;
+  for (let i = 0; i < dates.length; i++) made.push(await store.createItem({ ...base, title, type, start: dates[i], end: addDays(dates[i], span), sort_order: base.sort_order + i, series, recur: kind }) as Item);
   return made;
 }
 
@@ -301,7 +303,8 @@ export async function extendSeries(store: DataStore, items: Item[], member: Item
   const top = items.reduce((m, i) => Math.max(m, i.sort_order), 0);
   const { id: _id, ...rest } = last; void _id;
   const made: Item[] = [];
-  for (let i = 0; i < dates.length; i++) made.push(await store.createItem({ ...rest, start: dates[i], end: dates[i], status: "not_started", progress: 0, sort_order: top + 1 + i }) as Item);
+  const span = diffDays(last.start, last.end);
+  for (let i = 0; i < dates.length; i++) made.push(await store.createItem({ ...rest, start: dates[i], end: addDays(dates[i], span), status: "not_started", progress: 0, sort_order: top + 1 + i }) as Item);
   return made;
 }
 
@@ -331,7 +334,7 @@ export async function changeRecurrence(store: DataStore, items: Item[], member: 
   const dates = recurringDates(member.start, kind, later.length);
   let moved = 0;
   for (let i = 0; i < later.length; i++) {
-    if (later[i].start !== dates[i] || later[i].recur !== kind) { await store.updateItem(later[i].id, { start: dates[i], end: dates[i], recur: kind }); moved++; }
+    if (later[i].start !== dates[i] || later[i].recur !== kind) { await store.updateItem(later[i].id, { start: dates[i], end: addDays(dates[i], diffDays(later[i].start, later[i].end)), recur: kind }); moved++; } // längden på uppgifter bevaras
   }
   for (const i of all) if (i.start < member.start && i.recur !== kind) await store.updateItem(i.id, { recur: kind });
   return moved;

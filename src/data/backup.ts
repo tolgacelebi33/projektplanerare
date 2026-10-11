@@ -13,6 +13,8 @@ export const MAX_BACKUP_BYTES = 50_000_000;
 export const MAX_BACKUP_PROJECTS = 200;
 
 export interface BackupSummary {
+  /** Mallar i filen (hela arbetsytan). */
+  templates: { name: string; nodes: import("./types").TemplateNode[]; deps: import("./types").TemplateDep[]; created_at?: string }[];
   exportedAt: string;
   users: string[];
   projects: { name: string; items: number; parsed: ParsedProject }[];
@@ -31,7 +33,7 @@ export async function buildBackup(store: MemoryStore, now: Date): Promise<{ file
   const date = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
   return {
     filename: `projektplanerare-sakerhetskopia-${date}.json`, mime: "application/json", projects: projects.length, items,
-    text: JSON.stringify({ format: BACKUP_FORMAT, version: 1, exported_at: now.toISOString(), users: users.map((u) => u.name), projects: out }, null, 1),
+    text: JSON.stringify({ format: BACKUP_FORMAT, version: 1, exported_at: now.toISOString(), users: users.map((u) => u.name), templates: (await store.listTemplates()).map(({ name, nodes, deps, created_at }) => ({ name, nodes, deps, created_at })), projects: out }, null, 1),
   };
 }
 
@@ -39,7 +41,7 @@ export function parseBackup(text: string): BackupSummary {
   if (text.length > MAX_BACKUP_BYTES) throw new ImportError(sv.backup.tooBig);
   let raw: unknown;
   try { raw = JSON.parse(text); } catch { throw new ImportError(sv.backup.notBackup); }
-  const o = raw as { format?: unknown; version?: unknown; exported_at?: unknown; users?: unknown; projects?: unknown } | null;
+  const o = raw as { format?: unknown; version?: unknown; exported_at?: unknown; users?: unknown; projects?: unknown; templates?: unknown } | null;
   if (!o || typeof o !== "object" || o.format !== BACKUP_FORMAT) throw new ImportError(sv.backup.notBackup);
   if (o.version !== 1) throw new ImportError(sv.backup.version(String(o.version)));
   if (!Array.isArray(o.projects) || o.projects.length > MAX_BACKUP_PROJECTS) throw new ImportError(sv.backup.tooManyProjects(MAX_BACKUP_PROJECTS));
@@ -49,7 +51,16 @@ export function parseBackup(text: string): BackupSummary {
     try { parsed = parseJson(JSON.stringify(p)); } catch (e) { throw new ImportError(sv.backup.projectBroken(i + 1, e instanceof Error ? e.message : String(e))); }
     return { name: parsed.name, items: parsed.items.length, parsed };
   });
-  return { exportedAt: typeof o.exported_at === "string" ? o.exported_at : "", users, projects, items: projects.reduce((n, p) => n + p.items, 0) };
+  const templates = (Array.isArray(o.templates) ? o.templates : []).slice(0, 50).flatMap((t: unknown) => {
+    const x = t as { name?: unknown; nodes?: unknown; deps?: unknown; created_at?: unknown } | null;
+    if (!x || typeof x.name !== "string" || !x.name.trim() || !Array.isArray(x.nodes) || x.nodes.length === 0 || x.nodes.length > 500) return [];
+    const nodes = (x.nodes as Record<string, unknown>[]).filter((n) => n && typeof n.key === "string" && typeof n.title === "string" && ["epic", "milestone", "task"].includes(String(n.type)) && Number.isInteger(n.offset) && Number.isInteger(n.len) && (n.len as number) >= 0 && (n.len as number) <= 3650 && Math.abs(n.offset as number) <= 36500 && (n.parent === null || typeof n.parent === "string")) as unknown as import("./types").TemplateNode[];
+    if (nodes.length !== x.nodes.length || nodes.filter((n) => n.parent === null).length !== 1) return [];
+    const keys = new Set(nodes.map((n) => n.key));
+    const deps = (Array.isArray(x.deps) ? (x.deps as Record<string, unknown>[]) : []).filter((d) => d && keys.has(String(d.from)) && keys.has(String(d.to)) && ["finish_to_start", "start_to_start", "finish_to_finish", "start_to_finish"].includes(String(d.type))) as unknown as import("./types").TemplateDep[];
+    return [{ name: x.name, nodes, deps, ...(typeof x.created_at === "string" ? { created_at: x.created_at } : {}) }];
+  });
+  return { templates, exportedAt: typeof o.exported_at === "string" ? o.exported_at : "", users, projects, items: projects.reduce((n, p) => n + p.items, 0) };
 }
 
 export interface RestoreResult { projects: number; items: number; warnings: string[]; firstProjectId: string | null }
@@ -62,6 +73,7 @@ export async function restoreBackup(store: MemoryStore, workspaceId: string, b: 
     if (have.has(name.trim().toLowerCase())) continue;
     try { await store.addUser(name); have.add(name.trim().toLowerCase()); } catch (e) { warnings.push(`${name}: ${friendlyError(e)}`); }
   }
+  for (const tpl of b.templates) store.addTemplateRaw(tpl, workspaceId);
   let made = 0, items = 0, first: string | null = null;
   for (const p of b.projects) {
     const taken = new Set((await store.listProjects()).map((x) => x.name.trim().toLowerCase()));

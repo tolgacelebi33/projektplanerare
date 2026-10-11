@@ -1,11 +1,11 @@
 import type { DataStore } from "./DataStore";
 import { RuleError, earliestStart, rederiveEpics, shiftSuccessors, validateBaseline, validateCommentText, validateStatusDefs, validateDependency, validateFieldDefs, validateItemShape, validateParent, validateSavedViews } from "./rules";
-import { addDays } from "./dates";
+import { addDays, diffDays } from "./dates";
 import { extendSeries } from "./actions";
 import { PLACEHOLDER_RENAMES, placeholderOldName } from "./fixtures";
 import { countersFor, validCounters, type Counters, emptyCounters, itemCode, nextNumber, parseProjectCode, projectCode } from "./codes";
 import { applyPatch, isPatchList, json, makePatch, type Entry, type Patch } from "./patch";
-import { ACTIVITY_LIMITS, COMMENT_LIMITS, PROJECT_HEALTH, STATUS_UPDATE_LIMITS, type StatusDef, type Activity, type ProjectHealth, type StatusUpdate } from "./types";
+import { ACTIVITY_LIMITS, COMMENT_LIMITS, PROJECT_HEALTH, STATUS_UPDATE_LIMITS, TEMPLATE_LIMITS, type Template, type TemplateNode, type StatusDef, type Activity, type ProjectHealth, type StatusUpdate } from "./types";
 import { depDraft, describeChange } from "./activity";
 import { defOf, statusDefs } from "./statuses";
 import type { Baseline, Comment, Dependency, DependencyMode, FieldDef, Fixture, Item, Project, SavedView, User } from "./types";
@@ -23,6 +23,8 @@ export interface Snapshot {
   activity?: Activity[];
   /** Projektens statusuppdateringar. Ligger utanför ångra-historiken. */
   status_updates?: StatusUpdate[];
+  /** Mallar (för hela arbetsytan). Ligger utanför ångra-historiken. */
+  templates?: Template[];
 }
 
 export interface MemoryStoreOptions {
@@ -59,6 +61,8 @@ export class MemoryStore implements DataStore {
   protected activity: Activity[] = [];
   /** Projektstatus: historik över hälsa och text per projekt (den senaste gäller). Utanför ångra-historiken, tas bort med projektet. */
   protected statusUpdates: StatusUpdate[] = [];
+  /** Mallar: poster och grupper som kan skapas igen på ett annat datum. Hela arbetsytan, utanför ångra-historiken. */
+  protected templates: Template[] = [];
   private activityCount = new Map<string, number>();
   /** Den som gör ändringarna just nu (sätts av appen från "Skriv som"). Tomt namn visas som okänd. */
   actor: { id: string | null; name: string } = { id: null, name: "" };
@@ -242,12 +246,13 @@ export class MemoryStore implements DataStore {
     const now = this.snapshot();
     const target = applyPatch(now, patch);
     to.push(makePatch(target, now)); // från målläget tillbaka till nuläget, för att kunna gå åt andra hållet
-    const seq = this.seq, projectSeq = this.projectSeq, counters = this.counters, comments = this.comments, activity = this.activity, statusUpdates = this.statusUpdates;
+    const seq = this.seq, projectSeq = this.projectSeq, counters = this.counters, comments = this.comments, activity = this.activity, statusUpdates = this.statusUpdates, templates = this.templates;
     const was = new Map(this.items);
     this.logBase = new Map(); this.direct = new Set();
     this.restore(target);
     this.comments = comments; // Ångra och Gör om rör aldrig kommentarerna
     this.statusUpdates = statusUpdates; // projektstatusen också
+    this.templates = templates; // och mallarna
     this.activity = activity; this.rebuildActivityCount(); // och loggen står kvar, med själva Ångra som nya rader
     for (const [id, after] of this.items) { // vad Ångra eller Gör om ändrade, i loggen
       const before = was.get(id);
@@ -282,6 +287,7 @@ export class MemoryStore implements DataStore {
       comments: this.comments,
       activity: this.activity,
       status_updates: this.statusUpdates,
+      templates: this.templates,
     };
   }
 
@@ -295,6 +301,7 @@ export class MemoryStore implements DataStore {
     this.comments = (snap.comments ?? []).map((c) => ({ ...c }));
     this.activity = (snap.activity ?? []).map((a) => ({ ...a })); this.rebuildActivityCount();
     this.statusUpdates = (snap.status_updates ?? []).map((u) => ({ ...u }));
+    this.templates = (snap.templates ?? []).map((x) => ({ ...x, nodes: x.nodes.map((n) => ({ ...n })), deps: x.deps.map((d) => ({ ...d })) }));
     this.projectSeq = snap.project_seq ?? 0;
     this.counters = new Map();
     for (const [pid, c] of Object.entries(snap.counters ?? {})) if (this.projects.has(pid) && validCounters(c)) this.counters.set(pid, { ...c });
@@ -570,6 +577,80 @@ export class MemoryStore implements DataStore {
     this.comments = this.comments.filter((c) => c.id !== id && c.parent_id !== id);
     this.commit();
     return before - this.comments.length;
+  }
+  async listTemplates(): Promise<Template[]> {
+    await this.tick("listTemplates");
+    return this.templates.map((x) => ({ ...x, nodes: x.nodes.map((n) => ({ ...n })), deps: x.deps.map((d) => ({ ...d })) })).sort((a, b) => a.name.localeCompare(b.name));
+  }
+  /** Sparar en post, eller en grupp med hela sitt innehåll, som mall. Namnet är unikt (oavsett versaler). */
+  async saveTemplate(input: { name: string; item_id: string }): Promise<Template> {
+    await this.tick("saveTemplate");
+    const root = this.items.get(input.item_id);
+    if (!root) throw new RuleError("not_found", "Posten finns inte");
+    const name = input.name.trim();
+    if (!name) throw new RuleError("empty_name", "Namn saknas");
+    if (name.length > TEMPLATE_LIMITS.name) throw new RuleError("name_too_long", `Namnet är för långt (högst ${TEMPLATE_LIMITS.name} tecken)`);
+    if (this.templates.some((x) => x.name.toLowerCase() === name.toLowerCase())) throw new RuleError("duplicate_name", "Det finns redan en mall med det namnet");
+    if (this.templates.length >= TEMPLATE_LIMITS.count) throw new RuleError("too_many_templates", `Högst ${TEMPLATE_LIMITS.count} mallar`);
+    const tree: Item[] = [];
+    const walk = (i: Item) => { tree.push(i); [...this.items.values()].filter((c) => c.parent_id === i.id).sort((a, b) => a.sort_order - b.sort_order).forEach(walk); };
+    walk(root);
+    if (tree.length > TEMPLATE_LIMITS.nodes) throw new RuleError("template_too_big", `En mall får ha högst ${TEMPLATE_LIMITS.nodes} poster`);
+    const key = new Map(tree.map((i, n) => [i.id, `n${n}`]));
+    const nodes: TemplateNode[] = tree.map((i) => ({
+      key: key.get(i.id)!, parent: i.id === root.id ? null : key.get(i.parent_id ?? "") ?? null, type: i.type, title: i.title,
+      offset: diffDays(root.start, i.start), len: i.type === "milestone" ? 0 : diffDays(i.start, i.end), priority: i.priority, description: i.description,
+      ...(i.color !== undefined ? { color: i.color } : {}), ...(i.labels?.length ? { labels: [...i.labels] } : {}), ...(i.checklist?.length ? { checklist: i.checklist.map((c) => c.text) } : {}),
+    }));
+    const deps = [...this.deps.values()].filter((d) => key.has(d.from_item_id) && key.has(d.to_item_id)).map((d) => ({ from: key.get(d.from_item_id)!, to: key.get(d.to_item_id)!, type: d.type, ...(d.lag ? { lag: d.lag } : {}) }));
+    this.seq += 1;
+    const tpl: Template = { id: `t_new${this.seq}`, workspace_id: root.workspace_id, name, created_at: new Date().toISOString(), nodes, deps };
+    this.templates = [...this.templates, tpl];
+    this.commit();
+    return { ...tpl };
+  }
+  async deleteTemplate(id: string): Promise<void> {
+    await this.tick("deleteTemplate");
+    if (!this.templates.some((x) => x.id === id)) throw new RuleError("not_found", "Mallen finns inte");
+    this.templates = this.templates.filter((x) => x.id !== id);
+    this.commit();
+  }
+  /** Lägger in mallar från en säkerhetskopia (anropas bara av återställningen). Samma namn får ett tillägg. */
+  addTemplateRaw(t: Omit<Template, "id" | "workspace_id" | "created_at"> & { created_at?: string }, workspaceId: string): void {
+    let name = t.name.trim().slice(0, TEMPLATE_LIMITS.name) || "Mall", n = 2;
+    while (this.templates.some((x) => x.name.toLowerCase() === name.toLowerCase())) name = `${t.name.trim().slice(0, TEMPLATE_LIMITS.name - 4)} ${n++}`;
+    if (this.templates.length >= TEMPLATE_LIMITS.count) return;
+    this.seq += 1;
+    this.templates = [...this.templates, { ...t, name, id: `t_new${this.seq}`, workspace_id: workspaceId, created_at: t.created_at ?? new Date().toISOString() }];
+    this.commit();
+  }
+  /** Skapar en mall på ett datum: rotens start blir `start`, allt annat behåller sina avstånd och längder. Under `parent_id` (en grupp) eller överst. Returnerar de nya posternas id, roten först. */
+  async createFromTemplate(templateId: string, opts: { project_id: string; parent_id: string | null; start: string; title?: string }): Promise<string[]> {
+    await this.tick("createFromTemplate");
+    const tpl = this.templates.find((x) => x.id === templateId);
+    if (!tpl) throw new RuleError("not_found", "Mallen finns inte");
+    const project = this.projects.get(opts.project_id);
+    if (!project) throw new RuleError("not_found", "Projektet finns inte");
+    const top = [...this.items.values()].reduce((m, i) => Math.max(m, i.sort_order), 0);
+    const made = new Map<string, string>();
+    let order = top;
+    const ordered = tpl.nodes.slice();
+    for (const node of ordered) {
+      const start = addDays(opts.start, node.offset), end = addDays(start, node.len);
+      const parent = node.parent ? made.get(node.parent) ?? null : opts.parent_id;
+      const item = await this.createItem({
+        workspace_id: project.workspace_id, project_id: project.id, parent_id: parent, type: node.type, title: node.parent === null && opts.title?.trim() ? opts.title.trim().slice(0, 200) : node.title,
+        start, end, status: "not_started", assignee_id: null, description: node.description, priority: node.priority, progress: 0, sort_order: ++order,
+        ...(node.color !== undefined ? { color: node.color } : {}), ...(node.labels?.length ? { labels: [...node.labels] } : {}),
+        ...(node.checklist?.length ? { checklist: node.checklist.map((text, n) => ({ id: `c${Date.now().toString(36)}${n}`, text, done: false })) } : {}),
+      });
+      made.set(node.key, item.id);
+    }
+    for (const d of tpl.deps) {
+      const a = made.get(d.from), b = made.get(d.to);
+      if (a && b) { try { await this.createDependency({ workspace_id: project.workspace_id, from_item_id: a, to_item_id: b, type: d.type, ...(d.lag ? { lag: d.lag } : {}) }); } catch { /* ett beroende som inte går att lägga in hoppas över */ } }
+    }
+    return tpl.nodes.map((n) => made.get(n.key)!).filter(Boolean);
   }
   /** Alla projektens statusuppdateringar, äldst först. */
   async listStatusUpdates(): Promise<StatusUpdate[]> {

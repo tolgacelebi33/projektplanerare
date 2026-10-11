@@ -63,6 +63,9 @@ export function ItemPanel({ me = "", onMe, baseline, fieldDefs = [], onDuplicate
   const [title, setTitle] = useState("");
   const [extendN, setExtendN] = useState("12");
   const [seriesTitle, setSeriesTitle] = useState("");
+  const [tplOpen, setTplOpen] = useState(false);
+  const [tplName, setTplName] = useState("");
+  const [tplMsg, setTplMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [seriesKind, setSeriesKind] = useState<Recurrence>("monthly");
   const [seriesAsk, setSeriesAsk] = useState<null | "later" | "all">(null);
   const [description, setDescription] = useState("");
@@ -488,6 +491,7 @@ export function ItemPanel({ me = "", onMe, baseline, fieldDefs = [], onDuplicate
           {!confirmDelete ? (
             <div className="panel-row">
               <button type="button" className="mini" onClick={() => onDuplicate?.(item.id)}>{sv.extras.duplicate}</button>
+              <button type="button" className="mini" aria-expanded={tplOpen} onClick={() => { setTplOpen((o) => !o); setTplName(item.title.slice(0, 60)); setTplMsg(null); }}>{sv.templates.save}</button>
               <button type="button" className="mini" onClick={() => setConfirmDelete(true)}>{sv.panel.remove}</button>
             </div>
           ) : (
@@ -499,6 +503,13 @@ export function ItemPanel({ me = "", onMe, baseline, fieldDefs = [], onDuplicate
               </div>
             </div>
           )}
+          {tplOpen && !confirmDelete && (
+            <form className="tpl-save" onSubmit={(e) => { e.preventDefault(); void (async () => { try { await store.saveTemplate({ name: tplName, item_id: item.id }); setTplMsg({ ok: true, text: sv.templates.saved(tplName.trim()) }); setTplOpen(false); } catch (er) { setTplMsg({ ok: false, text: messageFor(er) }); } })(); }}>
+              <input name="tpl-name" aria-label={sv.templates.saveName} value={tplName} maxLength={60} onChange={(e) => setTplName(e.target.value)} />
+              <button type="submit" className="mini mini-primary" disabled={!tplName.trim()}>{sv.templates.saveGo}</button>
+            </form>
+          )}
+          {tplMsg && <p role={tplMsg.ok ? "status" : "alert"} className={tplMsg.ok ? "panel-muted" : "panel-error"}>{tplMsg.text}</p>}
           {err("delete")}
         </section>
         <p className="panel-muted panel-foot">{sv.panel.autosave}</p>

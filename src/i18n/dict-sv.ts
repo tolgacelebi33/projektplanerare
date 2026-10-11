@@ -119,7 +119,7 @@ export const svDict = {
     recurMade: (series: number, total: number) => `${series} återkommande milstolpar blev ${total} tillfällen (en milstolpe per datum).`,
     fieldsMade: (n: number) => `${n} kolumner som inte känns igen blev egna fält.`,
     linksSkipped: (n: number) => `${n} länkar hoppades över (bara http, https och mailto tillåts).`,
-    recurIgnored: (n: number) => `${n} rader med upprepning är inte milstolpar och upprepades inte (upprepning gäller milstolpar).`,
+    recurIgnored: (n: number) => `${n} rader med upprepning är grupper och upprepades inte (upprepning gäller milstolpar och uppgifter).`,
     unknownValue: (kind: string, value: string, n: number, fallback: string) => `Okänd ${kind} "${value}" (${n} poster) blev "${fallback}".`,
     sample: [
       ["1", "Grupp", "Webbplatslansering", "", "2026-10-12", "2026-11-27", "Pågår", "", "Hög", "", "Samlar allt arbete för lanseringen.", "", ""],
@@ -174,6 +174,7 @@ export const svDict = {
     button: "+ Återkommande milstolpe...", buttonShort: "+ Återkommande...", dialog: "Återkommande milstolpe", name: "Titel", defaultTitle: "Underhåll", first: "Första datum", every: "Återkommer", count: "Antal tillfällen",
     occurrences: "Tillfällen i serien",
     kinds: { weekly: "Varje vecka", biweekly: "Varannan vecka", monthly: "Varje månad", quarterly: "Var 3:e månad" },
+    type: "Typ", days: "Längd (dagar)", summaryTask: (n: number, first: string, last: string, d: number) => `${n} uppgifter på ${d} ${d === 1 ? "dag" : "dagar"} vardera, från ${first} till ${last}. Varje tillfälle är en egen uppgift som du kan bocka av och flytta för sig.`,
     summary: (n: number, first: string, last: string) => `${n} milstolpar, från ${first} till ${last}. Varje tillfälle är en egen milstolpe som du kan bocka av för sig.`,
     max: (n: number) => `Högst ${n} tillfällen.`, create: "Skapa", cancel: "Avbryt", badDate: "Välj ett giltigt första datum.", emptyTitle: "Skriv en titel.",
     series: "Återkommande", info: (kind: string, n: number) => `${kind}. ${n} tillfällen i serien.`, extend: "Lägg till fler", extendCount: "Antal att lägga till",
@@ -228,7 +229,7 @@ export const svDict = {
   palette: {
     title: "Sök och kommandon", placeholder: "Sök poster, projekt eller skriv ett kommando...", results: "Träffar", items: "Poster", projects: "Projekt", commands: "Kommandon", none: "Inga träffar.", loading: "Läser in...",
     hint: "Pil upp och ner väljer, Enter öppnar, Esc stänger.", button: "Sök", buttonHint: "Sök överallt och kör kommandon (Cmd/Ctrl + K)",
-    cmd: { newTask: "Ny uppgift", newMilestone: "Ny milstolpe", newGroup: "Ny grupp", newSeries: "Ny återkommande milstolpe", viewGantt: "Visa Gantt", viewWheel: "Visa Årshjul", viewBoard: "Visa Board", today: "Gå till idag", undo: "Ångra", redo: "Gör om", settings: "Öppna inställningar", help: "Öppna hjälpen", backup: "Spara säkerhetskopia", export: "Exportera projektet (JSON)" },
+    cmd: { newTask: "Ny uppgift", newMilestone: "Ny milstolpe", newGroup: "Ny grupp", newSeries: "Ny återkommande milstolpe", fromTemplate: "Skapa från mall", viewGantt: "Visa Gantt", viewWheel: "Visa Årshjul", viewBoard: "Visa Board", today: "Gå till idag", undo: "Ångra", redo: "Gör om", settings: "Öppna inställningar", help: "Öppna hjälpen", backup: "Spara säkerhetskopia", export: "Exportera projektet (JSON)" },
   },
   health: {
     labels: { on_track: "På spåret", at_risk: "Risk", off_track: "Försenat", on_hold: "Pausat", done: "Klart" }, none: "Ingen status", hint: "Projektets status. Klicka för att uppdatera och se historiken.",
@@ -249,6 +250,12 @@ export const svDict = {
     nameOf: (n: string) => `Namn: ${n}`, up: (n: string) => `Flytta upp ${n}`, down: (n: string) => `Flytta ner ${n}`, remove: (n: string) => `Ta bort ${n}`, removeBtn: "Ta bort", lastInCategory: "Det måste finnas minst en status i varje kategori",
     countHint: "Antal poster med statusen. Tas statusen bort får de kategorins första status.", newName: "Namn på ny status", newCategory: "Kategori för ny status", add: "Lägg till", save: "Spara", cancel: "Avbryt", close: "Stäng",
     reset: "Tillbaka till grundstatusarna", confirmReset: "Tillbaka till de fyra grundstatusarna? Poster som har en egen status får kategorins grundstatus.", resetYes: "Återställ",
+  },
+  templates: {
+    title: "Skapa från mall", button: "Från mall...", close: "Stäng", none: "Det finns inga mallar än. Öppna en post eller en grupp och välj Spara som mall.", start: "Startdatum", where: "Var", top: "Överst", inGroup: (g: string) => `I gruppen ${g}`,
+    newTitle: "Ny titel (valfritt)", newTitleHint: "Samma titel som mallen", count: (n: number) => `${n} ${n === 1 ? "post" : "poster"}`, create: "Skapa", createFrom: (n: string) => `Skapa från mallen ${n}`, removeBtn: "Ta bort", remove: (n: string) => `Ta bort mallen ${n}`,
+    confirmDelete: (n: string) => `Ta bort mallen ${n}?`, deleteYes: "Ta bort", cancel: "Avbryt", hint: "En mall sparar posten eller gruppen med hela sitt innehåll, datumen som avstånd och beroenden mellan posterna. Status, framsteg, ansvariga, kommentarer och logg följer inte med.",
+    save: "Spara som mall...", saveName: "Namn på mallen", saveGo: "Spara mall", saved: (n: string) => `Mallen ${n} sparades.`, made: (n: number) => `Skapade ${n} ${n === 1 ? "post" : "poster"} från mallen.`,
   },
   settings: {
     button: "Inställningar", title: "Inställningar",

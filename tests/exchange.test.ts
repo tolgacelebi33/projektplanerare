@@ -406,9 +406,13 @@ describe("återkommande milstolpar i CSV", () => {
     expect(e.items.filter((i) => i.title === "A").map((i) => i.start)).toEqual(["2026-10-12", "2026-10-26", "2026-11-09"]);
     expect(e.items.filter((i) => i.title === "B").length).toBe(1);
     expect(e.warnings.some((w) => w.includes("sometimes"))).toBe(true);
-    const t = parseCsv("Titel;Typ;Start;Återkommer\nUppgift;Uppgift;2026-10-12;Varje vecka\n", "t.csv", "2026-10-11");
-    expect(t.items.length).toBe(1);
-    expect(t.warnings.some((w) => w.includes("inte milstolpar"))).toBe(true);
+    // En rad som uttryckligen är en uppgift blir en serie uppgifter (med sin längd), en grupp upprepas inte
+    const t = parseCsv("Titel;Typ;Start;Slut;Återkommer;Antal tillfällen\nUppgift;Uppgift;2026-10-12;2026-10-14;Varje vecka;3\nGrupp;Grupp;2026-10-12;2026-10-14;Varje vecka;3\n", "t.csv", "2026-10-11");
+    const ts = t.items.filter((i) => i.title === "Uppgift");
+    expect(ts.map((i) => [i.type, i.start, i.end])).toEqual([["task", "2026-10-12", "2026-10-14"], ["task", "2026-10-19", "2026-10-21"], ["task", "2026-10-26", "2026-10-28"]]);
+    expect(new Set(ts.map((i) => i.series)).size).toBe(1);
+    expect(t.items.filter((i) => i.title === "Grupp").length).toBe(1);
+    expect(t.warnings.some((w) => w.includes("är grupper"))).toBe(true);
   });
   it("antalet begränsas till 120, och en milstolpe utan datum börjar idag", () => {
     const m = parseCsv("Titel;Återkommer;Antal tillfällen\nX;Varje vecka;9999\nY;Varje vecka;2\n", "m.csv", "2026-10-11");
