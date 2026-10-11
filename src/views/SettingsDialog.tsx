@@ -23,6 +23,24 @@ export function SettingsDialog({ settings, onChange, onClose }: { settings: Sett
           <label className="settings-check"><input type="checkbox" checked={settings.markUndated} onChange={(e) => set("markUndated", e.target.checked)} /><span>{t.markUndated}<small>{t.markUndatedHint}</small></span></label>
         </section>
         <section>
+          <h3>{t.listGroup}</h3>
+          <label className="settings-check"><input type="checkbox" checked={settings.highlightOverdue} onChange={(e) => set("highlightOverdue", e.target.checked)} /><span>{t.highlightOverdue}<small>{t.highlightOverdueHint}</small></span></label>
+          <label className="settings-check"><input type="checkbox" checked={settings.quickFilters} onChange={(e) => set("quickFilters", e.target.checked)} /><span>{t.quickFilters}<small>{t.quickFiltersHint}</small></span></label>
+        </section>
+        <section>
+          <h3>{t.cardsGroup}</h3>
+          <div className="settings-cards">
+            {(Object.keys(settings.cardFields) as (keyof Settings["cardFields"])[]).map((k) => (
+              <label key={k} className="settings-check"><input type="checkbox" checked={settings.cardFields[k]} onChange={(e) => onChange({ ...settings, cardFields: { ...settings.cardFields, [k]: e.target.checked } })} /><span>{t.cardFields[k]}</span></label>
+            ))}
+          </div>
+          <label className="panel-field"><span>{t.boardGroup}</span>
+            <select name="set-boardgroup" value={settings.boardGroup} onChange={(e) => set("boardGroup", e.target.value as Settings["boardGroup"])}>
+              {(["status", "assignee", "priority", "group"] as const).map((g) => <option key={g} value={g}>{sv.board.groups[g]}</option>)}
+            </select></label>
+          <p className="panel-muted">{t.boardGroupHint}</p>
+        </section>
+        <section>
           <h3>{t.startGroup}</h3>
           <div className="modal-row settings-row">
             <label className="panel-field"><span>{t.startView}</span>

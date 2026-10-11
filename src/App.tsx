@@ -2,8 +2,9 @@ import { Suspense, lazy, useEffect, useMemo, useRef, useState } from "react";
 import { downloadText } from "./download";
 import { MAX_IMPORT_BYTES, ImportError, parseUpload } from "./data/exchange";
 import { duplicateProject, exportProject, importParsed, type ExportFormat, type ImportResult } from "./data/importExport";
-import { bulkDelete, bulkMove, bulkStatus, canMove, createSeries, deleteSubtree, descendants, epicChoices, filterActive, filterView, moveTargets, newItemDraft, planBoardDrop, planMove, rangeIds, selectionRoots, swapWithSibling, type BulkResult } from "./data/actions";
+import { bulkDelete, bulkMove, bulkStatus, canMove, createSeries, deleteSubtree, descendants, epicChoices, filterActive, filterView, moveTargets, newItemDraft, planMove, rangeIds, selectionRoots, swapWithSibling, type BulkResult } from "./data/actions";
 import { BulkBar } from "./views/BulkBar";
+import { boardColumns, planColumnDrop, planColumnMoves } from "./data/boardColumns";
 import { RecurringDialog } from "./views/RecurringDialog";
 import { SettingsDialog } from "./views/SettingsDialog";
 import { loadSettings, saveSettings, type Settings } from "./settings";
@@ -65,11 +66,13 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
   const [hideDone, setHideDone] = useState(false);
   const [attrFilter, setAttrFilter] = useState<AttrFilter>(noAttrFilter);
   const [collapse, setCollapse] = useState({ n: 0, open: true });
+  const [quick, setQuick] = useState({ overdue: false, thisWeek: false, noAssignee: false, undated: false });
   const shown = useMemo(
-    () => (state.kind === "ready" ? filterView(state.items, state.deps, { query, hideDone, ...attrFilter }) : { items: [], deps: [] }),
-    [state, query, hideDone, attrFilter],
+    () => (state.kind === "ready" ? filterView(state.items, state.deps, { query, hideDone, ...attrFilter, ...quick, today: todayISO() }) : { items: [], deps: [] }),
+    [state, query, hideDone, attrFilter, quick],
   );
-  const filtering = filterActive({ query, hideDone, ...attrFilter });
+  const viewFilter = { query, hideDone, ...attrFilter, ...quick, today: todayISO() };
+  const filtering = filterActive(viewFilter);
   const colors = useMemo(() => (state.kind === "ready" ? effectiveColors(state.items) : new Map<string, never>()), [state]);
   const [view, setView] = useState<"gantt" | "wheel" | "board">(uiCarry.view ?? (new URLSearchParams(window.location.search).get("view") ? VIEW0 : settings.startView));
   const [year, setYear] = useState<number | null>(uiCarry.year ?? null);
@@ -149,13 +152,19 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
     if (!selAnchor.current) selAnchor.current = from;
     setSelected(new Set(rangeIds(visible, from, id)));
   };
-  const dropCards = async (moved: string[], status: Status, before: string | null) => {
+  const dropCards = async (moved: string[], colKey: string, before: string | null) => {
     if (!projects.projectId) return;
     try {
-      for (const u of planBoardDrop(await store.listItems(projects.projectId), moved, status, before)) await store.updateItem(u.id, u.patch);
+      const pid = projects.projectId;
+      const col = boardColumns(settings.boardGroup, await store.listItems(pid), users).find((c) => c.key === colKey);
+      if (!col) return;
+      // Kolumner som är grupper: korten flyttas först till gruppen (ett i taget, eftersom varje flytt ändrar syskonens ordning)
+      if (col.parent !== undefined) for (const id of moved) for (const u of planColumnMoves(await store.listItems(pid), id, col)) await store.updateItem(u.id, u.patch);
+      for (const u of planColumnDrop(await store.listItems(pid), moved, col, before)) await store.updateItem(u.id, u.patch);
       await refresh();
     } catch (e) { setWriteError(friendlyError(e)); reload(); }
   };
+  const moveCardTo = (id: string, colKey: string) => void dropCards([id], colKey, null);
   const dropSelection = () => { selAnchor.current = null; setSelected(new Set()); setEditId(null); };
   const runBulk = async (fn: (projectId: string) => Promise<BulkResult>) => {
     if (!projects.projectId) return;
@@ -443,6 +452,14 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
             <button key={v} aria-pressed={view === v} onClick={() => setView(v)}>{sv.view[v]}</button>
           ))}
         </div>
+        {view === "board" && (
+          <label className="project-deps keep-narrow">
+            <span className="toolbar-label">{sv.board.groupBy}</span>
+            <select className="project-select project-select-sm" aria-label={sv.board.groupBy} value={settings.boardGroup} onChange={(e) => setSettings({ ...settings, boardGroup: e.target.value as Settings["boardGroup"] })}>
+              {(["status", "assignee", "priority", "group"] as const).map((g) => <option key={g} value={g}>{sv.board.groups[g]}</option>)}
+            </select>
+          </label>
+        )}
         <button type="button" className="mini narrow-only keep-narrow" aria-expanded={toolsOpen} onClick={() => setToolsOpen((o) => !o)}>{toolsOpen ? sv.narrow.hideTools : sv.narrow.tools}</button>
         {view === "gantt" ? (
           <>
@@ -485,6 +502,13 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
             onChange={(e) => setQuery(e.target.value)} onKeyDown={(e) => { if (e.key === "Escape") setQuery(""); }} />
           <button type="button" className="mini" aria-pressed={hideDone} onClick={() => setHideDone((v) => !v)}>{sv.filter.hideDone}</button>
           <FilterPicker filter={attrFilter} users={users} onChange={setAttrFilter} />
+          {settings.quickFilters && (
+            <div className="quick-filters" role="group" aria-label={sv.qf.label}>
+              {(["overdue", "thisWeek", "noAssignee", "undated"] as const).map((k) => (
+                <button key={k} type="button" className="mini" aria-pressed={quick[k]} onClick={() => setQuick((q) => ({ ...q, [k]: !q[k] }))}>{sv.qf[k]}</button>
+              ))}
+            </div>
+          )}
           {filtering && state.kind === "ready" && <span className="toolbar-label" role="status">{sv.filter.count(shown.items.length, state.items.length)}</span>}
         </div>
         <span className="toolbar-sep" aria-hidden="true" />
@@ -506,7 +530,7 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
       {notice && <div role="alert" className="notice">{notice}{writeError && <button type="button" className="notice-x" aria-label={sv.dismiss} onClick={() => setWriteError(null)}>×</button>}</div>}
       {projects.error && <div role="alert" className="notice">{projects.error}</div>}
       <div className="app-body">
-      <main className={`app-main${settings.markUndated ? " mark-undated" : ""}`} ref={mainRef}>
+      <main className={`app-main${settings.markUndated ? " mark-undated" : ""}${settings.highlightOverdue ? " hl-overdue" : ""}`} ref={mainRef}>
        <Suspense fallback={<p role="status">{sv.loading}</p>}>
         {state.kind === "loading" && <p role="status">{sv.loading}</p>}
         {state.kind === "error" && (
@@ -517,7 +541,7 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
         {projects.projects && projects.projects.length === 0 && (
           <div className="empty-state"><p>{sv.project.none}</p><button type="button" className="btn btn-primary" onClick={() => void projects.create(sv.project.defaultName)}>{sv.project.createFirst}</button></div>
         )}
-        {state.kind === "ready" && projects.projectId && view === "board" && <BoardView markUndated={settings.markUndated} items={shown.items} allItems={state.items} users={users} colors={colors} openId={editId} selected={selected} onOpen={setEditId} onSelect={selectRow} onBackground={dropSelection} onDrop={(m, s, b) => void dropCards(m, s, b)} onStatus={(id, s) => void editField(id, "status", s)} onContext={openMenu} />}
+        {state.kind === "ready" && projects.projectId && view === "board" && <BoardView groupBy={settings.boardGroup} cardFields={settings.cardFields} highlightOverdue={settings.highlightOverdue} markUndated={settings.markUndated} items={shown.items} allItems={state.items} users={users} colors={colors} openId={editId} selected={selected} onOpen={setEditId} onSelect={selectRow} onBackground={dropSelection} onDrop={(m, k, b) => void dropCards(m, k, b)} onMoveTo={moveCardTo} onContext={openMenu} />}
         {state.kind === "ready" && projects.projectId && view === "wheel" && <YearWheel items={shown.items} year={effectiveYear} colors={colors} selectedId={editId} onOpen={setEditId} onContext={openMenu} />}
         {state.kind === "ready" && projects.projectId && view === "gantt" && (
           <div className="gantt-wrap">

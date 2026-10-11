@@ -8,9 +8,21 @@ export interface Settings {
   markUndated: boolean;
   startView: "gantt" | "wheel" | "board";
   startZoom: "day" | "week" | "month";
+  /** Vad som visas på korten i boarden. */
+  cardFields: CardFields;
+  /** Förfallna poster markeras i listan (understruket datum, inte bara färg). */
+  highlightOverdue: boolean;
+  /** Snabbfilter (Försenade, Denna vecka, Utan ansvarig, Utan datum) ovanför listan. */
+  quickFilters: boolean;
+  /** Vad boardens kolumner är. */
+  boardGroup: BoardGroup;
 }
-export const DEFAULT_SETTINGS: Settings = { touch: "auto", closeOnEmpty: true, markUndated: true, startView: "gantt", startZoom: "week" };
+export interface CardFields { date: boolean; assignee: boolean; priority: boolean; description: boolean; series: boolean; progress: boolean }
+export type BoardGroup = "status" | "assignee" | "priority" | "group";
+export const DEFAULT_CARD_FIELDS: CardFields = { date: true, assignee: true, priority: true, description: false, series: true, progress: false };
+export const DEFAULT_SETTINGS: Settings = { touch: "auto", closeOnEmpty: true, markUndated: true, startView: "gantt", startZoom: "week", cardFields: { ...DEFAULT_CARD_FIELDS }, highlightOverdue: true, quickFilters: true, boardGroup: "status" };
 const KEY = "projektplanerare.settings";
+const bool = (v: unknown, d: boolean) => (typeof v === "boolean" ? v : d);
 const pick = <T extends string>(v: unknown, ok: readonly T[], d: T): T => (ok.includes(v as T) ? (v as T) : d);
 
 export function normalizeSettings(raw: unknown): Settings {
@@ -21,6 +33,10 @@ export function normalizeSettings(raw: unknown): Settings {
     markUndated: typeof o.markUndated === "boolean" ? o.markUndated : DEFAULT_SETTINGS.markUndated,
     startView: pick(o.startView, ["gantt", "wheel", "board"], DEFAULT_SETTINGS.startView),
     startZoom: pick(o.startZoom, ["day", "week", "month"], DEFAULT_SETTINGS.startZoom),
+    cardFields: ((c) => ({ date: bool(c.date, DEFAULT_CARD_FIELDS.date), assignee: bool(c.assignee, DEFAULT_CARD_FIELDS.assignee), priority: bool(c.priority, DEFAULT_CARD_FIELDS.priority), description: bool(c.description, DEFAULT_CARD_FIELDS.description), series: bool(c.series, DEFAULT_CARD_FIELDS.series), progress: bool(c.progress, DEFAULT_CARD_FIELDS.progress) }))((o.cardFields && typeof o.cardFields === "object" ? o.cardFields : {}) as Record<string, unknown>),
+    highlightOverdue: bool(o.highlightOverdue, DEFAULT_SETTINGS.highlightOverdue),
+    quickFilters: bool(o.quickFilters, DEFAULT_SETTINGS.quickFilters),
+    boardGroup: pick(o.boardGroup, ["status", "assignee", "priority", "group"], DEFAULT_SETTINGS.boardGroup),
   };
 }
 export function loadSettings(): Settings {

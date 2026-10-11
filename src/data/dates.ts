@@ -81,3 +81,9 @@ export function recurringDates(first: ISODate, kind: "weekly" | "biweekly" | "mo
   return Array.from({ length: Math.max(0, count) }, (_, i) =>
     kind === "weekly" ? addDays(first, 7 * i) : kind === "biweekly" ? addDays(first, 14 * i) : kind === "monthly" ? addMonths(first, i) : addMonths(first, 3 * i));
 }
+
+/** Måndag och söndag i veckan som `today` ligger i. */
+export function weekRange(today: ISODate): { start: ISODate; end: ISODate } {
+  const start = addDays(today, -weekdayMon0(today));
+  return { start, end: addDays(start, 6) };
+}

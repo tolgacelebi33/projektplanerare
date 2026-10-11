@@ -1,6 +1,7 @@
 import type { DataStore } from "./DataStore";
 import { sv } from "../i18n/sv";
-import { addDays, recurringDates } from "./dates";
+import { addDays, recurringDates, weekRange } from "./dates";
+import { isOverdue } from "./rules";
 import type { Dependency, Item, ItemType, Priority, Recurrence, Status } from "./types";
 
 /** Alla poster under `id` (barn, barnbarn, ...), inte posten själv. */
@@ -84,9 +85,12 @@ export interface ViewFilter {
   query: string; hideDone: boolean;
   /** Val per egenskap: tom lista betyder inget filter. Ansvarig: id, eller "" för ingen ansvarig. */
   statuses?: Status[]; priorities?: Priority[]; assignees?: string[];
+  /** Snabbfilter. `today` behövs för Försenade och Denna vecka (ISO-datum). */
+  overdue?: boolean; thisWeek?: boolean; noAssignee?: boolean; undated?: boolean; today?: string;
 }
+const quickOn = (f: ViewFilter) => !!(f.overdue || f.thisWeek || f.noAssignee || f.undated);
 export const filterActive = (f: ViewFilter): boolean =>
-  f.query.trim() !== "" || f.hideDone || !!f.statuses?.length || !!f.priorities?.length || !!f.assignees?.length;
+  f.query.trim() !== "" || f.hideDone || !!f.statuses?.length || !!f.priorities?.length || !!f.assignees?.length || quickOn(f);
 
 /**
  * Filtrerar vad som visas (inte vad som lagras). En post visas om den matchar sökningen (titel eller beskrivning, utan hänsyn till versaler)
@@ -96,7 +100,9 @@ export const filterActive = (f: ViewFilter): boolean =>
 export function filterView(items: Item[], deps: Dependency[], f: ViewFilter): { items: Item[]; deps: Dependency[] } {
   const q = f.query.trim().toLowerCase();
   if (!filterActive(f)) return { items, deps };
-  const attr = f.hideDone || !!f.statuses?.length || !!f.priorities?.length || !!f.assignees?.length;
+  const attr = f.hideDone || !!f.statuses?.length || !!f.priorities?.length || !!f.assignees?.length || quickOn(f);
+  const today = f.today ?? "";
+  const week = today ? weekRange(today) : null;
   const byId = new Map(items.map((i) => [i.id, i]));
   const show = new Set<string>();
   for (const i of items) {
@@ -108,6 +114,10 @@ export function filterView(items: Item[], deps: Dependency[], f: ViewFilter): { 
       if (f.statuses?.length && !f.statuses.includes(i.status)) continue;
       if (f.priorities?.length && !f.priorities.includes(i.priority)) continue;
       if (f.assignees?.length && !f.assignees.includes(i.assignee_id ?? "")) continue;
+      if (f.overdue && (!today || !isOverdue(i, today))) continue;
+      if (f.thisWeek && (!week || i.end < week.start || i.start > week.end)) continue;
+      if (f.noAssignee && i.assignee_id !== null) continue;
+      if (f.undated && !i.undated) continue;
     }
     for (let cur: Item | undefined = i; cur && !show.has(cur.id); cur = cur.parent_id ? byId.get(cur.parent_id) : undefined) show.add(cur.id);
   }
@@ -212,9 +222,14 @@ export function treeOrderIds(items: Item[]): string[] {
 
 /** Korten i en boardkolumn i visad ordning: de med egen plats först (lägst först), därefter resten i listans ordning. Grupper är inga kort. */
 export function boardOrder(items: Item[], status: Status): Item[] {
-  const tree = new Map(treeOrderIds(items).map((id, i) => [id, i] as const));
+  return boardRankOrder(items.filter((i) => i.type !== "epic" && i.status === status), treeOrderIds(items));
+}
+
+/** Kort i visad ordning: de med egen plats först (lägst först), därefter resten i listans ordning (`treeIds`). */
+export function boardRankOrder(cards: Item[], treeIds: string[]): Item[] {
+  const tree = new Map(treeIds.map((id, i) => [id, i] as const));
   const hasRank = (i: Item) => typeof i.board_rank === "number";
-  return items.filter((i) => i.type !== "epic" && i.status === status).sort((a, b) =>
+  return [...cards].sort((a, b) =>
     hasRank(a) && hasRank(b) ? a.board_rank! - b.board_rank! || tree.get(a.id)! - tree.get(b.id)!
     : hasRank(a) ? -1 : hasRank(b) ? 1 : tree.get(a.id)! - tree.get(b.id)!);
 }

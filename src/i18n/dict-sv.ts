@@ -175,6 +175,9 @@ export const svDict = {
   narrow: { tools: "Verktyg", hideTools: "Dölj verktyg" },
   settings: {
     button: "Inställningar", title: "Inställningar", close: "Stäng", reset: "Återställ standard",
+    cardsGroup: "Kort i boarden", cardFields: { date: "Datum", assignee: "Ansvarig (initialer)", priority: "Prioritet", description: "Första raden av beskrivningen", series: "Upprepning för serier", progress: "Framsteg" },
+    boardGroup: "Kolumner i boarden", boardGroupHint: "Vad boardens kolumner är. Går också att byta i verktygsfältet.",
+    listGroup: "Listan", highlightOverdue: "Markera förfallna poster", highlightOverdueHint: "Förfallna poster får understruket och fetstilt datum i listan, och en markering på korten.", quickFilters: "Visa snabbfilter", quickFiltersHint: "Knappar för Försenade, Denna vecka, Utan ansvarig och Utan datum bredvid sök och filter.",
     panelGroup: "Panelen och listan",
     closeOnEmpty: "Klick på en tom yta stänger panelen", closeOnEmptyHint: "Klicka på en tom del av skärmen för att stänga panelen och släppa markeringen. Annars stänger du med krysset eller Esc.",
     markUndated: "Märk poster utan datum", markUndatedHint: "Poster som fått platshållardatum vid import visas streckade och som Ej schemalagda tills du sätter ett datum.",
@@ -202,7 +205,8 @@ export const svDict = {
     persisted: "Sparas i den här webbläsaren", persistYes: "Webbläsaren har lovat att inte rensa datan av sig själv.", persistNo: "Webbläsaren kan rensa datan om utrymmet tar slut. Exportera då och då som säkerhetskopia.", demo: "Provdata, sparas inte",
   },
   view: { label: "Vy", gantt: "Gantt", wheel: "Årshjul", board: "Board" },
-  board: { label: "Board, poster per status", empty: "Inga poster", dragHint: "Dra ett kort till en annan kolumn för att ändra status", cardStatus: (t: string) => `Status för ${t}` },
+  qf: { label: "Snabbfilter", overdue: "Försenade", thisWeek: "Denna vecka", noAssignee: "Utan ansvarig", undated: "Utan datum" },
+  board: { groupBy: "Gruppera efter", noGroup: "Utan grupp", groups: { status: "Status", assignee: "Ansvarig", priority: "Prioritet", group: "Grupp" }, label: "Board, poster per status", empty: "Inga poster", dragHint: "Dra ett kort till en annan kolumn för att ändra status", cardStatus: (t: string) => `Status för ${t}` },
   year: { label: "År", prev: "Föregående år", next: "Nästa år" },
   wheel: {
     months: ["jan", "feb", "mar", "apr", "maj", "jun", "jul", "aug", "sep", "okt", "nov", "dec"],

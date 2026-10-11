@@ -170,6 +170,9 @@ export const enDict: Dict = {
   narrow: { tools: "Tools", hideTools: "Hide tools" },
   settings: {
     button: "Settings", title: "Settings", close: "Close", reset: "Reset to defaults",
+    cardsGroup: "Cards on the board", cardFields: { date: "Date", assignee: "Assignee (initials)", priority: "Priority", description: "First line of the description", series: "Repetition for series", progress: "Progress" },
+    boardGroup: "Board columns", boardGroupHint: "What the board columns are. Can also be changed in the toolbar.",
+    listGroup: "The list", highlightOverdue: "Mark overdue items", highlightOverdueHint: "Overdue items get an underlined bold date in the list, and a marker on the cards.", quickFilters: "Show quick filters", quickFiltersHint: "Buttons for Overdue, This week, No assignee and No date next to search and filter.",
     panelGroup: "The panel and the list",
     closeOnEmpty: "Clicking an empty area closes the panel", closeOnEmptyHint: "Click an empty part of the screen to close the panel and clear the selection. Otherwise close with the cross or Esc.",
     markUndated: "Mark items without a date", markUndatedHint: "Items that got placeholder dates on import are shown dashed and as Unscheduled until you set a date.",
@@ -197,7 +200,8 @@ export const enDict: Dict = {
     persisted: "Saved in this browser", persistYes: "The browser has promised not to clear the data on its own.", persistNo: "The browser may clear the data if it runs low on space. Export now and then as a backup.", demo: "Sample data, not saved",
   },
   view: { label: "View", gantt: "Gantt", wheel: "Year wheel", board: "Board" },
-  board: { label: "Board, items by status", empty: "No items", dragHint: "Drag a card to another column to change its status", cardStatus: (t: string) => `Status of ${t}` },
+  qf: { label: "Quick filters", overdue: "Overdue", thisWeek: "This week", noAssignee: "No assignee", undated: "No date" },
+  board: { groupBy: "Group by", noGroup: "No group", groups: { status: "Status", assignee: "Assignee", priority: "Priority", group: "Group" }, label: "Board, items by status", empty: "No items", dragHint: "Drag a card to another column to change its status", cardStatus: (t: string) => `Status of ${t}` },
   year: { label: "Year", prev: "Previous year", next: "Next year" },
   wheel: {
     months: ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"],
