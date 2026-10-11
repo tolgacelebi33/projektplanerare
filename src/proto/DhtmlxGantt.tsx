@@ -617,7 +617,15 @@ export function DhtmlxGantt({ store, items, deps, zoom, onError, onPersisted, re
     const id = pendingFocus.current;
     if (id) requestAnimationFrame(() => { host.current?.querySelector<HTMLElement>(`[data-check="${CSS.escape(id)}"]`)?.focus(); });
   }, [mapped]);
-  useEffect(() => { gantt.getLinks().forEach((l) => { try { gantt.refreshLink(l.id); } catch { /* länken är borta */ } }); }, [critical]);
+  // Kritiska länkar ritas om när visningen slås på eller av eller när den kritiska linjen ändras. Inte vid första ritningen (länkarna ritas då med rätt klass),
+  // och med en enda ritning: en refreshLink per länk gav kvadratisk tid med tusentals länkar.
+  const criticalSeen = useRef<typeof critical>(critical);
+  useEffect(() => {
+    if (criticalSeen.current === critical) return;
+    const was = criticalSeen.current; criticalSeen.current = critical;
+    if (!was && !critical) return;
+    gantt.render();
+  }, [critical]);
   useEffect(() => { const id = requestAnimationFrame(() => { drawMarksRef.current?.(); drawResizersRef.current?.(); }); return () => cancelAnimationFrame(id); }, [mapped, seriesMarks, baseline, gridWidth, columns, columnWidths]);
 
   useEffect(() => {

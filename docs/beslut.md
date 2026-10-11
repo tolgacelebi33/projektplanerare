@@ -471,3 +471,7 @@ Fel: ett klick på en romb öppnade rätt tillfälle i panelen, men markeringen 
 ## 2026-10-11: Pilar mellan tillfällen i en serie
 
 Panelhuvudet har föregående och nästa tillfälle (‹ 2 av 4 ›) för poster som ingår i en serie, släckta i ändarna. Valet flyttar också markeringen i Gantt. Test SD4.
+
+## 2026-10-11: Startprestanda med många poster
+
+Mätning (produktionsbygge, 6000 poster): start 8,0 s, växande kvadratiskt (1000 poster 0,85 s, 3000 2,3 s). Orsak (CPU-profil): en effekt som anropade `refreshLink` för varje länk vid varje start, vilket gav en full omräkning per länk. Nu ritas länkarna om med en enda ritning, och bara när den kritiska linjen slås på, av eller ändras. Efter: 6000 poster 0,86 s (3000: 0,85 s). Skalatestet på GitHub föll på 34 s mot gränsen 20 s i utvecklingsläget (React dubbelkör effekter där). Testat: skalatest 1000/3000/6000, kritisk linje (3 test).
