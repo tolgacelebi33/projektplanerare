@@ -1,4 +1,5 @@
 /** Användarens inställningar, sparade i webbläsaren. Okända eller ogiltiga värden ersätts av standardvärdet, så en gammal eller trasig post kan aldrig stoppa appen. */
+import { normalizeCustomRules, type CustomRule } from "./data/customRules";
 export interface Settings {
   /** Pekläge i Gantt: automatiskt (på enheter med enbart pekskärm), alltid på (dra med finger, men tooltips vid hovring försvinner), eller av. */
   touch: "auto" | "on" | "off";
@@ -24,6 +25,7 @@ export interface Settings {
   hidePastSeries: boolean;
   /** Varje serie visas som en rad i listan, tidslinjen och boarden (tillfällena som markeringar). Av som standard: tillfällena är egna rader som kan flyttas var för sig. */
   collapseSeries: boolean;
+  customRules: CustomRule[];
   seriesRowV2: boolean;
   /** Visa en förhandsgranskning (kolumner, grupper, serier, antal) innan en fil läggs in. */
   importPreview: boolean;
@@ -56,7 +58,7 @@ export const DEFAULT_FEATURES: Features = { labels: true, checklist: true, links
 export interface CardFields { date: boolean; assignee: boolean; priority: boolean; description: boolean; series: boolean; progress: boolean; labels: boolean; checklist: boolean; links: boolean; lastUpdate: boolean; code: boolean; comments: boolean; estimate: boolean }
 export type BoardGroup = "status" | "assignee" | "priority" | "group" | `field:${string}`;
 export const DEFAULT_CARD_FIELDS: CardFields = { date: true, assignee: true, priority: true, description: false, series: true, progress: false, labels: true, checklist: true, links: true, lastUpdate: false, code: false, comments: true, estimate: false };
-export const DEFAULT_SETTINGS: Settings = { touch: "auto", closeOnEmpty: true, markUndated: true, startView: "gantt", startZoom: "week", cardFields: { ...DEFAULT_CARD_FIELDS }, highlightOverdue: true, quickFilters: true, boardGroup: "status", features: { ...DEFAULT_FEATURES }, checklistProgress: false, hidePastSeries: false, collapseSeries: true, seriesRowV2: true, importPreview: true, showCritical: false, reminders: { banner: true, os: false, scope: "all" }, me: "", backupReminderDays: 30, showBaseline: true, rules: { doneSetsProgress: false, seriesNext: false }, importExtraAsFields: true, moreViews: { calendar: true, week: true, workload: true, portfolio: true, report: true }, workloadField: "", workloadCap: 5 };
+export const DEFAULT_SETTINGS: Settings = { touch: "auto", closeOnEmpty: true, markUndated: true, startView: "gantt", startZoom: "week", cardFields: { ...DEFAULT_CARD_FIELDS }, highlightOverdue: true, quickFilters: true, boardGroup: "status", features: { ...DEFAULT_FEATURES }, checklistProgress: false, hidePastSeries: false, collapseSeries: true, customRules: [], seriesRowV2: true, importPreview: true, showCritical: false, reminders: { banner: true, os: false, scope: "all" }, me: "", backupReminderDays: 30, showBaseline: true, rules: { doneSetsProgress: false, seriesNext: false }, importExtraAsFields: true, moreViews: { calendar: true, week: true, workload: true, portfolio: true, report: true }, workloadField: "", workloadCap: 5 };
 const KEY = "projektplanerare.settings";
 const bool = (v: unknown, d: boolean) => (typeof v === "boolean" ? v : d);
 const pick = <T extends string>(v: unknown, ok: readonly T[], d: T): T => (ok.includes(v as T) ? (v as T) : d);
@@ -79,6 +81,7 @@ export function normalizeSettings(raw: unknown): Settings {
     // Beslut 2026-10-11: serier som en rad är standard. Inställningar sparade innan dess (utan markören) får det nya standardvärdet en gång.
     collapseSeries: o.seriesRowV2 === true ? bool(o.collapseSeries, true) : true,
     seriesRowV2: true,
+    customRules: normalizeCustomRules(o.customRules),
     importPreview: bool(o.importPreview, DEFAULT_SETTINGS.importPreview),
     showCritical: bool(o.showCritical, DEFAULT_SETTINGS.showCritical),
     reminders: ((r) => ({ banner: bool(r.banner, true), os: bool(r.os, false), scope: r.scope === "mine" ? ("mine" as const) : ("all" as const) }))((o.reminders && typeof o.reminders === "object" ? o.reminders : {}) as Record<string, unknown>),

@@ -8,7 +8,8 @@ import { applyPatch, isPatchList, json, makePatch, type Entry, type Patch } from
 import { MAX_CAPACITY, ACTIVITY_LIMITS, COMMENT_LIMITS, PROJECT_HEALTH, STATUS_UPDATE_LIMITS, TEMPLATE_LIMITS, type Template, type TemplateNode, type StatusDef, type Activity, type ProjectHealth, type StatusUpdate } from "./types";
 import { depDraft, describeChange } from "./activity";
 import { defOf, statusDefs } from "./statuses";
-import type { Baseline, Comment, Dependency, DependencyMode, FieldDef, Fixture, Item, Project, SavedView, User } from "./types";
+import { RULE_LIMITS, actionPatch, ruleApplies, timeTriggered, type CustomRule } from "./customRules";
+import type { Baseline, Comment, Dependency, DependencyMode, FieldDef, Fixture, Item, Project, SavedView, Status, User } from "./types";
 
 /** Allt lagret håller, för att kunna sparas och återställas. */
 export interface Snapshot {
@@ -54,6 +55,9 @@ export class MemoryStore implements DataStore {
   protected projectSeq = 0;
   /** Enkla regler som användaren slagit på i Inställningar (se settings.ts). Gäller alla skrivningar, så vyerna behöver inte veta om dem. */
   rules: { doneSetsProgress: boolean; seriesNext: boolean } = { doneSetsProgress: false, seriesNext: false };
+  /** Egna regler (se customRules.ts). Sätts av appen från inställningarna. */
+  customRules: CustomRule[] = [];
+  private ruleDepth = 0;
   protected counters = new Map<string, Counters>();
   /** Kommentarer: ingen ångra-historik (Ångra tar aldrig bort en kommentar), och de finns kvar om en post tas bort (så att Ångra kan ge tillbaka posten med sina kommentarer). */
   protected comments: Comment[] = [];
@@ -500,6 +504,7 @@ export class MemoryStore implements DataStore {
     rederiveEpics(this.items, [created.parent_id]);
     this.writes.push({ method: "createItem", args: [item] });
     this.commit();
+    if (this.logging) await this.fireRules(created.id, { kind: "created" });
     return { ...created };
   }
   async updateItem(id: string, patch: Partial<Omit<Item, "id" | "workspace_id" | "project_id">>) {
@@ -507,7 +512,7 @@ export class MemoryStore implements DataStore {
     const cur = this.items.get(id);
     if (!cur) throw new RuleError("not_found", `Item ${id} finns inte`);
     if (patch.code !== undefined && patch.code !== cur.code) throw new RuleError("code_fixed", "Koden kan inte ändras");
-    this.direct.add(id);
+    if (!this.ruleDepth) this.direct.add(id); // det en regel ändrar är en följd, inte något användaren gjorde (loggas som automatiskt)
     const next: Item = { ...cur, ...patch };
     // Egen status: den väljer kategori (status), och en ändrad kategori utan egen status eller med en annan kategori tar bort den egna statusen
     const defs = statusDefs(this.projects.get(cur.project_id));
@@ -552,7 +557,41 @@ export class MemoryStore implements DataStore {
     if (this.rules.seriesNext && cur.status !== "done" && next.status === "done" && next.series && next.recur) {
       try { await extendSeries(this, [...this.items.values()].filter((i) => i.project_id === next.project_id), next, 1); } catch { /* serien är full eller regeln gick inte att tillämpa: statusändringen står kvar */ }
     }
+    if (cur.status !== next.status && this.logging) await this.fireRules(id, { kind: "status", to: next.status });
     return { ...next };
+  }
+  /** Kör egna regler för en händelse på en post. Regler kan utlösa varandra, men högst `RULE_LIMITS.depth` led (så att två regler som motsäger varandra inte loopar). */
+  private async fireRules(id: string, ev: { kind: "created" } | { kind: "status"; to: Status }): Promise<void> {
+    if (!this.customRules.length || this.ruleDepth >= RULE_LIMITS.depth) return;
+    for (const r of this.customRules) {
+      if (r.when.kind !== ev.kind || (r.when.kind === "status" && ev.kind === "status" && r.when.to !== ev.to)) continue;
+      const cur = this.items.get(id);
+      if (!cur) return;
+      if (ruleApplies(r, cur)) await this.applyRule(r, cur);
+    }
+  }
+  private async applyRule(r: CustomRule, cur: Item): Promise<boolean> {
+    this.ruleDepth += 1;
+    try {
+      if (r.then.kind === "comment") { await this.addComment({ item_id: cur.id, text: r.then.value, author_id: null, author_name: `Regel${r.name ? `: ${r.name}` : ""}` }); return true; }
+      const patch = actionPatch(r.then, cur);
+      if (!patch) return false;
+      await this.updateItem(cur.id, patch);
+      return true;
+    } catch { return false; /* regeln gick inte att tillämpa (till exempel en ansvarig som tagits bort): posten får vara som den är */ } finally { this.ruleDepth -= 1; }
+  }
+  /** Kör tidsregler (försenad, slutar inom N dagar) över alla poster. Handlingarna är idempotenta, så det går bra att köra ofta. Returnerar antal ändrade poster. */
+  async runTimeRules(today: string): Promise<number> {
+    const rules = this.customRules.filter((r) => r.enabled && (r.when.kind === "overdue" || r.when.kind === "due_in"));
+    if (!rules.length) return 0;
+    let n = 0;
+    for (const id of [...this.items.keys()]) {
+      for (const r of rules) {
+        const cur = this.items.get(id);
+        if (cur && ruleApplies(r, cur) && timeTriggered(r, cur, today) && await this.applyRule(r, cur)) n += 1;
+      }
+    }
+    return n;
   }
   async deleteItem(id: string) {
     await this.tick("deleteItem");

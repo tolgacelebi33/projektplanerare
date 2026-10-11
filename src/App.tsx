@@ -90,6 +90,16 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
   const [paletteData, setPaletteData] = useState<{ project: Project; items: Item[] }[] | null>(null);
   const settingsRef = useRef(settings); settingsRef.current = settings;
   useEffect(() => { store.rules = settings.rules; }, [store, settings.rules]);
+  useEffect(() => { store.customRules = settings.customRules; }, [store, settings.customRules]);
+  // Tidsregler (försenad, slutar inom N dagar) körs när appen öppnas, när reglerna ändras och sedan varje minut medan den är öppen
+  useEffect(() => {
+    if (!settings.customRules.some((r) => r.enabled && (r.when.kind === "overdue" || r.when.kind === "due_in"))) return;
+    let alive = true;
+    const run = () => { void store.runTimeRules(todayISO()).then((n) => { if (alive && n > 0) void refresh(); }).catch(() => undefined); };
+    run();
+    const id = window.setInterval(run, 60_000);
+    return () => { alive = false; window.clearInterval(id); };
+  }, [store, settings.customRules, refresh]);
   const [zoom, setZoom] = useState<Zoom>(uiCarry.zoom ?? settings.startZoom);
   const [query, setQuery] = useState("");
   const [hideDone, setHideDone] = useState(false);
@@ -909,7 +919,7 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
       {statusOpen && project && <StatusDialog project={project} updates={statusUpdates} onClose={() => setStatusOpen(false)} onPublish={async (h, t) => { await store.addStatusUpdate({ project_id: project.id, health: h, text: t }); }} />}
       {paletteOpen && <CommandPalette data={paletteData ?? []} loading={paletteData === null} commands={paletteCommands} onClose={() => setPaletteOpen(false)}
         onOpenItem={(pid, iid) => { openInProject(pid, iid); }} onOpenProject={(pid) => { focusMedianOnNextProject(); projects.select(pid); }} />}
-      {settingsOpen && <SettingsDialog fieldDefs={fieldDefs} settings={settings} install={{ available: !!installEvt, installed, onInstall: () => { const e = installEvt; if (!e) return; void e.prompt().then(() => e.userChoice).finally(() => setInstallEvt(null)); } }} backup={{ lastSaved: lastBackup, onSave: saveBackupFile, onRestoreFile: pickBackup }} people={{ users, onCapacity: async (id, h) => { await store.setUserCapacity(id, h); await reloadUsers(); }, onAdd: async (n) => { await store.addUser(n); await reloadUsers(); }, onRename: async (id, n) => { await store.renameUser(id, n); await reloadUsers(); await refresh(); }, onRemove: async (id) => { const n = await store.removeUser(id); await reloadUsers(); await refresh(); setAttrFilter((f) => ({ ...f, assignees: f.assignees.filter((x) => x !== id) })); return n; } }} onChange={setSettings} onClose={() => setSettingsOpen(false)} />}
+      {settingsOpen && <SettingsDialog projects={(projects.projects ?? []).map((p) => ({ id: p.id, name: p.name }))} projectId={projects.projectId} fieldDefs={fieldDefs} settings={settings} install={{ available: !!installEvt, installed, onInstall: () => { const e = installEvt; if (!e) return; void e.prompt().then(() => e.userChoice).finally(() => setInstallEvt(null)); } }} backup={{ lastSaved: lastBackup, onSave: saveBackupFile, onRestoreFile: pickBackup }} people={{ users, onCapacity: async (id, h) => { await store.setUserCapacity(id, h); await reloadUsers(); }, onAdd: async (n) => { await store.addUser(n); await reloadUsers(); }, onRename: async (id, n) => { await store.renameUser(id, n); await reloadUsers(); await refresh(); }, onRemove: async (id) => { const n = await store.removeUser(id); await reloadUsers(); await refresh(); setAttrFilter((f) => ({ ...f, assignees: f.assignees.filter((x) => x !== id) })); return n; } }} onChange={setSettings} onClose={() => setSettingsOpen(false)} />}
       {backupPreview && <BackupRestore fileName={backupPreview.file} summary={backupPreview.summary} onCancel={() => setBackupPreview(null)} onConfirm={() => void confirmRestore()} />}
       {recurOpen && <RecurringDialog key={recurInit ? "from" : "new"} today={todayISO()} initial={recurInit ?? undefined} onCreate={(a) => void addSeries(a)} onClose={() => setRecurOpen(false)} />}
       {menu && <ContextMenu x={menu.x} y={menu.y} items={menuItems} confirm={confirmRemove} onPick={(id) => void pickMenu(id)} onClose={() => setMenu(null)} />}

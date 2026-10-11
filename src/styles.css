@@ -768,3 +768,11 @@ span.health-chip { cursor: default; }
   html[data-view="report"] .no-print { display: none; }
   html[data-view="report"] .rep-card, html[data-view="report"] section { break-inside: avoid; }
 }
+
+/* Regelbyggare */
+.rule-builder { margin-top: 18px; display: grid; gap: 10px; }
+.rule-builder h3 { margin: 0; font-family: var(--font-title); font-weight: 400; font-size: 14px; }
+.rule-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.rule-list li { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 10px; border: var(--line-width) solid var(--grid-line); background: var(--surface); }
+.rule-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; align-items: end; }
+.rule-actions { display: flex; align-items: center; gap: 10px; }

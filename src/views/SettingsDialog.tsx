@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { DEFAULT_SETTINGS, MORE_VIEWS, type Settings } from "../settings";
 import type { FieldDef, User } from "../data/types";
 import { sv } from "../i18n/sv";
+import { RuleBuilder } from "./RuleBuilder";
 
 /** Inställningar: ändras direkt och sparas i webbläsaren. Esc, Stäng eller klick utanför stänger. */
 const TABS = ["list", "board", "views", "item", "rules", "reminders", "people", "start", "touch", "backup", "info"] as const;
@@ -13,7 +14,7 @@ export interface InstallApi { available: boolean; installed: boolean; onInstall:
 export interface BackupApi { lastSaved: string | null; onSave: () => Promise<string>; onRestoreFile: (file: File) => Promise<void> }
 export interface PeopleApi { users: User[]; onCapacity: (id: string, hours: number | null) => Promise<void>; onAdd: (name: string) => Promise<void>; onRename: (id: string, name: string) => Promise<void>; onRemove: (id: string) => Promise<number> }
 
-export function SettingsDialog({ fieldDefs = [], settings, people, backup, install, onChange, onClose }: { fieldDefs?: FieldDef[]; settings: Settings; people?: PeopleApi; backup?: BackupApi; install?: InstallApi; onChange: (s: Settings) => void; onClose: () => void }) {
+export function SettingsDialog({ fieldDefs = [], settings, people, projects = [], projectId = null, backup, install, onChange, onClose }: { projects?: { id: string; name: string }[]; projectId?: string | null; fieldDefs?: FieldDef[]; settings: Settings; people?: PeopleApi; backup?: BackupApi; install?: InstallApi; onChange: (s: Settings) => void; onClose: () => void }) {
   const root = useRef<HTMLDivElement>(null);
   const [tab, setTab] = useState<Tab>(() => { try { const v = sessionStorage.getItem(TAB0_KEY); return (TABS as readonly string[]).includes(v ?? "") ? (v as Tab) : "list"; } catch { return "list"; } });
   const pick = (t: Tab) => { setTab(t); try { sessionStorage.setItem(TAB0_KEY, t); } catch { /* ignoreras */ } };
@@ -102,6 +103,7 @@ export function SettingsDialog({ fieldDefs = [], settings, people, backup, insta
               <p className="panel-muted">{t.rulesIntro}</p>
               {check(t.rules.doneSetsProgress, t.rules.doneSetsProgressHint, settings.rules.doneSetsProgress, (v) => onChange({ ...settings, rules: { ...settings.rules, doneSetsProgress: v } }))}
               {check(t.rules.seriesNext, t.rules.seriesNextHint, settings.rules.seriesNext, (v) => onChange({ ...settings, rules: { ...settings.rules, seriesNext: v } }))}
+              <RuleBuilder rules={settings.customRules} users={people?.users ?? []} projects={projects} projectId={projectId} onChange={(r) => set("customRules", r)} />
             </section>)}
             {tab === "reminders" && <RemindersTab settings={settings} onChange={onChange} />}
             {tab === "people" && people && <PeopleTab api={people} />}
@@ -141,7 +143,7 @@ export function SettingsDialog({ fieldDefs = [], settings, people, backup, insta
           </div>
         </div>
         <div className="panel-row modal-actions">
-          <button type="button" className="mini" onClick={() => onChange({ ...DEFAULT_SETTINGS })}>{t.reset}</button>
+          <button type="button" className="mini" onClick={() => onChange({ ...DEFAULT_SETTINGS, customRules: settings.customRules })}>{t.reset}</button>
           <button type="button" className="mini mini-primary" onClick={onClose}>{t.close}</button>
         </div>
       </div>
