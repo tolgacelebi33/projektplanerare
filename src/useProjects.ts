@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import type { DataStore } from "./data/DataStore";
-import type { DependencyMode, FieldDef, Project, SavedView } from "./data/types";
+import type { Baseline, DependencyMode, FieldDef, Project, SavedView } from "./data/types";
 
 const KEY = "projektplanerare.project";
 
@@ -33,6 +33,7 @@ export function useProjects(store: DataStore, workspaceId: string) {
     rename: async (id: string, name: string) => { await store.updateProject(id, { name }); await load(id); },
     setDependencyMode: async (id: string, mode: DependencyMode) => { await store.updateProject(id, { dependency_mode: mode }); await load(id); },
     setFields: async (id: string, fields: FieldDef[]) => { await store.updateProject(id, { fields }); await load(id); },
+    setBaseline: async (id: string, baseline: Baseline | null) => { await store.updateProject(id, { baseline }); await load(id); },
     setViews: async (id: string, views: SavedView[]) => { await store.updateProject(id, { views }); await load(id); },
     remove: async (id: string) => { await store.deleteProject(id); await load(null); },
   };

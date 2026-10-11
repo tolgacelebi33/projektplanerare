@@ -125,6 +125,7 @@ const CSV = "Namn;Beskrivning\nUtan datum ett;A\nUtan datum två;B\n";
 async function importUndated(page: Page) {
   await page.goto("/"); await page.waitForSelector(".gantt_row");
   await bar(page).getByLabel("Importfil").setInputFiles({ name: "utandatum.csv", mimeType: "text/csv", buffer: Buffer.from(CSV, "utf8") });
+  await page.getByRole("dialog", { name: "Förhandsgranska import" }).getByRole("button", { name: "Importera" }).click(); // förhandsgranskningen är på som standard
   await page.waitForTimeout(900);
 }
 const rowOf = (page: Page, title: string) => page.locator(".gantt_row", { has: page.locator(".grid-title", { hasText: title }) });
@@ -183,9 +184,11 @@ test("UX11 flaggan följer med i JSON-export och import, och återkommande rader
 });
 
 test("UX12 ett klick på tom tidslinje bredvid en stapel stänger också panelen (även när raderna fyller skärmen)", async ({ page }) => {
+  await page.setViewportSize({ width: 1500, height: 1100 }); // raderna ska ligga i DOM (listan är virtualiserad och verktygsraderna tar plats)
   await openApp(page, "dhtmlx");
   await page.locator('.gantt_row[data-task-id="i7"] .grid-title').click();
   await expect(panel(page)).toBeVisible();
+  await expect(page.locator(".gantt_row[data-task-id=\"i9\"]")).toBeVisible(); // raderna ritas om när panelen öppnats
   const tl = (await page.locator(".gantt_task").first().boundingBox())!;
   const r = (await page.locator(".gantt_row[data-task-id=\"i9\"]").boundingBox())!;
   await page.mouse.click(tl.x + 40, r.y + r.height / 2); // vänstra delen av tidslinjen, långt från stapeln

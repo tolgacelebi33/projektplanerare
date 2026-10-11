@@ -1,5 +1,5 @@
 import { isISODate, dayNumber, addDays, diffDays } from "./dates";
-import { FIELD_LIMITS, FIELD_TYPES, GROUP_COLORS, LIMITS, RECURRENCES, type FieldDef, type SavedView, type Dependency, type Item, type Status } from "./types";
+import { type Baseline, MAX_BASELINE_ITEMS, DEPENDENCY_TYPES, FIELD_LIMITS, FIELD_TYPES, GROUP_COLORS, LIMITS, MAX_LAG, RECURRENCES, type FieldDef, type SavedView, type Dependency, type Item, type Status } from "./types";
 
 export class RuleError extends Error {
   constructor(public code: string, message: string, public data?: Record<string, string>) {
@@ -65,6 +65,8 @@ export function validateDependency(dep: Dependency, all: Map<string, Item>, exis
   if (from.workspace_id !== dep.workspace_id || to.workspace_id !== dep.workspace_id)
     throw new RuleError("cross_workspace", "Beroende korsar workspace");
   if (from.project_id !== to.project_id) throw new RuleError("cross_project", "Beroende korsar projekt");
+  if (!DEPENDENCY_TYPES.includes(dep.type)) throw new RuleError("bad_dep_type", `Ogiltig beroendetyp: ${String(dep.type)}`);
+  if (dep.lag !== undefined && (!Number.isInteger(dep.lag) || Math.abs(dep.lag) > MAX_LAG)) throw new RuleError("bad_lag", `Fördröjningen måste vara ett heltal mellan -${MAX_LAG} och ${MAX_LAG} dagar`);
   if (reaches(dep.to_item_id, dep.from_item_id, existing))
     throw new RuleError("dep_cycle", "Beroendet skulle bilda en cykel");
 }
@@ -130,19 +132,35 @@ export function rederiveEpics(items: Map<string, Item>, fromParentIds: (string |
  * "Flexibelt" som i Asana och monday: bara posten som bryter beroendet flyttas, och bara framåt. Luckor behålls och inget dras tidigare.
  * Längden bevaras, och kedjan följer vidare. Epics flyttas aldrig (deras datum härleds ur innehållet). Muterar `items`, returnerar de flyttade id:na.
  */
+/**
+ * Tidigaste start för `succ` givet ett beroende av `pred` (längden på `succ` bevaras):
+ * slut-start: efter att föregångaren slutat, start-start: när föregångaren startat, slut-slut: slutar inte före föregångarens slut,
+ * start-slut: slutar inte före föregångarens start. Fördröjningen läggs på (negativ = försprång).
+ */
+export function earliestStart(pred: Pick<Item, "start" | "end">, succ: Pick<Item, "start" | "end">, d: Pick<Dependency, "type" | "lag">): string {
+  const lag = d.lag ?? 0;
+  const len = diffDays(succ.start, succ.end);
+  switch (d.type) {
+    case "start_to_start": return addDays(pred.start, lag);
+    case "finish_to_finish": return addDays(pred.end, lag - len);
+    case "start_to_finish": return addDays(pred.start, lag - len);
+    default: return addDays(pred.end, 1 + lag);
+  }
+}
+
 export function shiftSuccessors(items: Map<string, Item>, deps: Dependency[], fromIds: string[]): string[] {
-  const next = new Map<string, string[]>();
-  for (const d of deps) next.set(d.from_item_id, [...(next.get(d.from_item_id) ?? []), d.to_item_id]);
+  const next = new Map<string, Dependency[]>();
+  for (const d of deps) next.set(d.from_item_id, [...(next.get(d.from_item_id) ?? []), d]);
   const moved = new Set<string>();
   const queue = [...fromIds];
   let guard = 0;
   while (queue.length && guard++ < 100_000) {
     const x = items.get(queue.shift()!);
     if (!x) continue;
-    for (const yId of next.get(x.id) ?? []) {
-      const y = items.get(yId);
+    for (const d of next.get(x.id) ?? []) {
+      const y = items.get(d.to_item_id);
       if (!y || y.type === "epic") continue;
-      const need = addDays(x.end, 1);
+      const need = earliestStart(x, y, d);
       if (dayNumber(y.start) >= dayNumber(need)) continue;
       const delta = diffDays(y.start, need);
       items.set(y.id, { ...y, start: addDays(y.start, delta), end: addDays(y.end, delta) });
@@ -231,5 +249,18 @@ export function validateSavedViews(views: SavedView[]): void {
     if (typeof v.name !== "string" || !v.name.trim() || v.name.length > FIELD_LIMITS.viewName || names.has(v.name.trim().toLowerCase())) bad(`Vynamnet måste vara unikt, inte tomt och högst ${FIELD_LIMITS.viewName} tecken`);
     names.add(v.name.trim().toLowerCase());
     if (!["gantt", "wheel", "board", "calendar", "week", "workload", "portfolio"].includes(v.view) || !["day", "week", "month"].includes(v.zoom) || typeof v.boardGroup !== "string" || !Array.isArray(v.columns) || !v.filter || typeof v.filter !== "object") bad("Ogiltig sparad vy");
+  }
+}
+
+/** Baslinjen är ett ögonblicksbild av datum: giltiga datum, slut inte före start, och rimligt antal poster. */
+export function validateBaseline(b: Baseline): void {
+  const bad = (msg: string) => { throw new RuleError("bad_baseline", msg); };
+  if (!b || typeof b !== "object" || typeof b.saved_at !== "string" || !b.items || typeof b.items !== "object" || Array.isArray(b.items)) bad("Ogiltig baslinje");
+  if (!isISODate(b.saved_at.slice(0, 10))) bad("Ogiltigt datum för baslinjen");
+  const ids = Object.keys(b.items);
+  if (ids.length > MAX_BASELINE_ITEMS) bad(`Högst ${MAX_BASELINE_ITEMS} poster i en baslinje`);
+  for (const id of ids) {
+    const e = b.items[id];
+    if (!id || id.length > 100 || !e || !isISODate(e.start) || !isISODate(e.end) || dayNumber(e.end) < dayNumber(e.start)) bad("Ogiltig post i baslinjen");
   }
 }

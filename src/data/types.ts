@@ -18,9 +18,14 @@ export interface Project {
   fields?: FieldDef[];
   /** Sparade vyer (vy, filter, kolumner, gruppering under ett namn). */
   views?: SavedView[];
+  /** Baslinje: planens datum vid en tidpunkt, för att se glidning. Posterna är nycklar (id). */
+  baseline?: Baseline;
   /** Läsbar kod (PRJ0001). Delas ut av lagret, aldrig av användaren, och återanvänds aldrig. */
   code?: string;
 }
+
+export interface Baseline { saved_at: string; items: Record<string, { start: string; end: string }> }
+export const MAX_BASELINE_ITEMS = 50_000;
 
 export type FieldType = "text" | "number" | "date" | "select";
 /** Ett eget fält. `options` är rullistans val (bara för `select`), `card` att värdet visas på korten. */
@@ -86,12 +91,18 @@ export interface Item {
   sort_order: number;
 }
 
+export type DependencyType = "finish_to_start" | "start_to_start" | "finish_to_finish" | "start_to_finish";
+export const DEPENDENCY_TYPES: DependencyType[] = ["finish_to_start", "start_to_start", "finish_to_finish", "start_to_finish"];
+export const MAX_LAG = 365;
 export interface Dependency {
   id: string;
   workspace_id: string;
   from_item_id: string;
   to_item_id: string;
-  type: "finish_to_start";
+  /** Slut-start (standard), start-start, slut-slut eller start-slut. */
+  type: DependencyType;
+  /** Fördröjning i hela dagar (negativt = försprång). Saknas: 0. */
+  lag?: number;
 }
 
 export interface Fixture {

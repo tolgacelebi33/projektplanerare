@@ -84,9 +84,15 @@ export async function importParsed(store: MemoryStore, workspaceId: string, pars
       const made = await store.createItem({ ...rest, sort_order: rest.sort_order + sortBase, workspace_id: workspaceId, project_id: project.id, parent_id: parent_id ? idMap.get(parent_id)! : null, assignee_id });
       idMap.set(id, made.id); createdItems.push(made.id);
     }
+    if (parsed.baseline && !existing) { // en baslinje hör till ett helt projekt: den läggs inte in i ett projekt som redan har sin egen plan
+      // Baslinjens nycklar är filens id: de byts mot de nya posternas id (poster som inte kom med utelämnas)
+      const items: Record<string, { start: string; end: string }> = {};
+      for (const [k, v] of Object.entries(parsed.baseline.items)) { const nid = idMap.get(k); if (nid) items[nid] = v; }
+      if (Object.keys(items).length) await store.updateProject(project.id, { baseline: { saved_at: parsed.baseline.saved_at, items } });
+    }
     const skippedDeps: string[] = [];
     for (const d of parsed.deps) {
-      try { createdDeps.push((await store.createDependency({ workspace_id: workspaceId, from_item_id: idMap.get(d.from)!, to_item_id: idMap.get(d.to)!, type: "finish_to_start" })).id); }
+      try { createdDeps.push((await store.createDependency({ workspace_id: workspaceId, from_item_id: idMap.get(d.from)!, to_item_id: idMap.get(d.to)!, type: d.type ?? "finish_to_start", ...(d.lag ? { lag: d.lag } : {}) })).id); }
       catch { skippedDeps.push(`${byId.get(d.from)?.title ?? d.from} -> ${byId.get(d.to)?.title ?? d.to}`); }
     }
     if (unknown.size) warnings.push(sv.ex.unknownAssignees([...unknown].join(", ")));

@@ -1,11 +1,11 @@
 import type { DataStore } from "./DataStore";
-import { RuleError, rederiveEpics, shiftSuccessors, validateDependency, validateFieldDefs, validateItemShape, validateParent, validateSavedViews } from "./rules";
+import { RuleError, earliestStart, rederiveEpics, shiftSuccessors, validateBaseline, validateDependency, validateFieldDefs, validateItemShape, validateParent, validateSavedViews } from "./rules";
 import { addDays } from "./dates";
 import { extendSeries } from "./actions";
 import { PLACEHOLDER_RENAMES, placeholderOldName } from "./fixtures";
 import { countersFor, validCounters, type Counters, emptyCounters, itemCode, nextNumber, parseProjectCode, projectCode } from "./codes";
 import { applyPatch, isPatchList, json, makePatch, type Entry, type Patch } from "./patch";
-import type { Dependency, DependencyMode, FieldDef, Fixture, Item, Project, SavedView, User } from "./types";
+import type { Baseline, Dependency, DependencyMode, FieldDef, Fixture, Item, Project, SavedView, User } from "./types";
 
 /** Allt lagret håller, för att kunna sparas och återställas. */
 export interface Snapshot {
@@ -334,7 +334,7 @@ export class MemoryStore implements DataStore {
     this.commit(true);
     return proj;
   }
-  async updateProject(id: string, patch: { name?: string; dependency_mode?: DependencyMode; fields?: FieldDef[]; views?: SavedView[] }) {
+  async updateProject(id: string, patch: { name?: string; dependency_mode?: DependencyMode; fields?: FieldDef[]; views?: SavedView[]; baseline?: Baseline | null }) {
     await this.tick("updateProject");
     const cur = this.projects.get(id);
     if (!cur) throw new RuleError("not_found", `Projekt ${id} finns inte`);
@@ -344,7 +344,9 @@ export class MemoryStore implements DataStore {
     if (patch.dependency_mode !== undefined && patch.dependency_mode !== "shift" && patch.dependency_mode !== "none") throw new RuleError("bad_mode", "Ogiltigt beroendeläge");
     if (patch.fields !== undefined) validateFieldDefs(patch.fields);
     if (patch.views !== undefined) validateSavedViews(patch.views);
+    if (patch.baseline) validateBaseline(patch.baseline);
     const next: Project = { ...cur, name, dependency_mode: patch.dependency_mode ?? cur.dependency_mode ?? "shift", ...(patch.fields !== undefined ? { fields: patch.fields } : {}), ...(patch.views !== undefined ? { views: patch.views } : {}) };
+    if (patch.baseline === null) delete next.baseline; else if (patch.baseline) next.baseline = patch.baseline;
     this.projects.set(id, next);
     this.writes.push({ method: "updateProject", args: [id, patch] });
     this.commit();
@@ -399,13 +401,20 @@ export class MemoryStore implements DataStore {
     // Regel: när status blir Klar sätts framsteget till 100 (om framsteg inte ändras i samma skrivning)
     if (this.rules.doneSetsProgress && patch.status === "done" && cur.status !== "done" && patch.progress === undefined && cur.type !== "epic") next.progress = 100;
     if (cur.undated && (next.start !== cur.start || next.end !== cur.end) && patch.undated === undefined) delete next.undated; // nya datum: posten är schemalagd
-    // I läget "shift" får en uppgift inte flyttas till att börja före att dess föregångare är klar (som Asana och monday i strikt läge).
-    if (next.start !== cur.start && next.start < cur.start && cur.type !== "epic" && this.modeOf(cur.project_id) === "shift") {
-      const ends = [...this.deps.values()].filter((d) => d.to_item_id === id).map((d) => this.items.get(d.from_item_id)).filter((p): p is Item => !!p && p.type !== "epic").map((p) => p.end);
-      if (ends.length) {
-        const need = addDays(ends.sort().at(-1)!, 1);
-        if (next.start < need) throw new RuleError("before_predecessor", `Kan inte börja före att föregångaren är klar. Tidigast ${need}.`, { date: need });
+    // I läget "shift" får en uppgift inte flyttas så att ett beroende bryts (som Asana och monday i strikt läge): slut-start och start-start gäller starten,
+    // slut-slut och start-slut gäller slutet, och fördröjningen räknas med. Det är bara en kant som flyttas tidigare som kontrolleras.
+    if ((next.start < cur.start || next.end < cur.end) && cur.type !== "epic" && this.modeOf(cur.project_id) === "shift") {
+      let need = "";
+      for (const d of this.deps.values()) {
+        if (d.to_item_id !== id) continue;
+        const p = this.items.get(d.from_item_id);
+        if (!p || p.type === "epic") continue;
+        const startEdge = d.type === "finish_to_start" || d.type === "start_to_start";
+        if (startEdge ? next.start >= cur.start : next.end >= cur.end) continue;
+        const e = earliestStart(p, next, d);
+        if (next.start < e && e > need) need = e;
       }
+      if (need) throw new RuleError("before_predecessor", `Kan inte flyttas före vad beroendet tillåter. Tidigast ${need}.`, { date: need });
     }
     // Epics med innehåll får sina datum ur barnen och kan inte sättas direkt
     if (cur.type === "epic" && (next.start !== cur.start || next.end !== cur.end) && [...this.items.values()].some((i) => i.parent_id === id))
@@ -449,6 +458,20 @@ export class MemoryStore implements DataStore {
     this.writes.push({ method: "createDependency", args: [dep] });
     this.commit();
     return created;
+  }
+  /** Ändrar typ och/eller fördröjning. Efterföljaren flyttas om beroendet nu bryts (i läget shift). */
+  async updateDependency(id: string, patch: { type?: Dependency["type"]; lag?: number }) {
+    await this.tick("updateDependency");
+    const cur = this.deps.get(id);
+    if (!cur) throw new RuleError("not_found", `Beroende ${id} finns inte`);
+    const next: Dependency = { ...cur, ...(patch.type !== undefined ? { type: patch.type } : {}), ...(patch.lag !== undefined ? { lag: patch.lag } : {}) };
+    if (next.lag === 0) delete next.lag;
+    validateDependency(next, this.items, [...this.deps.values()].filter((d) => d.id !== id));
+    this.deps.set(id, next);
+    this.afterDatesChanged([next.from_item_id]);
+    this.writes.push({ method: "updateDependency", args: [id, patch] });
+    this.commit();
+    return { ...next };
   }
   async deleteDependency(id: string) {
     await this.tick("deleteDependency");

@@ -2,11 +2,11 @@ import { useEffect, useMemo, useRef } from "react";
 import { gantt, type Task } from "dhtmlx-gantt";
 import "dhtmlx-gantt/codebase/dhtmlxgantt.css";
 import type { DataStore } from "../data/DataStore";
-import { addDays, fromLocalDate, toLocalDate, todayISO } from "../data/dates";
+import { addDays, diffDays, fromLocalDate, toLocalDate, todayISO } from "../data/dates";
 import { friendlyError } from "../i18n/errors";
 import type { ISODate } from "../data/types";
 import { isOverdue } from "../data/rules";
-import type { Dependency, Item, Status, User } from "../data/types";
+import type { Baseline, Dependency, Item, Status, User } from "../data/types";
 import { sv } from "../i18n/sv";
 import { datePatch, persistPatch } from "./persist";
 import { STATUS_GLYPH } from "./statusUi";
@@ -31,6 +31,8 @@ import { setDragParent, startRowDragFeedback } from "./rowDrag";
 import { consumeFocusMedian, scrollCarry } from "../scrollCarry";
 /** Rutnätets fasta bredd är GRID_WIDTH (layout.ts). Panelen till höger tar plats från tidslinjen, aldrig från rutnätet. */
 
+const LINK_TYPE: Record<string, string> = { finish_to_start: "0", start_to_start: "1", finish_to_finish: "2", start_to_finish: "3" };
+const DEP_TYPE: Record<string, "finish_to_start" | "start_to_start" | "finish_to_finish" | "start_to_finish"> = { "0": "finish_to_start", "1": "start_to_start", "2": "finish_to_finish", "3": "start_to_finish" };
 interface TaskRow { sm: string; code: string; cf: Record<string, string | number | null>; od: boolean; und: boolean; rec: boolean; color: string; id: string; text: string; start_date: Date; end_date: Date; type: string; kind: Item["type"]; parent: string | number; status: Status; priority: Item["priority"]; assignee: string; progress: number; open: boolean }
 interface LinkRow { id: string; source: string; target: string; type: string }
 
@@ -46,7 +48,9 @@ function treeOrder(items: Item[]): string[] {
 
 export interface ContextArgs { id: string | null; x: number; y: number; date: ISODate | null }
 
-export function DhtmlxGantt({ store, items, deps, zoom, onError, onPersisted, revealId, onNotice, onCreateAt, onRename, onContext, onToggleDone, onMoveRow, onAddInGroup, onEditField, onSelect, selected, touchMode, fieldDefs, gridWidth, columns, users, collapse, colors, todayToken, seriesMarks, onOpenItem }: {
+export function DhtmlxGantt({ store, items, deps, zoom, onError, onPersisted, revealId, onNotice, onCreateAt, onRename, onContext, onToggleDone, onMoveRow, onAddInGroup, onEditField, onSelect, selected, touchMode, fieldDefs, gridWidth, columns, users, collapse, colors, todayToken, seriesMarks, onOpenItem, baseline }: {
+  /** Baslinje att rita som tunna staplar under de verkliga (null: ingen). */
+  baseline?: Baseline | null;
   /** Serier som visas som en rad: raden (id) och de andra tillfällena, som ritas som romber på raden. */
   seriesMarks?: ReadonlyMap<string, Item[]>;
   /** Klick på en romb: öppna det tillfället. */
@@ -96,6 +100,8 @@ export function DhtmlxGantt({ store, items, deps, zoom, onError, onPersisted, re
   const marksRef = useRef<ReadonlyMap<string, Item[]>>(new Map());
   marksRef.current = seriesMarks ?? new Map();
   const drawMarksRef = useRef<(() => void) | null>(null);
+  const baselineRef = useRef<Baseline | null>(null);
+  baselineRef.current = baseline ?? null;
   const openItemRef = useRef(onOpenItem);
   openItemRef.current = onOpenItem;
   const latest = useRef({ store, onError, workspaceId, onPersisted, onNotice, onCreateAt, onRename, onContext, onToggleDone, onMoveRow, onAddInGroup, onEditField, onSelect, users });
@@ -127,7 +133,7 @@ export function DhtmlxGantt({ store, items, deps, zoom, onError, onPersisted, re
       sm: (marks.get(i.id) ?? []).map((m) => `${m.id}|${m.start}|${m.status}|${m.title}`).join(";"), code: i.code ?? "", status: i.status, priority: i.priority, assignee: i.assignee_id ?? "", progress: i.progress, color: colors.get(i.id) ?? "none", rec: !!i.series, und: !!i.undated, od: isOverdue(i, todayISO()), cf: i.fields ?? {},
       open: true,
     }));
-    const links: LinkRow[] = deps.map((d) => ({ id: d.id, source: d.from_item_id, target: d.to_item_id, type: "0" }));
+    const links: LinkRow[] = deps.map((d) => ({ id: d.id, source: d.from_item_id, target: d.to_item_id, type: LINK_TYPE[d.type] ?? "0" }));
     return { tasks, links, order: treeOrder(items) };
   }, [items, deps, colors, seriesMarks]);
 
@@ -198,7 +204,10 @@ export function DhtmlxGantt({ store, items, deps, zoom, onError, onPersisted, re
       const host = (area?.querySelector(".gantt_data_area") as HTMLElement | null) ?? area ?? null;
       if (!host) return;
       host.querySelectorAll(":scope > .series-marks").forEach((e) => e.remove());
-      if (!marksRef.current.size) return;
+      const bl = baselineRef.current;
+      if (!marksRef.current.size && !bl) return;
+      const st = gantt.getScrollState(), viewH = (area?.clientHeight ?? 800) + 80; // bara raderna som syns (och lite till), så att en stor plan inte ritar tusentals element vid varje rullning
+      const near = (top: number) => top >= (st.y ?? 0) - 80 && top <= (st.y ?? 0) + viewH;
       const wrap = document.createElement("div");
       wrap.className = "series-marks";
       wrap.style.cssText = "position:absolute;left:0;top:0;width:0;height:0;z-index:3;";
@@ -206,6 +215,7 @@ export function DhtmlxGantt({ store, items, deps, zoom, onError, onPersisted, re
         if (!gantt.isTaskExists(repId) || !gantt.isTaskVisible(repId)) continue;
         const task = gantt.getTask(repId);
         const pos = gantt.getTaskPosition(task, task.start_date as Date, task.end_date as Date);
+        if (!near(pos.top as number)) continue;
         for (const m of others) {
           const d = toLocalDate(m.start);
           const cell = gantt.getTaskPosition(task, d, toLocalDate(addDays(m.start, 1)));
@@ -219,6 +229,23 @@ export function DhtmlxGantt({ store, items, deps, zoom, onError, onPersisted, re
           b.addEventListener("pointerdown", (e) => e.stopPropagation());
           wrap.appendChild(b);
         }
+      }
+      // Baslinje: en tunn stapel under den verkliga för varje post som fanns när baslinjen sparades. Röd kant om slutet har glidit.
+      if (bl) {
+        gantt.eachTask((task) => {
+          const e = bl.items[String(task.id)];
+          if (!e || !gantt.isTaskVisible(task.id)) return;
+          const pos = gantt.getTaskPosition(task, task.start_date as Date, task.end_date as Date);
+          if (!near(pos.top as number)) return;
+          const a = gantt.getTaskPosition(task, toLocalDate(e.start), toLocalDate(addDays(e.end, 1)));
+          const slip = diffDays(e.end, addDays(fromLocalDate(task.end_date as Date), -1));
+          const bar = document.createElement("div");
+          bar.className = `baseline-bar${slip > 0 ? " slip" : slip < 0 ? " early" : ""}`;
+          bar.dataset.id = String(task.id);
+          bar.style.cssText = `position:absolute;left:${a.left}px;top:${(pos.top as number) + (pos.height as number) + 1}px;width:${Math.max(4, a.width as number)}px;`;
+          bar.title = sv.baseline.tip(e.start, e.end, slip);
+          wrap.appendChild(bar);
+        });
       }
       host.appendChild(wrap);
     };
@@ -328,16 +355,13 @@ export function DhtmlxGantt({ store, items, deps, zoom, onError, onPersisted, re
         // Efter sparning hämtas data om: biblioteket räknar själv om epics datum (och tappar milstolpens dag), lagret har rätt värden
         if (patch) persistPatch(latest.current.store, known.current, String(id), patch).then(() => latest.current.onPersisted?.()).catch(latest.current.onError);
       }, {}),
-      // Beroenden normaliseras till slut-till-start. DHTMLX anger typ efter vilka handtag man drog mellan:
-      //  "0" slut -> början: källan är föregångare.
-      //  "3" början -> slut: man valde A:s början och B:s slut, alltså börjar A när B är klar, så B är föregångare (tvärtom mot källa -> mål).
-      //  "1" början -> början och "2" slut -> slut finns inte i modellen och avvisas med en förklaring.
+      // Beroenden: DHTMLX anger typ efter vilka handtag man drog mellan (0 slut till start, 1 start till start, 2 slut till slut, 3 start till slut), källan är föregångare.
       gantt.attachEvent("onBeforeLinkAdd", (_id, link) => {
         const src = String(link.source), tgt = String(link.target), type = String(link.type);
         const notice = (m: string) => (latest.current.onNotice ?? latest.current.onError)(m);
-        if (type !== "0" && type !== "3") { notice(sv.link.unsupported); return false; }
-        const [from, to] = type === "0" ? [src, tgt] : [tgt, src];
-        latest.current.store.createDependency({ workspace_id: latest.current.workspaceId, from_item_id: from, to_item_id: to, type: "finish_to_start" })
+        const dtype = DEP_TYPE[type];
+        if (!dtype) { notice(sv.link.unsupported); return false; }
+        latest.current.store.createDependency({ workspace_id: latest.current.workspaceId, from_item_id: src, to_item_id: tgt, type: dtype })
           .then(() => latest.current.onPersisted?.())
           .catch((e) => notice(friendlyError(e)));
         return false; // beroendet ritas först när det sparats och vyn synkats från lagret
@@ -488,7 +512,7 @@ export function DhtmlxGantt({ store, items, deps, zoom, onError, onPersisted, re
     const sameStructure =
       current.length === order.length && current.every((id, i) => id === order[i]) &&
       tasks.every((t) => String(gantt.getParent(t.id) || 0) === String(t.parent)) &&
-      gantt.getLinks().length === links.length && links.every((l) => gantt.isLinkExists(l.id) && String(gantt.getLink(l.id).source) === l.source && String(gantt.getLink(l.id).target) === l.target);
+      gantt.getLinks().length === links.length && links.every((l) => gantt.isLinkExists(l.id) && String(gantt.getLink(l.id).source) === l.source && String(gantt.getLink(l.id).target) === l.target && String(gantt.getLink(l.id).type) === l.type);
     gantt.silent(() => {
       if (sameStructure) {
         consumeFocusMedian();
@@ -528,7 +552,7 @@ export function DhtmlxGantt({ store, items, deps, zoom, onError, onPersisted, re
     const id = pendingFocus.current;
     if (id) requestAnimationFrame(() => { host.current?.querySelector<HTMLElement>(`[data-check="${CSS.escape(id)}"]`)?.focus(); });
   }, [mapped]);
-  useEffect(() => { const id = requestAnimationFrame(() => drawMarksRef.current?.()); return () => cancelAnimationFrame(id); }, [mapped, seriesMarks]);
+  useEffect(() => { const id = requestAnimationFrame(() => drawMarksRef.current?.()); return () => cancelAnimationFrame(id); }, [mapped, seriesMarks, baseline]);
 
   useEffect(() => {
     gantt.config.scales = ZOOM[zoom].scales as never;

@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { canMove, changeRecurrence, deleteSeries, deleteSubtree, descendants, epicChoices, extendSeries, MAX_SERIES, renameSeries, seriesMembers, swapWithSibling } from "../data/actions";
 import { effectiveColors } from "../data/colors";
-import { GROUP_COLORS, RECURRENCES, type GroupColor, type Recurrence } from "../data/types";
+import { DEPENDENCY_TYPES, GROUP_COLORS, RECURRENCES, type GroupColor, type Recurrence } from "../data/types";
 import type { DataStore } from "../data/DataStore";
-import { isISODate, todayISO } from "../data/dates";
+import { diffDays, isISODate, todayISO } from "../data/dates";
 import { MAX_DESCRIPTION, MAX_TITLE, RuleError, isOverdue, validateItemShape } from "../data/rules";
-import type { Dependency, FieldDef, Item, Priority, Status, User } from "../data/types";
+import type { Baseline, Dependency, FieldDef, Item, Priority, Status, User } from "../data/types";
 import { friendlyError } from "../i18n/errors";
 import { sv } from "../i18n/sv";
 import { STATUS_GLYPH } from "../proto/statusUi";
@@ -25,10 +25,12 @@ type SaveState = { kind: "idle" } | { kind: "saving" } | { kind: "saved" } | { k
  * Detaljpanel för en post, fast bredd, dockad till höger. Ändringar sparas per fält direkt (inget spara-steg), så att man
  * kan hoppa mellan poster utan att tappa något. Läser alltid färska data från DataStore (drag i vyerna sparas direkt i storen).
  */
-export function ItemPanel({ fieldDefs = [], onDuplicate, onNewSeries, nextDate, features = DEFAULT_FEATURES, checklistProgress = false, store, projectId, itemId, dataVersion, autoSelectTitle = false, focusField = null, onFocusDone, onClose, onChanged, onOpen }: {
+export function ItemPanel({ baseline, fieldDefs = [], onDuplicate, onNewSeries, nextDate, features = DEFAULT_FEATURES, checklistProgress = false, store, projectId, itemId, dataVersion, autoSelectTitle = false, focusField = null, onFocusDone, onClose, onChanged, onOpen }: {
   features?: Features; checklistProgress?: boolean;
   /** Projektets egna fält. */
   fieldDefs?: FieldDef[];
+  /** Projektets baslinje (om den finns), för att visa postens plan och glidning. */
+  baseline?: Baseline | null;
   onDuplicate?: (id: string) => void; onNewSeries?: (item: Item, count: number) => void;
   /** Datum för nästa tillfälle i postens serie (om den ingår i en). */
   nextDate?: string | null;
@@ -223,6 +225,10 @@ export function ItemPanel({ fieldDefs = [], onDuplicate, onNewSeries, nextDate, 
             {rows.map(({ dep, other }) => (
               <li key={dep.id}>
                 <button type="button" className="panel-link" onClick={() => onOpen(other.id)}>{STATUS_GLYPH[other.status]} {other.title}</button>
+                <select className="dep-type" aria-label={sv.panel.depTypeOf(other.title)} value={dep.type} onChange={(e) => void depAction(`dep-${kind}`, () => store.updateDependency(dep.id, { type: e.target.value as Dependency["type"] }))}>
+                  {DEPENDENCY_TYPES.map((t) => <option key={t} value={t}>{sv.panel.depTypes[t]}</option>)}
+                </select>
+                <LagInput key={`${dep.id}-${dep.lag ?? 0}`} value={dep.lag ?? 0} label={sv.panel.depLagOf(other.title)} onCommit={(n) => depAction(`dep-${kind}`, () => store.updateDependency(dep.id, { lag: n }))} />
                 <button type="button" className="panel-x" aria-label={sv.panel.removeDep(other.title)} onClick={() => depAction(`dep-${kind}`, () => store.deleteDependency(dep.id))}>×</button>
               </li>
             ))}
@@ -374,6 +380,15 @@ export function ItemPanel({ fieldDefs = [], onDuplicate, onNewSeries, nextDate, 
           {err("order")}
         </section>
 
+        {baseline && (() => {
+          const e = baseline.items[item.id];
+          return (
+            <section className="panel-section" data-section="baseline">
+              <h3>{sv.baseline.inPanel}</h3>
+              <p className="panel-muted">{e ? sv.baseline.panelLine(e.start, e.end, diffDays(e.end, item.end)) : sv.baseline.noEntry}</p>
+            </section>
+          );
+        })()}
         {!epic && depList("pred")}
         {!epic && depList("succ")}
 
@@ -487,3 +502,15 @@ function PanelHead({ onClose, kind, code, refCode, crumbs = [], saveState }: { o
 
 const messageFor = friendlyError;
 
+
+/** Fördröjning i dagar för ett beroende: ändras när fältet lämnas eller vid Enter (negativt = försprång). */
+function LagInput({ value, label, onCommit }: { value: number; label: string; onCommit: (n: number) => unknown }) {
+  const [v, setV] = useState(String(value));
+  const done = () => { const n = Number(v.replace(",", ".")); if (v.trim() === "" ) { setV(String(value)); return; } if (n !== value) void onCommit(n); };
+  return (
+    <span className="dep-lag">
+      <input type="number" step={1} value={v} aria-label={label} title={label} onChange={(e) => setV(e.target.value)} onBlur={done} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); (e.target as HTMLInputElement).blur(); } }} />
+      <span aria-hidden="true">{sv.panel.depDays}</span>
+    </span>
+  );
+}

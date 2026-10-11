@@ -79,6 +79,7 @@ test("ST5 stor mängd data (importerad fil) sparas och läses tillbaka lika", as
   await page.goto(url); await page.waitForSelector(".gantt_task_line");
   const rows = ["Titel;Start;Slut", ...Array.from({ length: 800 }, (_, i) => `Post ${i + 1};2026-10-${String((i % 28) + 1).padStart(2, "0")};2026-10-${String((i % 28) + 1).padStart(2, "0")}`)].join("\n");
   await page.getByRole("group", { name: "Projekt" }).getByLabel("Importfil").setInputFiles({ name: "stor.csv", mimeType: "text/csv", buffer: Buffer.from(rows, "utf8") });
+  await page.getByRole("dialog", { name: "Förhandsgranska import" }).getByRole("button", { name: "Importera" }).click(); // förhandsgranskningen är på som standard
   await expect(page.getByRole("alert").filter({ hasText: "Importerade 800 poster" })).toBeVisible();
   await expect.poll(async () => ((await idbGet(page, "state")) as { snapshot: { items: unknown[] } }).snapshot.items.length, { timeout: 15000 }).toBe(820);
   await page.reload(); await page.waitForSelector(".gantt_task_line");

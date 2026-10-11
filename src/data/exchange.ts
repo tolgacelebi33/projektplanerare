@@ -1,12 +1,13 @@
 import { addDays, isISODate, recurringDates, todayISO } from "./dates";
-import { RuleError, validateFieldDefs, validateItemShape, validateSavedViews } from "./rules";
+import { RuleError, validateBaseline, validateFieldDefs, validateItemShape, validateSavedViews } from "./rules";
 import { newChecklistId, normalizeLink } from "./extras";
 import { importFieldValue, inferFieldDef, newFieldId } from "./fields";
 import { FIELD_LIMITS, LIMITS, type FieldValue } from "./types";
 import { sv } from "../i18n/sv";
 import { enDict, svDict } from "../i18n/sv";
 import { friendlyError } from "../i18n/errors";
-import type { Dependency, DependencyMode, FieldDef, ISODate, Item, ItemType, Priority, Project, Recurrence, SavedView, Status, User } from "./types";
+import { DEPENDENCY_TYPES, MAX_LAG, type DependencyType } from "./types";
+import type { Baseline, Dependency, DependencyMode, FieldDef, ISODate, Item, ItemType, Priority, Project, Recurrence, SavedView, Status, User } from "./types";
 
 /**
  * Export och import av projekt, utan beroende av lagring. JSON ger full återgivning (används också för att kopiera ett projekt).
@@ -32,13 +33,15 @@ export interface ParsedProject {
   name: string;
   dependency_mode: DependencyMode;
   items: ParsedItem[];
-  deps: { from: string; to: string }[];
+  deps: { from: string; to: string; type?: DependencyType; lag?: number }[];
   /** Projektets egna fält och sparade vyer (JSON, och kolumner som blev fält vid CSV-import). */
   fields?: FieldDef[];
   views?: SavedView[];
   /** Saker som importerades med avvikelse (okänd ansvarig m.m.) */
   warnings: string[];
   report?: ImportReport;
+  /** Baslinjen (JSON), med postnycklar som i filens id. */
+  baseline?: Baseline;
 }
 
 /** Sammanfattning av det som ska läggas in (antal per typ, grupper med innehåll, serier, poster utan riktigt datum). */
@@ -67,15 +70,16 @@ const TYPES: ItemType[] = ["epic", "milestone", "task"];
 export class ImportError extends Error {}
 
 /** Lagrets poster som en neutral beskrivning (ansvarig som namn, inga projekt- eller workspace-id). */
-export function toParsed(project: Pick<Project, "name" | "dependency_mode"> & Partial<Pick<Project, "fields" | "views">>, items: Item[], deps: Dependency[], users: User[]): ParsedProject {
+export function toParsed(project: Pick<Project, "name" | "dependency_mode"> & Partial<Pick<Project, "fields" | "views" | "baseline">>, items: Item[], deps: Dependency[], users: User[]): ParsedProject {
   const name = new Map(users.map((u) => [u.id, u.name]));
   const ids = new Set(items.map((i) => i.id));
   return {
     name: project.name,
     dependency_mode: project.dependency_mode ?? "shift",
     ...(project.fields?.length ? { fields: project.fields } : {}), ...(project.views?.length ? { views: project.views } : {}),
+    ...(project.baseline && Object.keys(project.baseline.items).length ? { baseline: { saved_at: project.baseline.saved_at, items: Object.fromEntries(Object.entries(project.baseline.items).filter(([k]) => ids.has(k))) } } : {}),
     items: items.map(({ workspace_id: _w, project_id: _p, assignee_id, ...rest }) => ({ ...rest, assignee: assignee_id ? name.get(assignee_id) ?? null : null })),
-    deps: deps.filter((d) => ids.has(d.from_item_id) && ids.has(d.to_item_id)).map((d) => ({ from: d.from_item_id, to: d.to_item_id })),
+    deps: deps.filter((d) => ids.has(d.from_item_id) && ids.has(d.to_item_id)).map((d) => ({ from: d.from_item_id, to: d.to_item_id, ...(d.type !== "finish_to_start" ? { type: d.type } : {}), ...(d.lag ? { lag: d.lag } : {}) })),
     warnings: [],
   };
 }
@@ -83,7 +87,7 @@ export function toParsed(project: Pick<Project, "name" | "dependency_mode"> & Pa
 // ---------- JSON ----------
 
 export function toJson(p: ParsedProject, exportedAt: string): string {
-  return JSON.stringify({ format: FORMAT, version: 1, exported_at: exportedAt, project: { name: p.name, dependency_mode: p.dependency_mode, ...(p.fields?.length ? { fields: p.fields } : {}), ...(p.views?.length ? { views: p.views } : {}) }, items: p.items, dependencies: p.deps }, null, 2);
+  return JSON.stringify({ format: FORMAT, version: 1, exported_at: exportedAt, project: { name: p.name, dependency_mode: p.dependency_mode, ...(p.fields?.length ? { fields: p.fields } : {}), ...(p.views?.length ? { views: p.views } : {}), ...(p.baseline ? { baseline: p.baseline } : {}) }, items: p.items, dependencies: p.deps }, null, 2);
 }
 
 function shapeCheck(it: ParsedItem, n: number) {
@@ -153,13 +157,16 @@ export function parseJson(text: string): ParsedProject {
   const depsRaw = Array.isArray(raw.dependencies) ? raw.dependencies : [];
   const deps = depsRaw.map((d, i) => {
     if (!isObj(d) || typeof d.from !== "string" || typeof d.to !== "string") throw new ImportError(sv.ex.depShape(i + 1));
-    return { from: d.from, to: d.to };
+    if (d.type !== undefined && !DEPENDENCY_TYPES.includes(d.type as DependencyType)) throw new ImportError(sv.ex.depType(i + 1, String(d.type)));
+    if (d.lag !== undefined && (typeof d.lag !== "number" || !Number.isInteger(d.lag) || Math.abs(d.lag) > MAX_LAG)) throw new ImportError(sv.ex.depLag(i + 1, MAX_LAG));
+    return { from: d.from, to: d.to, ...(d.type !== undefined && d.type !== "finish_to_start" ? { type: d.type as DependencyType } : {}), ...(typeof d.lag === "number" && d.lag !== 0 ? { lag: d.lag } : {}) };
   });
   const out: ParsedProject = {
     name: typeof proj.name === "string" && proj.name.trim() ? proj.name.trim().slice(0, 100) : sv.ex.defaultName,
     dependency_mode: proj.dependency_mode === "none" ? "none" : "shift", items, deps, warnings: [],
   };
   if (Array.isArray(proj.fields)) { try { validateFieldDefs(proj.fields as FieldDef[]); } catch (er) { throw new ImportError(friendlyError(er)); } out.fields = proj.fields as FieldDef[]; }
+  if (isObj(proj.baseline)) { try { validateBaseline(proj.baseline as unknown as Baseline); } catch (er) { throw new ImportError(friendlyError(er)); } out.baseline = proj.baseline as unknown as Baseline; }
   if (Array.isArray(proj.views)) { try { validateSavedViews(proj.views as SavedView[]); } catch (er) { throw new ImportError(friendlyError(er)); } out.views = proj.views as SavedView[]; }
   structureCheck(out);
   out.report = buildReport(out, null);
@@ -188,9 +195,21 @@ function treeOrder(items: ParsedItem[]): ParsedItem[] {
   return out;
 }
 
+/** Föregångare i en CSV-cell: bara id för slut-start utan fördröjning, annars id:TYP och fördröjning (till exempel i7:SS+2). Kolon avskiljer, så id som Jira-nycklar (A-12) går bra. */
+const DEP_ABBR: Record<DependencyType, string> = { finish_to_start: "FS", start_to_start: "SS", finish_to_finish: "FF", start_to_finish: "SF" };
+const predCell = (d: { from: string; type?: DependencyType; lag?: number }): string => (!d.type && !d.lag ? d.from : `${d.from}:${DEP_ABBR[d.type ?? "finish_to_start"]}${d.lag ? (d.lag > 0 ? `+${d.lag}` : `${d.lag}`) : ""}`);
+function parsePred(token: string, line: number): { ref: string; type?: DependencyType; lag?: number } {
+  const m = /^(.*):(FS|SS|FF|SF)([+-]\d+)?$/i.exec(token);
+  if (!m) return { ref: token };
+  const type = (Object.keys(DEP_ABBR) as DependencyType[]).find((k) => DEP_ABBR[k] === m[2].toUpperCase())!;
+  const lag = m[3] ? Number(m[3]) : 0;
+  if (Math.abs(lag) > MAX_LAG) throw new ImportError(sv.ex.row(line, sv.ex.depLag(0, MAX_LAG)));
+  return { ref: m[1].trim(), ...(type !== "finish_to_start" ? { type } : {}), ...(lag ? { lag } : {}) };
+}
+
 export function toCsv(p: ParsedProject): string {
   const preds = new Map<string, string[]>();
-  for (const d of p.deps) preds.set(d.to, [...(preds.get(d.to) ?? []), d.from]);
+  for (const d of p.deps) preds.set(d.to, [...(preds.get(d.to) ?? []), predCell(d)]);
   const rows = treeOrder(p.items).map((i) => [
     i.id, sv.panel.type[i.type], i.title, i.parent_id ?? "", i.start, i.type === "milestone" ? i.start : i.end, sv.status[i.status], i.assignee ?? "",
     sv.panel.priorities[i.priority], String(i.progress), i.description, (preds.get(i.id) ?? []).join(", "), i.code ?? "",
@@ -462,10 +481,10 @@ export function parseRows(rows: string[][], name: string, today: string = todayI
     if (byTitle.length === 1) return byTitle[0].id;
     throw new ImportError(sv.ex.row(line, byTitle.length > 1 ? sv.ex.refAmbiguous(what, ref, titleCount.get(ref) ?? byTitle.length) : sv.ex.refMissing(what, ref)));
   };
-  const deps: { from: string; to: string }[] = [];
+  const deps: ParsedProject["deps"] = [];
   items.forEach((it, idx) => {
     if (parentRef[idx]) it.parent_id = resolve(parentRef[idx]!, idx + 2, sv.ex.whatParent);
-    for (const p of predRef[idx]) deps.push({ from: resolve(p, idx + 2, sv.ex.whatPred), to: it.id });
+    for (const p of predRef[idx]) { const q = parsePred(p, idx + 2); deps.push({ from: resolve(q.ref, idx + 2, sv.ex.whatPred), to: it.id, ...(q.type ? { type: q.type } : {}), ...(q.lag ? { lag: q.lag } : {}) }); }
   });
   // Återkommande rader blir en serie: ett tillfälle per datum, direkt efter raden, med samma serie och egenskaper
   const catById = new Map(items.map((it, i) => [it.id, catRef[i]] as const));

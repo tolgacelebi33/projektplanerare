@@ -43,11 +43,11 @@ test.describe("beroenden skapade genom att dra mellan handtag", () => {
   const cases: [string, "left" | "right", string, "left" | "right", string][] = [
     ["i2 slut -> i3 början", "right", "i3", "left", "i2>i3"],
     ["i3 slut -> i2 början", "right", "i2", "left", "i3>i2"],
-    ["i2 början -> i3 slut (tvärtom-felet)", "left", "i3", "right", "i3>i2"],
-    ["i3 början -> i2 slut", "left", "i2", "right", "i2>i3"],
+    ["i2 början -> i3 slut (start-slut)", "left", "i3", "right", "i2>i3"],
+    ["i3 början -> i2 slut (start-slut)", "left", "i2", "right", "i3>i2"],
   ];
   for (const [name, fromSide, toId, toSide, want] of cases) {
-    test(`L ${name}: föregångaren är den vars slut valdes (${want})`, async ({ page }) => {
+    test(`L ${name}: källan är föregångare (${want})`, async ({ page }) => {
       await openApp(page, "dhtmlx");
       await setDepMode(page, "none"); // länkens riktning testas, inte flytt av efterföljare
       const fromId = name.startsWith("i2") ? "i2" : "i3";
@@ -63,16 +63,21 @@ test.describe("beroenden skapade genom att dra mellan handtag", () => {
     });
   }
 
-  test("L start -> start och slut -> slut avvisas med förklaring, och inget sparas eller ritas", async ({ page }) => {
+  test("L start -> start och slut -> slut ger ett start-start- respektive slut-slut-beroende, med källan som föregångare", async ({ page }) => {
     await openApp(page, "dhtmlx");
-      await setDepMode(page, "none"); // länkens riktning testas, inte flytt av efterföljare
-    const before = (await depsOf(page)).length;
+    await setDepMode(page, "none"); // länkens typ testas, inte flytt av efterföljare
     await dragLink(page, "i2", "left", "i3", "left");
-    await expect(page.getByRole("alert").filter({ hasText: "Bara slut-till-start-beroenden stöds" })).toBeVisible();
-    await dragLink(page, "i2", "right", "i3", "right");
-    expect(await pair(page, "i2", "i3")).toEqual([]);
-    expect((await depsOf(page)).length).toBe(before);
-    await expect(page.locator(".gantt_task_link")).toHaveCount(before);
+    await expect.poll(async () => (await depsOf(page)).filter((d) => d.from_item_id === "i2" && d.to_item_id === "i3").map((d) => (d as { type?: string }).type)).toEqual(["start_to_start"]);
+    await page.locator(".gantt_row").first().click(); // släpp markering
+    const links = await page.evaluate(() => (window as any).__dhx.getLinks().filter((l: any) => l.source === "i2" && l.target === "i3").map((l: any) => String(l.type)));
+    expect(links).toEqual(["1"]);
+  });
+
+  test("L slut -> slut mellan två poster ger ett slut-slut-beroende", async ({ page }) => {
+    await openApp(page, "dhtmlx");
+    await setDepMode(page, "none");
+    await dragLink(page, "i3", "right", "i2", "right");
+    await expect.poll(async () => (await depsOf(page)).filter((d) => d.from_item_id === "i3" && d.to_item_id === "i2").map((d) => (d as { type?: string }).type)).toEqual(["finish_to_finish"]);
   });
 
   test("L ett beroende som skulle bilda en cykel avvisas med meddelande", async ({ page }) => {
@@ -88,7 +93,8 @@ test.describe("beroenden skapade genom att dra mellan handtag", () => {
   test("L meddelandet går att stänga", async ({ page }) => {
     await openApp(page, "dhtmlx");
       await setDepMode(page, "none"); // länkens riktning testas, inte flytt av efterföljare
-    await dragLink(page, "i2", "left", "i3", "left");
+    await setZoom(page, "Månad");
+    await dragLink(page, "i6", "right", "i3", "left"); // i3 -> i6 finns redan: cykel, som ger ett meddelande
     const n = page.locator(".notice");
     await expect(n).toBeVisible();
     await n.getByRole("button", { name: "Stäng meddelandet" }).click();

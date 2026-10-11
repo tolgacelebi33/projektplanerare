@@ -24,7 +24,7 @@ test("FB1 filterraden är ett eget, märkt band under vyraden, avgränsat från 
   const tools = page.getByRole("group", { name: "Lista", exact: true });
   await expect(tools.getByRole("button", { name: "Kolumner" })).toBeVisible();
   await expect(tools.getByRole("button", { name: "Fäll ihop alla" })).toBeVisible();
-  await expect(tools.locator(".toolbar-label")).toHaveText("Lista");
+  await expect(tools.locator(".toolbar-label").first()).toHaveText("Lista");
 });
 
 test("FB2 med aktivt filter märks bandet (markerat, antal, Visar n av m) och Rensa alla filter visar allt igen", async ({ page }) => {

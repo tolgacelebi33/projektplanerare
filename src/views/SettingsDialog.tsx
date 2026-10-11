@@ -50,6 +50,7 @@ export function SettingsDialog({ fieldDefs = [], settings, people, onChange, onC
               {check(t.markUndated, t.markUndatedHint, settings.markUndated, (v) => set("markUndated", v))}
               {check(t.highlightOverdue, t.highlightOverdueHint, settings.highlightOverdue, (v) => set("highlightOverdue", v))}
               {check(t.quickFilters, t.quickFiltersHint, settings.quickFilters, (v) => set("quickFilters", v))}
+              {check(sv.baseline.show, sv.baseline.showHint, settings.showBaseline, (v) => set("showBaseline", v))}
               {check(t.collapseSeries, t.collapseSeriesHint, settings.collapseSeries, (v) => set("collapseSeries", v))}
             </section>)}
             {tab === "board" && (<section>

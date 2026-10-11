@@ -131,7 +131,7 @@ for (const lib of LIBS) {
       await expect(succs.locator("li")).toContainText("Wireframes");
       const before = (await deps(page)).length;
       // Lägg till föregångare: Kravinsamling (i2) -> i6
-      await preds.locator("select").selectOption("i2");
+      await preds.getByRole("combobox", { name: /Lägg till föregångare/ }).selectOption("i2");
       await expect(preds.locator("li")).toHaveCount(2);
       expect((await deps(page)).length).toBe(before + 1);
       expect((await deps(page)).some((d) => d.from_item_id === "i2" && d.to_item_id === "i6")).toBe(true);
@@ -140,7 +140,7 @@ for (const lib of LIBS) {
       await expect(preds.locator("li")).toHaveCount(1);
       expect((await deps(page)).length).toBe(before);
       // Cykel: i3 som efterföljare till i6 när i3 -> i6 redan finns
-      await succs.locator("select").selectOption("i3");
+      await succs.getByRole("combobox", { name: /Lägg till efterföljare/ }).selectOption("i3");
       await expect(succs.locator('[data-field="dep-succ"]')).toHaveText("Beroendet skulle bilda en cykel.");
       expect((await deps(page)).length).toBe(before);
       // Klick på ett beroende öppnar den posten

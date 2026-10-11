@@ -37,6 +37,7 @@ import { ItemPanel } from "./views/ItemPanel";
 import { YearWheel } from "./views/YearWheel";
 import { BoardView } from "./views/BoardView";
 import { ImportPreview } from "./views/ImportPreview";
+import { BaselineBar } from "./views/BaselineBar";
 import { CalendarView } from "./views/CalendarView";
 import { MyWeekView } from "./views/MyWeekView";
 import { WorkloadView } from "./views/WorkloadView";
@@ -281,6 +282,14 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
     setQuick({ overdue: !!v.filter.quick?.overdue, thisWeek: !!v.filter.quick?.thisWeek, noAssignee: !!v.filter.quick?.noAssignee, undated: !!v.filter.quick?.undated });
     const bg = v.boardGroup.startsWith("field:") && !ids.has(v.boardGroup.slice(6)) ? "status" : v.boardGroup;
     if (bg !== settings.boardGroup) setSettings({ ...settings, boardGroup: bg as Settings["boardGroup"] });
+  };
+  /** Sparar planens datum som de är nu (alla poster i projektet, inte bara de som syns). */
+  const saveBaseline = async () => {
+    if (!project) return;
+    try {
+      const all = await store.listItems(project.id);
+      await projects.setBaseline(project.id, { saved_at: new Date().toISOString(), items: Object.fromEntries(all.map((i) => [i.id, { start: i.start, end: i.end }])) });
+    } catch (e) { setWriteError(friendlyError(e)); }
   };
   const removeView = async (id: string) => { if (project) await projects.setViews(project.id, savedViews.filter((v) => v.id !== id)); };
   /** Duplicerar en post (en grupp med hela sitt innehåll), och öppnar kopian med titeln markerad. */
@@ -642,6 +651,9 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
           <ColumnPicker columns={columns} fieldDefs={fieldDefs} onToggle={toggleColumn} />
           <button type="button" className="mini" disabled={!project} onClick={() => setFieldsOpen(true)}>{sv.fields.button}</button>
           {project && <SavedViews views={savedViews} current={currentView()} onApply={applyView} onSave={saveView} onRemove={removeView} />}
+          {view === "gantt" && project && state.kind === "ready" && (
+            <BaselineBar baseline={project.baseline} count={state.items.length} onSave={saveBaseline} onRemove={async () => { await projects.setBaseline(project.id, null); }} />
+          )}
           {view === "gantt" && (<>
             <button type="button" className="mini" onClick={() => setCollapse((c) => ({ n: c.n + 1, open: false }))}>{sv.filter.collapseAll}</button>
             <button type="button" className="mini" onClick={() => setCollapse((c) => ({ n: c.n + 1, open: true }))}>{sv.filter.expandAll}</button>
@@ -685,7 +697,7 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
             onCreateAt={({ rowId, date }) => void addItem("task", { anchorId: rowId, start: date }).catch(() => undefined)}
             onRename={(id) => { setJustCreated(id); setEditId(id); }}
             onContext={openMenu}
-            onToggleDone={(id) => void toggleDone(id)} onMoveRow={moveRow} onAddInGroup={(gid) => void addItem("task", { anchorId: gid }).catch(() => undefined)} store={store} items={listItems} deps={listDeps} seriesMarks={collapsed?.marks} onOpenItem={setEditId} zoom={zoom}
+            onToggleDone={(id) => void toggleDone(id)} onMoveRow={moveRow} onAddInGroup={(gid) => void addItem("task", { anchorId: gid }).catch(() => undefined)} store={store} items={listItems} deps={listDeps} seriesMarks={collapsed?.marks} onOpenItem={setEditId} baseline={settings.showBaseline ? project?.baseline ?? null : null} zoom={zoom}
             onError={(e) => { setWriteError(typeof e === "string" ? e : friendlyError(e)); reload(); }} />
           <GridResizer width={gridWidth} onChange={changeGrid} onCommit={commitGrid} onFit={fitGrid} />
           </div>
@@ -695,7 +707,7 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
        </Suspense>
       </main>
       {editId && (
-        <ItemPanel key="panel" fieldDefs={fieldDefs} onDuplicate={(id) => void doDuplicateItem(id)} onNewSeries={(it, n) => { if (it.recur) { setRecurInit({ title: it.title, kind: it.recur, count: n }); setRecurOpen(true); } }} nextDate={state.kind === "ready" ? (() => { const cur = state.items.find((i) => i.id === editId); if (!cur?.series) return null; const nx = nextOccurrenceIds(state.items, todayISO()); return state.items.find((i) => i.series === cur.series && nx.has(i.id))?.start ?? null; })() : null} features={settings.features} checklistProgress={settings.checklistProgress} store={store} projectId={projects.projectId!} itemId={editId} dataVersion={state.kind === "ready" ? state.items : undefined} autoSelectTitle={editId === justCreated} focusField={panelFocus} onFocusDone={() => setPanelFocus(null)}
+        <ItemPanel key="panel" baseline={project?.baseline ?? null} fieldDefs={fieldDefs} onDuplicate={(id) => void doDuplicateItem(id)} onNewSeries={(it, n) => { if (it.recur) { setRecurInit({ title: it.title, kind: it.recur, count: n }); setRecurOpen(true); } }} nextDate={state.kind === "ready" ? (() => { const cur = state.items.find((i) => i.id === editId); if (!cur?.series) return null; const nx = nextOccurrenceIds(state.items, todayISO()); return state.items.find((i) => i.series === cur.series && nx.has(i.id))?.start ?? null; })() : null} features={settings.features} checklistProgress={settings.checklistProgress} store={store} projectId={projects.projectId!} itemId={editId} dataVersion={state.kind === "ready" ? state.items : undefined} autoSelectTitle={editId === justCreated} focusField={panelFocus} onFocusDone={() => setPanelFocus(null)}
           onClose={() => setEditId(null)} onChanged={() => void refresh()} onOpen={setEditId} />
       )}
       </div>
