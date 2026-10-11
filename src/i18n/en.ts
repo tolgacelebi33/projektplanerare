@@ -210,7 +210,7 @@ export const enDict: Dict = {
   },
   quick: { label: "Add task", placeholder: "Add task...  (Enter)" },
   today: "Today",
-  filter: { label: "Filter", attrs: "Filter by", clear: "Clear filters", collapseAll: "Collapse all", expandAll: "Expand all", search: "Search", placeholder: "Search...", hideDone: "Hide done", count: (n: number, total: number) => `Showing ${n} of ${total}` },
+  filter: { listLabel: "List", clearAll: "Clear all filters", activeLabel: "Active filters", activeCount: (n: number) => `${n} active filters`, chipQuery: (q: string) => `Search: ${q}`, removeOf: (l: string) => `Remove the filter ${l}`, label: "Filter", attrs: "Filter by", clear: "Clear filters", collapseAll: "Collapse all", expandAll: "Expand all", search: "Search", placeholder: "Search...", hideDone: "Hide done", count: (n: number, total: number) => `Showing ${n} of ${total}` },
   history: { label: "History", undo: "Undo", redo: "Redo", undoHint: "Undo the last change (Cmd/Ctrl+Z)", redoHint: "Redo (Cmd/Ctrl+Shift+Z)" },
   check: { done: "Mark as done", undone: "Mark as not done" },
   dismiss: "Dismiss the message",

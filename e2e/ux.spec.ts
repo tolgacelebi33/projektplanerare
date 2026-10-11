@@ -179,7 +179,7 @@ test("UX12 ett klick på tom tidslinje bredvid en stapel stänger också panelen
   await page.locator('.gantt_row[data-task-id="i7"] .grid-title').click();
   await expect(panel(page)).toBeVisible();
   const tl = (await page.locator(".gantt_task").first().boundingBox())!;
-  const r = (await page.locator('.gantt_row[data-task-id="i16"]').boundingBox())!;
+  const r = (await page.locator(".gantt_row[data-task-id=\"i9\"]").boundingBox())!;
   await page.mouse.click(tl.x + 40, r.y + r.height / 2); // vänstra delen av tidslinjen, långt från stapeln
   await expect(panel(page)).toHaveCount(0);
 });

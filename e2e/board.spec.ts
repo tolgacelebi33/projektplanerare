@@ -61,13 +61,13 @@ test("B6 ett klick på tom yta släpper både markering och öppnad post", async
   await card(page, "i6").locator(".board-title").click();
   await expect(page.locator("aside.panel")).toBeVisible();
   await expect(card(page, "i6")).toHaveClass(/open/);
-  await page.locator(".board").click({ position: { x: 5, y: 600 } });
+  await page.locator(".board").click({ position: { x: 5, y: 300 } });
   await expect(page.locator("aside.panel")).toHaveCount(0);
   await expect(card(page, "i6")).not.toHaveClass(/open/);
   await card(page, "i6").click({ modifiers: [MOD] });
   await card(page, "i9").click({ modifiers: [MOD] });
   await expect(page.getByRole("region", { name: "Markerade poster" })).toBeVisible();
-  await page.locator(".board").click({ position: { x: 5, y: 600 } });
+  await page.locator(".board").click({ position: { x: 5, y: 300 } });
   await expect(page.getByRole("region", { name: "Markerade poster" })).toHaveCount(0);
 });
 

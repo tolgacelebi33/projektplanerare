@@ -3,7 +3,8 @@ import { smallFixture } from "../src/data/fixtures";
 import { MemoryStore } from "../src/data/MemoryStore";
 
 const url = "/";
-const titles = (page: Page) => page.locator(".gantt_row .grid-title").allTextContents();
+// Titlarna i bibliotekets modell (alla poster): DOM har bara de rader som ryms i fönstret
+const titles = (page: Page) => page.evaluate(() => { const g = (window as any).__dhx; const t: string[] = []; if (g) g.eachTask((x: any) => { t.push(String(x.text)); }); return t; });
 const idbGet = (page: Page, key: string) => page.evaluate((k) => new Promise<unknown>((res, rej) => {
   const r = indexedDB.open("projektplanerare", 1);
   r.onsuccess = () => { const g = r.result.transaction("kv", "readonly").objectStore("kv").get(k); g.onsuccess = () => { r.result.close(); res(g.result ?? null); }; g.onerror = () => rej(g.error); };

@@ -17,7 +17,7 @@ async function dragRow(page: Page, from: string, to: string, dy: number) {
 }
 
 test.beforeEach(async ({ page }) => {
-  await page.setViewportSize({ width: 1500, height: 850 });
+  await page.setViewportSize({ width: 1500, height: 960 }); // högt nog att sista raden syns även med filterbandet
   await page.clock.setFixedTime(new Date("2026-10-09T10:00:00"));
   await openApp(page, "dhtmlx");
 });

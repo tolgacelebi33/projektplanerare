@@ -537,3 +537,16 @@ body[data-overlay] .gantt_tooltip { display: none !important; }
 .views-apply[aria-pressed="true"] { border-color: var(--text); font-weight: var(--weight-strong); }
 .views-add { display: flex; gap: 6px; }
 .views-add input { flex: 1; min-width: 0; font: inherit; font-size: 13px; color: var(--text); background: var(--surface-alt); border: var(--line-width) solid var(--line); border-radius: 6px; padding: 4px 8px; }
+
+/* Filterraden: ett eget, tydligt avgränsat band med rubriken Filter (som Asana och monday visar aktiva filter som chips med "rensa alla") */
+.filter-row { align-items: flex-start; background: var(--surface-alt); }
+.filter-band { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; padding: 5px 12px 5px 14px; background: var(--surface); border: var(--line-width) solid var(--line); border-radius: 10px; box-shadow: inset 4px 0 0 var(--line); }
+.filter-band { border-color: var(--grid-line); }
+.filter-band.active { border-color: var(--text); background: color-mix(in srgb, var(--text) 9%, var(--surface)); box-shadow: inset 5px 0 0 var(--text); }
+.filter-title { display: inline-flex; align-items: center; gap: 6px; font-family: var(--font-title); font-size: 13px; letter-spacing: 0.04em; text-transform: uppercase; }
+.filter-badge { display: inline-grid; place-items: center; min-width: 18px; height: 18px; padding: 0 5px; border-radius: var(--radius-pill); background: var(--text); color: var(--surface); font-family: var(--font-body); font-size: 11px; font-weight: var(--weight-strong); }
+.filter-chips { margin: 0; }
+.filter-chips .chip { background: var(--surface-alt); box-shadow: none; padding-left: 8px; }
+.list-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; padding: 5px 0; }
+.filter-clear { border-style: dashed; }
+@media (max-width: 700px) { .filter-row { display: none; } .tools-open .filter-row { display: flex; } }

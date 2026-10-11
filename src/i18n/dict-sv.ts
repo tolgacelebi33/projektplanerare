@@ -215,7 +215,7 @@ export const svDict = {
   },
   quick: { label: "Lägg till uppgift", placeholder: "Lägg till uppgift...  (Enter)" },
   today: "Idag",
-  filter: { label: "Filter", attrs: "Filtrera", clear: "Rensa filter", collapseAll: "Fäll ihop alla", expandAll: "Öppna alla", search: "Sök", placeholder: "Sök...", hideDone: "Dölj klara", count: (n: number, total: number) => `Visar ${n} av ${total}` },
+  filter: { listLabel: "Lista", clearAll: "Rensa alla filter", activeLabel: "Aktiva filter", activeCount: (n: number) => `${n} aktiva filter`, chipQuery: (q: string) => `Sök: ${q}`, removeOf: (l: string) => `Ta bort filtret ${l}`, label: "Filter", attrs: "Filtrera", clear: "Rensa filter", collapseAll: "Fäll ihop alla", expandAll: "Öppna alla", search: "Sök", placeholder: "Sök...", hideDone: "Dölj klara", count: (n: number, total: number) => `Visar ${n} av ${total}` },
   history: { label: "Historik", undo: "Ångra", redo: "Gör om", undoHint: "Ångra senaste ändringen (Cmd/Ctrl+Z)", redoHint: "Gör om (Cmd/Ctrl+Shift+Z)" },
   check: { done: "Markera som klar", undone: "Markera som inte klar" },
   dismiss: "Stäng meddelandet",

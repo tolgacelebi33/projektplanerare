@@ -218,9 +218,10 @@ test.describe("sparande i webbläsaren (utan ?fixture)", () => {
     await expect(page.getByRole("group", { name: "Projekt" }).getByRole("combobox", { name: "Projekt" }).locator("option:checked")).toHaveText("Sparat projekt");
     await page.getByRole("group", { name: "Projekt" }).getByRole("combobox", { name: "Projekt" }).selectOption("proj_1");
     await page.waitForSelector(".gantt_task_line");
-    await expect(page.locator(".gantt_row")).toHaveCount(21);
-    await expect(page.locator(".gantt_row .grid-title", { hasText: "Färg och typografi (klart)" })).toHaveCount(1);
-    await expect(page.locator(".gantt_row .grid-title", { hasText: "Kvar efter omladdning" })).toHaveCount(1);
+    const modelTitles = () => page.evaluate(() => { const g = (window as any).__dhx; const t: string[] = []; g.eachTask((x: any) => { t.push(String(x.text)); }); return t; }); // bibliotekets modell: DOM har bara de rader som ryms
+    await expect.poll(async () => (await modelTitles()).length).toBe(21);
+    expect((await modelTitles()).filter((t) => t === "Färg och typografi (klart)")).toHaveLength(1);
+    expect((await modelTitles()).filter((t) => t === "Kvar efter omladdning")).toHaveLength(1);
     await expect(page.locator(SEL.dhtmlx.bar("i7"))).toHaveCSS("background-color", await page.evaluate(() => { const p = document.createElement("div"); p.style.background = "var(--status-done-bg)"; document.body.appendChild(p); const c = getComputedStyle(p).backgroundColor; p.remove(); return c; }));
   });
 

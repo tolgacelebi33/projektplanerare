@@ -29,7 +29,7 @@ import { columnWidth, loadColumns, saveColumns, type ColumnId } from "./columns"
 import { ColumnPicker } from "./views/ColumnPicker";
 import { HelpDialog } from "./views/HelpDialog";
 import { effectiveColors } from "./data/colors";
-import { FilterPicker, noAttrFilter, type AttrFilter } from "./views/FilterPicker";
+import { FilterPicker, attrCount, noAttrFilter, type AttrFilter } from "./views/FilterPicker";
 import { GridResizer } from "./views/GridResizer";
 import { useProjectData } from "./proto/useProjectData";
 import type { Zoom } from "./proto/zoom";
@@ -473,6 +473,17 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
   const persistent = store instanceof PersistentStore ? store : null;
   const notice = writeError ?? persistent?.saveError ?? null;
 
+  const clearAllFilters = () => { setQuery(""); setHideDone(false); setAttrFilter(noAttrFilter); setQuick({ overdue: false, thisWeek: false, noAssignee: false, undated: false }); };
+  // Aktiva filter som chips som går att ta bort ett och ett (söktext, dölj klara och urvalen i Filtrera). Snabbfiltren är knappar som syns som nedtryckta.
+  const filterChips: { key: string; label: string; remove: () => void }[] = [];
+  if (query.trim()) filterChips.push({ key: "q", label: sv.filter.chipQuery(query.trim()), remove: () => setQuery("") });
+  for (const s of attrFilter.statuses) filterChips.push({ key: `s-${s}`, label: `${sv.panel.status}: ${sv.status[s]}`, remove: () => setAttrFilter((f) => ({ ...f, statuses: f.statuses.filter((x) => x !== s) })) });
+  for (const p of attrFilter.priorities) filterChips.push({ key: `p-${p}`, label: `${sv.panel.priority}: ${sv.panel.priorities[p]}`, remove: () => setAttrFilter((f) => ({ ...f, priorities: f.priorities.filter((x) => x !== p) })) });
+  for (const id of attrFilter.assignees) filterChips.push({ key: `a-${id}`, label: `${sv.panel.assignee}: ${users.find((u) => u.id === id)?.name ?? sv.cols.none}`, remove: () => setAttrFilter((f) => ({ ...f, assignees: f.assignees.filter((x) => x !== id) })) });
+  for (const l of attrFilter.labels) filterChips.push({ key: `l-${l}`, label: `${sv.extras.labels}: ${l}`, remove: () => setAttrFilter((f) => ({ ...f, labels: f.labels.filter((x) => x !== l) })) });
+  for (const [fid, vals] of Object.entries(attrFilter.fields)) for (const v of vals) filterChips.push({ key: `f-${fid}-${v}`, label: `${fieldDefs.find((d) => d.id === fid)?.name ?? fid}: ${v}`, remove: () => setAttrFilter((f) => ({ ...f, fields: { ...f.fields, [fid]: (f.fields[fid] ?? []).filter((x) => x !== v) } })) });
+  const activeFilterCount = filterChips.length + (hideDone ? 1 : 0) + Object.values(quick).filter(Boolean).length; // Dölj klara och snabbfiltren är knappar som visas nedtryckta, de får ingen chip
+
   return (
     <div className={`app${toolsOpen ? " tools-open" : ""}`}>
       <header className="app-header">
@@ -557,8 +568,10 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
           <button type="button" className="mini" disabled={!hist.undo} title={sv.history.undoHint} onClick={() => void travel("undo")}>{sv.history.undo}</button>
           <button type="button" className="mini" disabled={!hist.redo} title={sv.history.redoHint} onClick={() => void travel("redo")}>{sv.history.redo}</button>
         </div>
-        <span className="toolbar-sep" aria-hidden="true" />
-        <div className="add-group" role="group" aria-label={sv.filter.label}>
+      </div>
+      <div className="toolbar filter-row">
+        <div className={`filter-band${filtering ? " active" : ""}`} role="group" aria-label={sv.filter.label}>
+          <span className="filter-title">{sv.filter.label}{activeFilterCount > 0 && <span className="filter-badge" aria-label={sv.filter.activeCount(activeFilterCount)}>{activeFilterCount}</span>}</span>
           <input type="search" className="search" aria-label={sv.filter.search} placeholder={sv.filter.placeholder} value={query}
             onChange={(e) => setQuery(e.target.value)} onKeyDown={(e) => { if (e.key === "Escape") setQuery(""); }} />
           <button type="button" className="mini" aria-pressed={hideDone} onClick={() => setHideDone((v) => !v)}>{sv.filter.hideDone}</button>
@@ -570,16 +583,29 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
               ))}
             </div>
           )}
+          {filterChips.length > 0 && (
+            <ul className="chips filter-chips" aria-label={sv.filter.activeLabel}>
+              {filterChips.map((c) => (
+                <li key={c.key} className="chip">
+                  <span>{c.label}</span>
+                  <button type="button" className="chip-x" aria-label={sv.filter.removeOf(c.label)} onClick={c.remove}>×</button>
+                </li>
+              ))}
+            </ul>
+          )}
           {filtering && state.kind === "ready" && <span className="toolbar-label" role="status">{sv.filter.count(shown.items.length, state.items.length)}</span>}
+          {filtering && <button type="button" className="mini filter-clear" onClick={clearAllFilters}>{sv.filter.clearAll}</button>}
         </div>
-        <span className="toolbar-sep" aria-hidden="true" />
-        <ColumnPicker columns={columns} fieldDefs={fieldDefs} onToggle={toggleColumn} />
-        <button type="button" className="mini" disabled={!project} onClick={() => setFieldsOpen(true)}>{sv.fields.button}</button>
-        {project && <SavedViews views={savedViews} current={currentView()} onApply={applyView} onSave={saveView} onRemove={removeView} />}
-        {view === "gantt" && (<>
-          <button type="button" className="mini" onClick={() => setCollapse((c) => ({ n: c.n + 1, open: false }))}>{sv.filter.collapseAll}</button>
-          <button type="button" className="mini" onClick={() => setCollapse((c) => ({ n: c.n + 1, open: true }))}>{sv.filter.expandAll}</button>
-        </>)}
+        <div className="list-tools" role="group" aria-label={sv.filter.listLabel}>
+          <span className="toolbar-label">{sv.filter.listLabel}</span>
+          <ColumnPicker columns={columns} fieldDefs={fieldDefs} onToggle={toggleColumn} />
+          <button type="button" className="mini" disabled={!project} onClick={() => setFieldsOpen(true)}>{sv.fields.button}</button>
+          {project && <SavedViews views={savedViews} current={currentView()} onApply={applyView} onSave={saveView} onRemove={removeView} />}
+          {view === "gantt" && (<>
+            <button type="button" className="mini" onClick={() => setCollapse((c) => ({ n: c.n + 1, open: false }))}>{sv.filter.collapseAll}</button>
+            <button type="button" className="mini" onClick={() => setCollapse((c) => ({ n: c.n + 1, open: true }))}>{sv.filter.expandAll}</button>
+          </>)}
+        </div>
       </div>
       {(view === "gantt" || view === "board") && selected.size > 0 && state.kind === "ready" && (
         <BulkBar count={selected.size} inside={selectionRoots(state.items, selected).reduce((n, id) => n + descendants(state.items, id).length, 0)}
