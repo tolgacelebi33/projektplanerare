@@ -568,6 +568,8 @@ export function DhtmlxGantt({ store, items, deps, zoom, onError, onPersisted, re
     const DAY = 86_400_000;
     let lo = Date.now() - 14 * DAY, hi = Date.now() + 60 * DAY;
     for (const t of tasks) { lo = Math.min(lo, t.start_date.getTime() - 7 * DAY); hi = Math.max(hi, t.end_date.getTime() + 14 * DAY); }
+    // Rombernas tillfällen (serier som en rad) är inte rader men måste gå att nå: skalan sträcker sig till dem också.
+    for (const others of marksRef.current.values()) for (const m of others) { lo = Math.min(lo, toLocalDate(m.start).getTime() - 7 * DAY); hi = Math.max(hi, toLocalDate(addDays(m.end, 1)).getTime() + 14 * DAY); }
     gantt.config.start_date = gantt.date.date_part(new Date(lo));
     gantt.config.end_date = gantt.date.date_part(new Date(hi));
     const current: string[] = [];

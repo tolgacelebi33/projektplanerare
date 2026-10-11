@@ -459,3 +459,7 @@ Beslut: i postpanelen visas extra ansvariga som chips (namn och kryss för att t
 ## 2026-10-11: Serier som en rad är nu standard (rättelse)
 
 Beslut: "Visa serier som en rad" är på som standard. Jag hade tolkat "Det ska gå men inte standard" som att en rad per tillfälle skulle vara standard; användaren menade att det är att flytta tillfällen var för sig som inte är standard. Inställningar sparade innan ändringen (utan markören `seriesRowV2`) får det nya värdet en gång; därefter gäller användarens eget val. Tillfällena är fortfarande egna poster och kan flyttas var för sig när valet stängs av. Testat: SD1 (standard + migrering), SR1-SR5.
+
+## 2026-10-11: Tidsskalan når seriens sista tillfälle
+
+Fel: med serier som en rad räknades tidsskalans slut bara på de synliga raderna, så romber för senare tillfällen låg utanför skalan och gick inte att nå (en serie med 26 tillfällen visade bara några månader). Skalan omfattar nu även rombernas datum. Test SD2. Overifierat: om det var detta användaren såg.

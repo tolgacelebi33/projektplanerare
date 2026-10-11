@@ -23,3 +23,24 @@ test("SD1 återkommande serier visas som en rad som standard, och en sparad gamm
   await page.reload();
   await expect(page.getByRole("button", { name: "Serier som en rad", exact: true })).toHaveAttribute("aria-pressed", "false");
 });
+
+test("SD2 tidsskalan sträcker sig till seriens sista tillfälle, så att alla romber går att nå och klicka", async ({ page }) => {
+  await page.setViewportSize({ width: 1500, height: 900 });
+  await page.clock.setFixedTime(new Date("2026-10-09T10:00:00"));
+  await openApp(page, "dhtmlx", { seriesRow: true });
+  await page.getByRole("button", { name: "+ Återkommande milstolpe..." }).click();
+  const d = page.getByRole("dialog", { name: "Återkommande milstolpe" });
+  await d.getByLabel("Titel").fill("Community"); const f = d.locator('input[name="first"]'); await f.fill("2026-10-20"); await f.blur();
+  await d.getByLabel("Återkommer").selectOption("biweekly"); await d.getByLabel("Antal tillfällen").fill("26");
+  await d.getByRole("button", { name: "Skapa" }).click();
+  await expect(page.locator(".series-mark").first()).toBeAttached();
+  const last = await page.evaluate(() => { const s = (window as any).__dhx.getState(); return [s.max_date.getTime(), (window as any).__dhx.config.end_date?.getTime()]; });
+  // sista tillfället: 2026-10-20 + 25*14 dagar = 2027-10-05
+  expect(last[0]).toBeGreaterThanOrEqual(new Date("2027-10-06T00:00:00").getTime());
+  await page.evaluate(() => { const g = (window as any).__dhx; g.scrollTo(g.getScrollState().max_x ?? 1e6, null); });
+  const mark = page.locator('.series-mark[title$="2027-10-05"]');
+  await expect(mark).toBeVisible();
+  await mark.click();
+  await expect(page.locator("aside.panel")).toBeVisible();
+  await expect(page.locator('aside.panel input[name="start"], aside.panel input[type="date"]').first()).toHaveValue("2027-10-05");
+});
