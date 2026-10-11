@@ -41,7 +41,8 @@ export function newItemDraft(kind: ItemType, items: Item[], selected: Item | nul
     workspace_id: ids.workspaceId, project_id: ids.projectId, parent_id: parent, type: kind, title: sv.newItem[kind],
     start, end: kind === "milestone" ? start : addDays(start, 4),
     status: "not_started", assignee_id: null, description: "", priority: "normal", progress: 0,
-    sort_order: items.reduce((m, i) => Math.max(m, i.sort_order), 0) + 1,
+    // En ny grupp på översta nivån hamnar överst (som i monday och som menyvalet "Ny grupp överst" säger), allt annat sist
+    sort_order: kind === "epic" && parent === null ? items.reduce((m, i) => Math.min(m, i.sort_order), 0) - 1 : items.reduce((m, i) => Math.max(m, i.sort_order), 0) + 1,
   };
 }
 

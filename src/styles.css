@@ -1,5 +1,5 @@
 html, body, #root { height: 100%; margin: 0; }
-.app { display: flex; flex-direction: column; height: 100%; }
+.app { display: flex; flex-direction: column; height: 100%; overflow-y: auto; }
 .app-header { display: flex; align-items: center; gap: 16px; padding: 12px 16px; border-bottom: var(--line-width) solid var(--line); }
 .logo-slot { width: 48px; height: 48px; }
 .app-title { font-family: var(--font-title); font-weight: var(--weight-regular); font-size: 22px; margin: 0; letter-spacing: 0.02em; }
@@ -161,7 +161,7 @@ html, body, #root { height: 100%; margin: 0; }
 }
 
 /* Detaljpanel: fast bredd, dockad längst till höger bredvid tidslinjen, uppifrån och ner */
-.app-body { flex: 1; min-height: 0; display: flex; }
+.app-body { flex: 1 0 220px; min-height: 220px; display: flex; } /* aldrig mindre än så: det som inte ryms rullar sidan */
 .app-body .app-main { flex: 1 1 auto; min-width: 0; }
 .panel { flex: 0 0 420px; width: 420px; box-sizing: border-box; display: flex; flex-direction: column; min-height: 0; background: var(--surface); color: var(--text); border-left: var(--line-width) solid var(--line); font-family: var(--font-body); }
 .panel-head { display: flex; align-items: flex-start; gap: 8px; padding: 14px 16px 10px; border-bottom: var(--line-width) solid var(--grid-line); }
@@ -452,7 +452,8 @@ body[data-overlay] .gantt_tooltip { display: none !important; }
 .narrow-only { display: none; }
 
 /* Smalt fönster (telefon): rubriken är liten, verktygsfälten är hopfällda bakom "Verktyg", panelen fyller skärmen, och boardens kolumner bläddras i sidled */
-@media (max-width: 700px) {
+/* Smalt fönster, eller en telefon på högkant eller liggande (låg höjd): verktygsfälten viks ihop bakom Verktyg, annars tar de hela höjden och tidslinjen försvinner */
+@media (max-width: 700px), (max-height: 520px) {
   .app-header { padding: 8px 12px; gap: 8px; }
   .logo-slot { display: none; }
   .app-title { font-size: 16px; }
@@ -572,7 +573,7 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--text); }
 .filter-chips .chip { background: var(--surface-alt); box-shadow: none; padding-left: 8px; }
 .list-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; padding: 5px 0; }
 .filter-clear { border-style: dashed; }
-@media (max-width: 700px) { .filter-row { display: none; } .tools-open .filter-row { display: flex; } }
+@media (max-width: 700px), (max-height: 520px) { .filter-row { display: none; } .tools-open .filter-row { display: flex; } }
 
 .people-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
 .people-list li, .people-add { display: flex; gap: 8px; align-items: center; }
@@ -626,6 +627,11 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--text); }
 .comment-hint { font-size: 12px; }
 .comment-compose .panel-row select { width: auto; }
 .mention { background: transparent; color: inherit; font-weight: var(--weight-strong); text-decoration: underline; text-underline-offset: 2px; }
+.dhx-host .gantt_grid_head_cell { position: relative; }
+body.col-resizing { cursor: col-resize; user-select: none; }
+.col-resizer { position: absolute; top: 0; right: -4px; width: 9px; height: 100%; cursor: col-resize; z-index: 6; touch-action: none; }
+.col-resizer::after { content: ""; position: absolute; top: 25%; bottom: 25%; left: 4px; width: 1px; background: transparent; }
+.col-resizer:hover::after, .col-resizer:focus-visible::after, .col-resizer.active::after { background: var(--text); width: 2px; left: 3px; }
 .panel-kind-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .code-tag { font-family: var(--font-title); font-size: 11px; letter-spacing: 0.04em; padding: 0 6px; border: var(--line-width) solid var(--line); border-radius: var(--radius-pill); white-space: nowrap; user-select: all; }
 .grid-code { font-family: var(--font-title); font-size: 11px; letter-spacing: 0.03em; white-space: nowrap; }

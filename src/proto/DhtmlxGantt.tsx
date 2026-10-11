@@ -25,7 +25,7 @@ const ZOOM = {
 } as const;
 
 import { GRID_MIN } from "../layout";
-import { COLUMN_ORDER, COLUMN_WIDTH, FIELD_COLUMN_WIDTH, type ColumnId, type StaticColumnId } from "../columns";
+import { COLUMN_ORDER, COLUMN_WIDTH, columnWidth, type ColumnId, type ColumnWidths, type StaticColumnId } from "../columns";
 import type { FieldDef } from "../data/types";
 import { setDragParent, startRowDragFeedback } from "./rowDrag";
 import { consumeFocusMedian, scrollCarry } from "../scrollCarry";
@@ -48,7 +48,10 @@ function treeOrder(items: Item[]): string[] {
 
 export interface ContextArgs { id: string | null; x: number; y: number; date: ISODate | null }
 
-export function DhtmlxGantt({ store, items, deps, zoom, onError, onPersisted, revealId, onNotice, onCreateAt, onRename, onContext, onToggleDone, onMoveRow, onAddInGroup, onEditField, onSelect, selected, touchMode, fieldDefs, gridWidth, columns, users, collapse, colors, todayToken, seriesMarks, onOpenItem, baseline }: {
+export function DhtmlxGantt({ store, items, deps, zoom, onError, onPersisted, revealId, onNotice, onCreateAt, onRename, onContext, onToggleDone, onMoveRow, onAddInGroup, onEditField, onSelect, selected, touchMode, fieldDefs, gridWidth, columns, users, collapse, colors, todayToken, seriesMarks, onOpenItem, baseline, columnWidths, onResizeColumn }: {
+  /** Egna kolumnbredder, och hur de ändras (id "title" = rutnätets bredd; null = tillbaka till standard). */
+  columnWidths?: ColumnWidths;
+  onResizeColumn?: (id: ColumnId | "title", width: number | null, final: boolean) => void;
   /** Baslinje att rita som tunna staplar under de verkliga (null: ingen). */
   baseline?: Baseline | null;
   /** Serier som visas som en rad: raden (id) och de andra tillfällena, som ritas som romber på raden. */
@@ -100,6 +103,8 @@ export function DhtmlxGantt({ store, items, deps, zoom, onError, onPersisted, re
   const marksRef = useRef<ReadonlyMap<string, Item[]>>(new Map());
   marksRef.current = seriesMarks ?? new Map();
   const drawMarksRef = useRef<(() => void) | null>(null);
+  const drawResizersRef = useRef<(() => void) | null>(null);
+  const keyFocusRef = useRef<string | null>(null);
   const baselineRef = useRef<Baseline | null>(null);
   baselineRef.current = baseline ?? null;
   const openItemRef = useRef(onOpenItem);
@@ -110,6 +115,11 @@ export function DhtmlxGantt({ store, items, deps, zoom, onError, onPersisted, re
   selectedRef.current = selected ?? selectedRef.current;
   const gridWidthRef = useRef(gridWidth);
   const columnsRef = useRef(columns);
+  const widthsRef = useRef<ColumnWidths>(columnWidths ?? {});
+  widthsRef.current = columnWidths ?? {};
+  const resizeRef = useRef(onResizeColumn);
+  resizeRef.current = onResizeColumn;
+  const widthSigRef = useRef(JSON.stringify(columnWidths ?? {}));
   const fieldSigRef = useRef(JSON.stringify((fieldDefs ?? []).map((d) => [d.id, d.name])));
   const fieldDefsRef = useRef<FieldDef[]>(fieldDefs ?? []);
   fieldDefsRef.current = fieldDefs ?? [];
@@ -250,7 +260,45 @@ export function DhtmlxGantt({ store, items, deps, zoom, onError, onPersisted, re
       host.appendChild(wrap);
     };
     drawMarksRef.current = drawMarks;
-    const markEvents = ["onGanttRender", "onDataRender", "onAfterTaskUpdate", "onAfterTaskAdd", "onAfterTaskDelete", "onGanttScroll"].map((ev) => gantt.attachEvent(ev as never, (() => { drawMarks(); return true; }) as never));
+    // Kolumnrubrikernas kanter går att dra (Community-utgåvan saknar det): ett handtag i varje rubrik. Titeln ändrar rutnätets bredd, de andra sin egen.
+    const colOf = (name: string): ColumnId | "title" | null => name === "text" ? "title" : name === "start_date" ? "start" : name === "end_date" ? "end" : name === "progress_pct" ? "progress" : name.startsWith("field_") ? (`f:${name.slice(6)}` as ColumnId) : (COLUMN_ORDER as string[]).includes(name) ? (name as ColumnId) : null;
+    const drawResizers = () => {
+      const area = (gantt as unknown as { $grid_scale?: HTMLElement }).$grid_scale ?? document.querySelector<HTMLElement>(".dhx-host .gantt_grid_scale");
+      area?.querySelectorAll<HTMLElement>(".gantt_grid_head_cell").forEach((cell) => {
+        if (cell.querySelector(":scope > .col-resizer")) return;
+        const id = colOf(cell.getAttribute("data-column-id") ?? "");
+        if (!id) return;
+        const label = cell.textContent?.trim() || String(id);
+        const h = document.createElement("span");
+        h.className = "col-resizer"; h.setAttribute("role", "separator"); h.setAttribute("aria-orientation", "vertical"); h.tabIndex = 0;
+        h.setAttribute("aria-label", sv.cols.resize(label)); h.title = sv.cols.resizeHint; h.dataset.col = String(id);
+        const widthNow = () => (id === "title" ? gridWidthRef.current : columnWidth(id, widthsRef.current));
+        h.addEventListener("pointerdown", (e) => {
+          e.preventDefault(); e.stopPropagation();
+          const x0 = e.clientX, w0 = widthNow();
+          h.classList.add("active");
+          document.body.classList.add("col-resizing");
+          // Lyssnarna sitter på dokumentet: rubriken ritas om medan man drar (kolumnerna byggs om), och då försvinner handtaget under pekaren
+          let raf = 0, last = w0;
+          const move = (ev: PointerEvent) => { last = w0 + (ev.clientX - x0); if (!raf) raf = requestAnimationFrame(() => { raf = 0; resizeRef.current?.(id, last, false); }); };
+          const up = () => { document.removeEventListener("pointermove", move, true); document.removeEventListener("pointerup", up, true); document.removeEventListener("pointercancel", up, true); document.body.classList.remove("col-resizing"); h.classList.remove("active"); if (raf) cancelAnimationFrame(raf); resizeRef.current?.(id, last, true); };
+          document.addEventListener("pointermove", move, true); document.addEventListener("pointerup", up, true); document.addEventListener("pointercancel", up, true);
+        });
+        h.addEventListener("dblclick", (e) => { e.preventDefault(); e.stopPropagation(); resizeRef.current?.(id, id === "title" ? null : null, true); });
+        h.addEventListener("click", (e) => e.stopPropagation());
+        h.addEventListener("keydown", (e) => {
+          const step = 8;
+          if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
+            keyFocusRef.current = id; e.preventDefault(); e.stopPropagation(); resizeRef.current?.(id, widthNow() + (e.key === "ArrowRight" ? step : -step), true); }
+        });
+        cell.appendChild(h);
+        if (keyFocusRef.current === id) h.focus({ preventScroll: true }); // rubriken ritas om när bredden ändras: fokus ska ligga kvar
+      });
+    };
+    drawResizersRef.current = drawResizers;
+    const dropKeyFocus = (e: Event) => { if (!(e.target as Element | null)?.closest?.(".col-resizer")) keyFocusRef.current = null; };
+    document.addEventListener("pointerdown", dropKeyFocus, true); document.addEventListener("focusin", dropKeyFocus, true);
+    const markEvents = ["onGanttRender", "onGanttReady", "onGridResizeEnd", "onDataRender", "onAfterTaskUpdate", "onAfterTaskAdd", "onAfterTaskDelete", "onGanttScroll"].map((ev) => gantt.attachEvent(ev as never, (() => { drawMarks(); drawResizers(); return true; }) as never));
     gantt.plugins({ tooltip: true });
     gantt.templates.tooltip_text = (start, end, t) => {
       const status = (t as unknown as { status: Status }).status;
@@ -280,25 +328,26 @@ export function DhtmlxGantt({ store, items, deps, zoom, onError, onPersisted, re
     const select = (t: Task, field: string, label: string, value: string, options: [string, string][], cls = "") =>
       `<select class="cell-select ${cls}" data-id="${t.id}" data-field="${field}" aria-label="${esc(`${label}: ${t.text}`)}">${options.map(([v, l]) => `<option value="${esc(v)}"${v === value ? " selected" : ""}>${esc(l)}</option>`).join("")}</select>`;
     const dayOf = (d: Date) => `${d.getDate()} ${gantt.locale.date.month_short[d.getMonth()]}`;
+    const cw = (c: ColumnId) => columnWidth(c, widthsRef.current);
     const COLS: Record<StaticColumnId, unknown> = {
-      code: { name: "code", label: sv.cols.code, width: COLUMN_WIDTH.code, template: (t: Task) => `<span class="grid-code">${esc((t as unknown as TaskRow).code)}</span>` },
-      status: { name: "status", label: sv.panel.status, width: COLUMN_WIDTH.status, template: (t: Task) => select(t, "status", sv.panel.status, (t as unknown as TaskRow).status,
+      code: { name: "code", label: sv.cols.code, width: cw("code"), template: (t: Task) => `<span class="grid-code">${esc((t as unknown as TaskRow).code)}</span>` },
+      status: { name: "status", label: sv.panel.status, width: cw("status"), template: (t: Task) => select(t, "status", sv.panel.status, (t as unknown as TaskRow).status,
         (["not_started", "in_progress", "done", "blocked"] as Status[]).map((s) => [s, `${STATUS_GLYPH[s]} ${sv.status[s]}`] as [string, string]), `chip st-${(t as unknown as TaskRow).status}`) },
-      assignee: { name: "assignee", label: sv.panel.assignee, width: COLUMN_WIDTH.assignee, template: (t: Task) => select(t, "assignee", sv.panel.assignee, (t as unknown as TaskRow).assignee,
+      assignee: { name: "assignee", label: sv.panel.assignee, width: cw("assignee"), template: (t: Task) => select(t, "assignee", sv.panel.assignee, (t as unknown as TaskRow).assignee,
         [["", sv.cols.none], ...latest.current.users.map((u) => [u.id, u.name] as [string, string])]) },
-      priority: { name: "priority", label: sv.panel.priority, width: COLUMN_WIDTH.priority, template: (t: Task) => select(t, "priority", sv.panel.priority, (t as unknown as TaskRow).priority,
+      priority: { name: "priority", label: sv.panel.priority, width: cw("priority"), template: (t: Task) => select(t, "priority", sv.panel.priority, (t as unknown as TaskRow).priority,
         (["low", "normal", "high", "urgent"] as const).map((p) => [p, sv.panel.priorities[p]] as [string, string]), `prio-${(t as unknown as TaskRow).priority}`) },
-      start: { name: "start_date", label: sv.panel.start, width: COLUMN_WIDTH.start, align: "right", template: (t: Task) => `<span class="grid-date">${dayOf(t.start_date as Date)}</span>` },
-      end: { name: "end_date", label: sv.grid.end, width: COLUMN_WIDTH.end, align: "right", template: (t: Task) => `<span class="grid-date">${(t as unknown as TaskRow).und ? `<i class="grid-undated">${esc(sv.undated.cell)}</i>` : shortDate(t)}</span>` },
-      progress: { name: "progress_pct", label: sv.panel.progress, width: COLUMN_WIDTH.progress, align: "right", template: (t: Task) => `<span class="grid-date">${(t as unknown as TaskRow).progress}%</span>` },
+      start: { name: "start_date", label: sv.panel.start, width: cw("start"), align: "right", template: (t: Task) => `<span class="grid-date">${dayOf(t.start_date as Date)}</span>` },
+      end: { name: "end_date", label: sv.grid.end, width: cw("end"), align: "right", template: (t: Task) => `<span class="grid-date">${(t as unknown as TaskRow).und ? `<i class="grid-undated">${esc(sv.undated.cell)}</i>` : shortDate(t)}</span>` },
+      progress: { name: "progress_pct", label: sv.panel.progress, width: cw("progress"), align: "right", template: (t: Task) => `<span class="grid-date">${(t as unknown as TaskRow).progress}%</span>` },
     };
     const fieldCol = (c: ColumnId) => {
       const def = fieldDefsRef.current.find((d) => `f:${d.id}` === c);
       if (!def) return null;
-      return { name: `field_${def.id}`, label: def.name, width: FIELD_COLUMN_WIDTH, template: (t: Task) => `<span class="grid-field">${esc(String(((t as unknown as TaskRow).cf ?? {})[def.id] ?? ""))}</span>` };
+      return { name: `field_${def.id}`, label: def.name, width: cw(c), template: (t: Task) => `<span class="grid-field">${esc(String(((t as unknown as TaskRow).cf ?? {})[def.id] ?? ""))}</span>` };
     };
     buildColumnsRef.current = () => [titleColumn,
-      ...COLUMN_ORDER.filter((c) => columnsRef.current.includes(c)).map((c) => COLS[c]),
+      ...COLUMN_ORDER.filter((c) => columnsRef.current.includes(c)).map((c) => ({ ...(COLS[c] as object), width: cw(c) })), // bredden läses om varje gång (användaren kan ha dragit i den)
       ...columnsRef.current.filter((c) => c.startsWith("f:")).map(fieldCol).filter(Boolean)];
     gantt.config.columns = buildColumnsRef.current() as never;
     gantt.plugins({ keyboard_navigation: true });
@@ -475,15 +524,16 @@ export function DhtmlxGantt({ store, items, deps, zoom, onError, onPersisted, re
     // Panelen till höger tar plats: DHTMLX måste få veta när behållaren ändrar storlek
     const ro = new ResizeObserver(() => gantt.setSizes());
     ro.observe(host.current!);
-    return () => { scrollCarry.read = null; hostEl.removeEventListener("change", onCellChange, true); hostEl.removeEventListener("keydown", onCheckKey, true); hostEl.removeEventListener("keyup", onCheckKey, true); hostEl.removeEventListener("click", onSelectClick, true); hostEl.removeEventListener("click", onCheck, true); document.removeEventListener("pointermove", onAnyMove, true); document.removeEventListener("pointerleave", hideTip, true); window.removeEventListener("blur", hideTip); hostEl.removeEventListener("pointerdown", onPtrDown, true); hostEl.removeEventListener("pointerup", onPtrUp, true); document.removeEventListener("keydown", forget, true); hostEl.removeEventListener("contextmenu", onContextMenu, true); ro.disconnect(); ids.forEach((id) => gantt.detachEvent(id)); markEvents.forEach((id) => gantt.detachEvent(id)); drawMarksRef.current = null; stopDragFeedback?.(); gantt.clearAll(); };
+    return () => { scrollCarry.read = null; hostEl.removeEventListener("change", onCellChange, true); hostEl.removeEventListener("keydown", onCheckKey, true); hostEl.removeEventListener("keyup", onCheckKey, true); hostEl.removeEventListener("click", onSelectClick, true); hostEl.removeEventListener("click", onCheck, true); document.removeEventListener("pointermove", onAnyMove, true); document.removeEventListener("pointerleave", hideTip, true); window.removeEventListener("blur", hideTip); hostEl.removeEventListener("pointerdown", onPtrDown, true); hostEl.removeEventListener("pointerup", onPtrUp, true); document.removeEventListener("keydown", forget, true); hostEl.removeEventListener("contextmenu", onContextMenu, true); ro.disconnect(); ids.forEach((id) => gantt.detachEvent(id)); markEvents.forEach((id) => gantt.detachEvent(id)); drawMarksRef.current = null; drawResizersRef.current = null; document.removeEventListener("pointerdown", dropKeyFocus, true); document.removeEventListener("focusin", dropKeyFocus, true); stopDragFeedback?.(); gantt.clearAll(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Rutnätets bredd ändras av användaren. Biblioteket bygger om layouten (och nollställer scrollen, som därför sparas och återställs).
   useEffect(() => {
     const sig = JSON.stringify((fieldDefs ?? []).map((d) => [d.id, d.name]));
-    if (gridWidthRef.current === gridWidth && columnsRef.current === columns && fieldSigRef.current === sig) return;
-    gridWidthRef.current = gridWidth; columnsRef.current = columns; fieldSigRef.current = sig;
+    const sigW = JSON.stringify(columnWidths ?? {});
+    if (gridWidthRef.current === gridWidth && columnsRef.current === columns && fieldSigRef.current === sig && widthSigRef.current === sigW) return;
+    gridWidthRef.current = gridWidth; columnsRef.current = columns; fieldSigRef.current = sig; widthSigRef.current = sigW;
     const layout = gantt.config.layout as unknown as { cols: { width?: number }[] };
     layout.cols[0].width = gridWidth;
     // Rutnätsvyn har en egen bredd (grid_width), och biblioteket skriver över titelkolumnens "*" med det beräknade värdet första gången.
@@ -494,7 +544,7 @@ export function DhtmlxGantt({ store, items, deps, zoom, onError, onPersisted, re
     const sc = gantt.getScrollState();
     gantt.resetLayout();
     requestAnimationFrame(() => gantt.scrollTo(sc.x, sc.y));
-  }, [gridWidth, columns, fieldDefs]);
+  }, [gridWidth, columns, fieldDefs, columnWidths]);
 
   // Synkning från lagret. Ändras bara fält (titel, datum, status) uppdateras bilden på plats, så att scroll, markering och
   // hopfällda grupper bevaras. Ändras strukturen (poster, förälder, ordning, beroenden) laddas om med scroll och fällning bevarade.
@@ -552,7 +602,7 @@ export function DhtmlxGantt({ store, items, deps, zoom, onError, onPersisted, re
     const id = pendingFocus.current;
     if (id) requestAnimationFrame(() => { host.current?.querySelector<HTMLElement>(`[data-check="${CSS.escape(id)}"]`)?.focus(); });
   }, [mapped]);
-  useEffect(() => { const id = requestAnimationFrame(() => drawMarksRef.current?.()); return () => cancelAnimationFrame(id); }, [mapped, seriesMarks, baseline]);
+  useEffect(() => { const id = requestAnimationFrame(() => { drawMarksRef.current?.(); drawResizersRef.current?.(); }); return () => cancelAnimationFrame(id); }, [mapped, seriesMarks, baseline, gridWidth, columns, columnWidths]);
 
   useEffect(() => {
     gantt.config.scales = ZOOM[zoom].scales as never;

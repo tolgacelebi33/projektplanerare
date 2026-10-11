@@ -25,7 +25,7 @@ import { ProjectBar } from "./views/ProjectBar";
 import { LANGS, setLang, storedLang, sv, type Lang } from "./i18n/sv";
 import { focusMedianOnNextProject, rememberScroll, uiCarry } from "./scrollCarry";
 import { clampGrid, loadGridWidth, saveGridWidth } from "./layout";
-import { COLUMN_ORDER, columnWidth, loadColumns, saveColumns, type ColumnId } from "./columns";
+import { COLUMN_ORDER, clampColumn, columnWidth, defaultColumnWidth, loadColumns, loadColumnWidths, saveColumns, saveColumnWidths, type ColumnId, type ColumnWidths } from "./columns";
 import { ColumnPicker } from "./views/ColumnPicker";
 import { HelpDialog } from "./views/HelpDialog";
 import { effectiveColors } from "./data/colors";
@@ -275,7 +275,7 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
   const applyView = (v: import("./data/types").SavedView) => {
     const ids = new Set(fieldDefs.map((d) => d.id));
     const cols = v.columns.filter((c) => !c.startsWith("f:") || ids.has(c.slice(2))) as ColumnId[];
-    const w = (list: ColumnId[]) => list.reduce((n, c) => n + columnWidth(c), 0);
+    const w = (list: ColumnId[]) => list.reduce((n, c) => n + columnWidth(c, widthsRef.current), 0);
     changeGrid(gridRef.current + w(cols) - w(columns)); commitGrid();
     setColumns(cols); saveColumns(cols);
     setView(v.view); setZoom(v.zoom);
@@ -464,6 +464,19 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
   // Vänstra kolumnens bredd: användarens val, sparas i webbläsaren. Begränsas av utrymmet så att tidslinjen alltid syns.
   const [gridWidth, setGridWidth] = useState(() => (typeof window !== "undefined" && window.innerWidth < 700 ? 200 : loadGridWidth())); // på en telefon ska tidslinjen synas bredvid listan
   const gridRef = useRef(gridWidth);
+  // Kolumnbredder: att dra i en rubriks kant ändrar kolumnens bredd och rutnätets lika mycket (titeln behåller sin), att dra i titelns kant ändrar rutnätets bredd.
+  const [colWidths, setColWidths] = useState<ColumnWidths>(loadColumnWidths);
+  const widthsRef = useRef(colWidths); widthsRef.current = colWidths;
+  const resizeColumn = (id: ColumnId | "title", width: number | null, final: boolean) => {
+    if (id === "title") { changeGrid(width ?? gridRef.current); if (final) commitGrid(); return; }
+    const before = columnWidth(id, widthsRef.current);
+    const to = width === null ? defaultColumnWidth(id) : clampColumn(width);
+    const next = { ...widthsRef.current };
+    if (width === null) delete next[id]; else next[id] = to;
+    widthsRef.current = next; setColWidths(next);
+    changeGrid(gridRef.current + (to - before));
+    if (final) { saveColumnWidths(next); commitGrid(); }
+  };
   const changeGrid = (w: number) => { const next = clampGrid(w, mainRef.current?.clientWidth ?? Infinity); gridRef.current = next; setGridWidth(next); };
   const commitGrid = () => saveGridWidth(gridRef.current);
   /** Dubbelklick på dragfältet: bredda så att de längsta synliga titlarna ryms (de rader som ritats just nu). */
@@ -479,7 +492,7 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
     const staticIds = COLUMN_ORDER as ColumnId[];
     const next = [...staticIds.filter((x) => (x === c ? !on : columns.includes(x))), ...(columns.filter((x) => x.startsWith("f:") && x !== c) as ColumnId[]), ...(c.startsWith("f:") && !on ? [c] : [])];
     setColumns(next); saveColumns(next);
-    changeGrid(gridRef.current + (on ? -columnWidth(c) : columnWidth(c))); commitGrid();
+    changeGrid(gridRef.current + (on ? -columnWidth(c, widthsRef.current) : columnWidth(c, widthsRef.current))); commitGrid();
   };
   const [users, setUsers] = useState<User[]>([]);
   const reloadUsers = async () => { setUsers(await store.listUsers()); };
@@ -739,7 +752,7 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
         {state.kind === "ready" && projects.projectId && view === "gantt" && (
           <div className="gantt-wrap">
           <div className="gantt-main">
-          <DhtmlxGantt fieldDefs={fieldDefs} key={`${theme}-${settings.touch}`} touchMode={settings.touch} selected={selected} onSelect={selectRow} colors={colors} collapse={collapse} gridWidth={gridWidth} columns={columns} users={users} onEditField={editField} revealId={reveal} todayToken={todayToken} onPersisted={() => void refresh()}
+          <DhtmlxGantt fieldDefs={fieldDefs} key={`${theme}-${settings.touch}`} touchMode={settings.touch} selected={selected} onSelect={selectRow} colors={colors} collapse={collapse} gridWidth={gridWidth} columns={columns} columnWidths={colWidths} onResizeColumn={resizeColumn} users={users} onEditField={editField} revealId={reveal} todayToken={todayToken} onPersisted={() => void refresh()}
             onNotice={setWriteError}
             onCreateAt={({ rowId, date }) => void addItem("task", { anchorId: rowId, start: date }).catch(() => undefined)}
             onRename={(id) => { setJustCreated(id); setEditId(id); }}

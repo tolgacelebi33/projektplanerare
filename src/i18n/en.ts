@@ -44,7 +44,7 @@ export const enDict: Dict = {
     ],
   },
   colors: { label: "Colour", auto: "Automatic", none: "None", names: { gron: "Green", rod: "Red", koppar: "Copper", brons: "Brown", guld: "Gold", bla: "Blue", stal: "Steel" } as Record<string, string> },
-  cols: { code: "ID", label: "Columns", hint: "Choose which columns the grid shows. Status, assignee and priority can be changed right in the row.", none: "None" },
+  cols: { resize: (n: string) => `Resize ${n}`, resizeHint: "Drag to change the width. Double-click for the default width. The arrow keys also work.", code: "ID", label: "Columns", hint: "Choose which columns the grid shows. Status, assignee and priority can be changed right in the row.", none: "None" },
   drag: { into: (name: string) => `Goes into the group "${name}"`, top: "Goes at the top (no group)" },
   grid: { title: "Title", end: "End", resize: "Column width", resizeHint: "Drag to change the width of the left column. Double-click to fit the text. Arrow keys change it in steps." },
   dates: {

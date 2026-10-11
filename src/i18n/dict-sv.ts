@@ -44,7 +44,7 @@ export const svDict = {
     ],
   },
   colors: { label: "Färg", auto: "Automatisk", none: "Ingen", names: { gron: "Grön", rod: "Röd", koppar: "Koppar", brons: "Brun", guld: "Guld", bla: "Blå", stal: "Stål" } as Record<string, string> },
-  cols: { code: "ID", label: "Kolumner", hint: "Välj vilka kolumner som visas i rutnätet. Status, ansvarig och prioritet kan ändras direkt i raden.", none: "Ingen" },
+  cols: { resize: (n: string) => `Ändra bredd på ${n}`, resizeHint: "Dra för att ändra bredden. Dubbelklicka för standardbredd. Piltangenterna ändrar också.", code: "ID", label: "Kolumner", hint: "Välj vilka kolumner som visas i rutnätet. Status, ansvarig och prioritet kan ändras direkt i raden.", none: "Ingen" },
   drag: { into: (name: string) => `Läggs i gruppen "${name}"`, top: "Läggs överst (ingen grupp)" },
   grid: { title: "Titel", end: "Slut", resize: "Kolumnbredd", resizeHint: "Dra för att ändra bredden på vänstra kolumnen. Dubbelklicka för att passa texten. Pilar ändrar i steg." },
   dates: {
