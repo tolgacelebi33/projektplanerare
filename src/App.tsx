@@ -11,13 +11,13 @@ import { SettingsDialog } from "./views/SettingsDialog";
 import { FieldsDialog } from "./views/FieldsDialog";
 import { SavedViews } from "./views/SavedViews";
 import { removeFieldDef } from "./data/fieldActions";
-import { loadSettings, saveSettings, type Settings } from "./settings";
+import { loadSettings, saveSettings, MORE_VIEWS, type Settings, type ViewId } from "./settings";
 import { friendlyError } from "./i18n/errors";
 import { ContextMenu, type MenuItem } from "./views/ContextMenu";
 import { QuickAdd } from "./views/QuickAdd";
 import type { ISODate } from "./data/types";
 import { todayISO } from "./data/dates";
-import type { ItemType, Priority, Status, User } from "./data/types";
+import type { Item, ItemType, Priority, Project, Status, User } from "./data/types";
 import { PersistentStore } from "./data/PersistentStore";
 import { getApp } from "./store";
 import { useProjects } from "./useProjects";
@@ -36,13 +36,18 @@ import type { Zoom } from "./proto/zoom";
 import { ItemPanel } from "./views/ItemPanel";
 import { YearWheel } from "./views/YearWheel";
 import { BoardView } from "./views/BoardView";
+import { CalendarView } from "./views/CalendarView";
+import { MyWeekView } from "./views/MyWeekView";
+import { WorkloadView } from "./views/WorkloadView";
+import { PortfolioView } from "./views/PortfolioView";
+import { myWeekGroups, portfolioRows, shiftPatch } from "./data/overviews";
 import { THEMES, applyTheme, getTheme, type Theme } from "./theme";
 
 // Gantt-biblioteket laddas först när vyn visas.
 const DhtmlxGantt = lazy(() => import("./proto/DhtmlxGantt").then((m) => ({ default: m.DhtmlxGantt })));
 
 const params = new URLSearchParams(location.search);
-const VIEW0 = params.get("view") === "wheel" ? "wheel" : params.get("view") === "board" ? "board" : "gantt";
+const VIEW0: ViewId = (["wheel", "board", "calendar", "week", "workload", "portfolio"] as const).find((v) => v === params.get("view")) ?? "gantt";
 
 /** Byter man språk monteras appen om (nyckeln), men lagret är kvar, så ingen data försvinner. */
 export function App() {
@@ -84,7 +89,7 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
   const labelList = useMemo(() => (state.kind === "ready" ? allLabels(state.items) : []), [state]);
   const nextIds = useMemo(() => (state.kind === "ready" ? nextOccurrenceIds(state.items, todayISO()) : new Set<string>()), [state]);
   const colors = useMemo(() => (state.kind === "ready" ? effectiveColors(state.items) : new Map<string, never>()), [state]);
-  const [view, setView] = useState<"gantt" | "wheel" | "board">(uiCarry.view ?? (new URLSearchParams(window.location.search).get("view") ? VIEW0 : settings.startView));
+  const [view, setView] = useState<ViewId>(uiCarry.view ?? (new URLSearchParams(window.location.search).get("view") ? VIEW0 : settings.startView));
   const [year, setYear] = useState<number | null>(uiCarry.year ?? null);
   uiCarry.zoom = zoom; uiCarry.view = view; uiCarry.year = year;
   const [theme, setTheme] = useState<Theme>(getTheme);
@@ -143,7 +148,26 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
   const [reveal, setReveal] = useState<string | null>(null); // post som vyn ska bläddra fram, med eller utan att panelen öppnas
   useEffect(() => { if (editId !== justCreated) setJustCreated(null); }, [editId, justCreated]);
   // Byte av projekt: stäng panelen, den hör till ett annat projekt
-  useEffect(() => { setEditId(null); setSelected(new Set()); }, [projects.projectId]);
+  const pendingOpen = useRef<string | null>(null);
+  useEffect(() => { setEditId(pendingOpen.current); pendingOpen.current = null; setSelected(new Set()); }, [projects.projectId]);
+  // Min vecka och Portfölj läser alla projekt. Läses om när det aktuella projektets data ändras.
+  const [allData, setAllData] = useState<{ project: Project; items: Item[] }[]>([]);
+  useEffect(() => {
+    if ((view !== "week" && view !== "portfolio") || !projects.projects) return;
+    let on = true;
+    void Promise.all(projects.projects.map(async (p) => ({ project: p, items: await store.listItems(p.id) }))).then((r) => { if (on) setAllData(r); }).catch(() => undefined);
+    return () => { on = false; };
+  }, [view, projects.projects, state, store]);
+  const openInProject = (pid: string, iid: string) => {
+    if (pid === projects.projectId) { setEditId(iid); return; }
+    pendingOpen.current = iid; projects.select(pid);
+  };
+  const shiftItem = async (id: string, delta: number) => {
+    if (state.kind !== "ready") return;
+    const it = state.items.find((i) => i.id === id);
+    if (!it || delta === 0) return;
+    try { await store.updateItem(id, shiftPatch(it, delta)); await refresh(); } catch (e) { setWriteError(friendlyError(e)); reload(); }
+  };
   // Flerval: markerade rader (bara i Gantt). Poster som tagits bort (t.ex. av ångra) tas ur markeringen.
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
   const selAnchor = useRef<string | null>(null);
@@ -523,6 +547,12 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
             <button key={v} aria-pressed={view === v} onClick={() => setView(v)}>{sv.view[v]}</button>
           ))}
         </div>
+        {(MORE_VIEWS.some((v) => settings.moreViews[v]) || !(["gantt", "wheel", "board"] as string[]).includes(view)) && (
+          <select className="project-select project-select-sm keep-narrow" aria-label={sv.ov.more} value={(MORE_VIEWS as readonly string[]).includes(view) ? view : ""} onChange={(e) => { if (e.target.value) setView(e.target.value as ViewId); }}>
+            <option value="">{sv.ov.more}</option>
+            {MORE_VIEWS.filter((v) => settings.moreViews[v] || v === view).map((v) => <option key={v} value={v}>{sv.ov[v]}</option>)}
+          </select>
+        )}
         {view === "board" && (
           <label className="project-deps keep-narrow">
             <span className="toolbar-label">{sv.board.groupBy}</span>
@@ -631,6 +661,10 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
           <div className="empty-state"><p>{sv.project.none}</p><button type="button" className="btn btn-primary" onClick={() => void projects.create(sv.project.defaultName)}>{sv.project.createFirst}</button></div>
         )}
         {state.kind === "ready" && projects.projectId && view === "board" && <BoardView fields={fieldDefs} nextIds={nextIds} groupBy={boardGroup} cardFields={settings.cardFields} highlightOverdue={settings.highlightOverdue} markUndated={settings.markUndated} items={shown.items} allItems={state.items} users={users} colors={colors} openId={editId} selected={selected} onOpen={setEditId} onSelect={selectRow} onBackground={dropSelection} onDrop={(m, k, b) => void dropCards(m, k, b)} onMoveTo={moveCardTo} onContext={openMenu} />}
+        {state.kind === "ready" && projects.projectId && view === "calendar" && <CalendarView items={shown.items} today={todayISO()} markUndated={settings.markUndated} colors={colors} openId={editId} onOpen={setEditId} onShift={(id, d) => void shiftItem(id, d)} />}
+        {state.kind === "ready" && projects.projectId && view === "workload" && <WorkloadView items={shown.items} users={users} fieldDefs={fieldDefs} fieldId={settings.workloadField} cap={settings.workloadCap} today={todayISO()} onOpen={setEditId} />}
+        {view === "week" && projects.projects && projects.projects.length > 0 && <MyWeekView groups={myWeekGroups(allData, todayISO())} users={users} multi={projects.projects.length > 1} onOpen={openInProject} />}
+        {view === "portfolio" && projects.projects && projects.projects.length > 0 && <PortfolioView rows={portfolioRows(allData, todayISO())} currentId={projects.projectId} onOpen={(pid) => { focusMedianOnNextProject(); projects.select(pid); setView("gantt"); }} />}
         {state.kind === "ready" && projects.projectId && view === "wheel" && <YearWheel items={shown.items} year={effectiveYear} colors={colors} selectedId={editId} onOpen={setEditId} onContext={openMenu} />}
         {state.kind === "ready" && projects.projectId && view === "gantt" && (
           <div className="gantt-wrap">

@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { DEFAULT_SETTINGS, type Settings } from "../settings";
+import { DEFAULT_SETTINGS, MORE_VIEWS, type Settings } from "../settings";
 import type { FieldDef } from "../data/types";
 import { sv } from "../i18n/sv";
 
@@ -53,6 +53,24 @@ export function SettingsDialog({ fieldDefs = [], settings, onChange, onClose }: 
           <label className="settings-check"><input type="checkbox" checked={settings.checklistProgress} onChange={(e) => set("checklistProgress", e.target.checked)} /><span>{t.checklistProgress}<small>{t.checklistProgressHint}</small></span></label>
           <label className="settings-check"><input type="checkbox" checked={settings.importExtraAsFields} onChange={(e) => set("importExtraAsFields", e.target.checked)} /><span>{t.importFields}<small>{t.importFieldsHint}</small></span></label>
           <label className="settings-check"><input type="checkbox" checked={settings.hidePastSeries} onChange={(e) => set("hidePastSeries", e.target.checked)} /><span>{t.hidePastSeries}<small>{t.hidePastSeriesHint}</small></span></label>
+        </section>
+        <section>
+          <h3>{t.moreViewsGroup}</h3>
+          <p className="panel-muted">{t.moreViewsHint}</p>
+          <div className="settings-cards">
+            {MORE_VIEWS.map((v) => (
+              <label key={v} className="settings-check"><input type="checkbox" checked={settings.moreViews[v]} onChange={(e) => onChange({ ...settings, moreViews: { ...settings.moreViews, [v]: e.target.checked } })} /><span>{sv.ov[v]}</span></label>
+            ))}
+          </div>
+          <div className="modal-row settings-row">
+            <label className="panel-field"><span>{t.workloadField}</span>
+              <select name="set-wlfield" value={settings.workloadField} onChange={(e) => set("workloadField", e.target.value)}>
+                <option value="">{sv.ov.work.count}</option>
+                {fieldDefs.filter((d) => d.type === "number").map((d) => <option key={d.id} value={d.id}>{sv.ov.work.sumOf(d.name)}</option>)}
+              </select></label>
+            <label className="panel-field"><span>{t.workloadCap}</span>
+              <input name="set-wlcap" type="number" min={0} max={999} step={1} value={settings.workloadCap} onChange={(e) => { const n = Math.floor(Number(e.target.value)); if (Number.isFinite(n) && n >= 0 && n <= 999) set("workloadCap", n); }} /></label>
+          </div>
         </section>
         <section>
           <h3>{t.startGroup}</h3>

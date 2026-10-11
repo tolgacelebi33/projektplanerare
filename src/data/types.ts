@@ -35,7 +35,7 @@ export interface SavedViewFilter {
 }
 /** En sparad vy: allt som bestämmer hur projektet visas. `columns` är kolumnerna i listan (egna fält som "f:id"). */
 export interface SavedView {
-  id: string; name: string; view: "gantt" | "wheel" | "board"; zoom: "day" | "week" | "month"; boardGroup: string; columns: string[]; filter: SavedViewFilter;
+  id: string; name: string; view: "gantt" | "wheel" | "board" | "calendar" | "week" | "workload" | "portfolio"; zoom: "day" | "week" | "month"; boardGroup: string; columns: string[]; filter: SavedViewFilter;
 }
 
 /** Gruppens färg (Svedbergs palett). Okänd/saknad = automatisk (efter gruppens plats), "none" = ingen. */

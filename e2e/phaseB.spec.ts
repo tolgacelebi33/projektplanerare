@@ -96,7 +96,7 @@ test("B5 uppdateringslogg: ny rad med tid, senaste överst, ta bort, och senaste
   const s = sec(page, "log");
   await s.getByLabel("Ny uppdatering").fill("Första"); await s.getByRole("button", { name: "Lägg till uppdatering" }).click();
   await expect.poll(async () => (await get(page, "i7")).log?.length).toBe(1);
-  await page.clock.setFixedTime(new Date("2026-10-10T09:30:00"));
+  await page.clock.setFixedTime(new Date("2026-10-10T09:30:00+02:00"));
   await s.getByLabel("Ny uppdatering").fill("Andra"); await s.getByRole("button", { name: "Lägg till uppdatering" }).click();
   await expect.poll(async () => (await get(page, "i7")).log?.length).toBe(2);
   const rows = await s.locator(".log li p").allTextContents();

@@ -180,6 +180,7 @@ export const svDict = {
     cardsGroup: "Kort i boarden", cardFields: { date: "Datum", assignee: "Ansvarig (initialer)", priority: "Prioritet", description: "Första raden av beskrivningen", series: "Upprepning för serier", progress: "Framsteg", labels: "Etiketter", checklist: "Checklista (räknare)", links: "Länkar (antal)", lastUpdate: "Senaste uppdatering" },
     featuresGroup: "Delar av posten", features: { labels: "Etiketter", checklist: "Checklista", links: "Länkar", log: "Uppdateringar (logg)" }, featuresHint: "Det som är avslaget syns inte i panelen, men det som redan skrivits finns kvar.",
     checklistProgress: "Checklistan styr framsteget", checklistProgressHint: "Framsteg blir andelen avbockade punkter, och räknas om varje gång du bockar.",
+    moreViewsGroup: "Fler vyer", moreViewsHint: "Vilka extra vyer som finns i listan Fler vyer. Data finns kvar även om en vy är avstängd.", workloadField: "Belastning räknar", workloadCap: "Belastning: markera över (0 = aldrig)",
     importFields: "Okända kolumner vid import blir egna fält", importFieldsHint: "En kolumn i en importerad fil som inte känns igen blir ett eget fält (med rullista om värdena upprepas) i stället för text i beskrivningen.",
     hidePastSeries: "Dölj passerade tillfällen i serier", hidePastSeriesHint: "Tillfällen i en återkommande serie vars datum passerat visas inte i vyerna (de finns kvar).",
     boardGroup: "Kolumner i boarden", boardGroupHint: "Vad boardens kolumner är. Går också att byta i verktygsfältet.",
@@ -212,6 +213,15 @@ export const svDict = {
   views: {
     label: "Vyer", hint: "Spara hur du tittar på projektet (vy, zoom, filter, kolumner, gruppering) under ett namn och återvänd till det med ett klick.",
     none: "Inga sparade vyer ännu.", name: "Namn på vyn", namePlaceholder: "Namn, till exempel Försenat M3", save: "Spara aktuell vy", removeOf: (n: string) => `Ta bort vyn ${n}`,
+  },
+  ov: {
+    more: "Fler vyer", calendar: "Kalender", week: "Min vecka", workload: "Belastning", portfolio: "Portfölj",
+    weekdays: ["mån", "tis", "ons", "tor", "fre", "lör", "sön"], prev: "Föregående", next: "Nästa", today: "Idag", month: "Månad", weekMode: "Vecka", mode: "Visning",
+    weekNo: (n: number) => `vecka ${n}`, moreItems: (n: number) => `+${n} till`, fewer: "Visa färre", noItems: "Inget här.",
+    dragHint: "Dra en post till en annan dag för att flytta den. Öppna posten för att ändra datum med tangentbordet.",
+    myWeek: { overdue: "Försenat", today: "Idag", thisWeek: "Resten av veckan", nextWeek: "Nästa vecka", empty: "Inget försenat och inget att göra de närmaste två veckorna.", project: (n: string) => `Projekt ${n}`, intro: "Det som är försenat, pågår idag eller ligger i den här eller nästa vecka, i alla projekt. Klara poster och poster utan riktigt datum tas inte med." },
+    work: { intro: "Poster som inte är klara per ansvarig och vecka. En post räknas i varje vecka den överlappar.", person: "Ansvarig", total: "Summa", none: "Ingen ansvarig", over: "Över kapacitet", cell: (n: string, who: string, from: string) => `${n} hos ${who}, vecka från ${from}`, count: "Antal poster", sumOf: (f: string) => `Summa av ${f}`, itemsIn: (who: string, from: string) => `Poster hos ${who}, vecka från ${from}`, back: "Tidigare veckor", forward: "Senare veckor", shown: "Veckor" },
+    port: { intro: "Alla projekt i en tabell. Klara räknas som andel av posterna (grupper räknas inte).", name: "Projekt", period: "Period", items: "Poster", done: "Klara", overdue: "Försenade", nextMs: "Nästa milstolpe", open: "Öppna", openOf: (n: string) => `Öppna projektet ${n}`, noDates: "Inga datum", none: "Ingen" },
   },
   quick: { label: "Lägg till uppgift", placeholder: "Lägg till uppgift...  (Enter)" },
   today: "Idag",

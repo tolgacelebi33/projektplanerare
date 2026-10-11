@@ -229,6 +229,6 @@ export function validateSavedViews(views: SavedView[]): void {
     ids.add(v.id);
     if (typeof v.name !== "string" || !v.name.trim() || v.name.length > FIELD_LIMITS.viewName || names.has(v.name.trim().toLowerCase())) bad(`Vynamnet måste vara unikt, inte tomt och högst ${FIELD_LIMITS.viewName} tecken`);
     names.add(v.name.trim().toLowerCase());
-    if (!["gantt", "wheel", "board"].includes(v.view) || !["day", "week", "month"].includes(v.zoom) || typeof v.boardGroup !== "string" || !Array.isArray(v.columns) || !v.filter || typeof v.filter !== "object") bad("Ogiltig sparad vy");
+    if (!["gantt", "wheel", "board", "calendar", "week", "workload", "portfolio"].includes(v.view) || !["day", "week", "month"].includes(v.zoom) || typeof v.boardGroup !== "string" || !Array.isArray(v.columns) || !v.filter || typeof v.filter !== "object") bad("Ogiltig sparad vy");
   }
 }

@@ -175,6 +175,7 @@ export const enDict: Dict = {
     cardsGroup: "Cards on the board", cardFields: { date: "Date", assignee: "Assignee (initials)", priority: "Priority", description: "First line of the description", series: "Repetition for series", progress: "Progress", labels: "Labels", checklist: "Checklist (counter)", links: "Links (count)", lastUpdate: "Latest update" },
     featuresGroup: "Parts of an item", features: { labels: "Labels", checklist: "Checklist", links: "Links", log: "Updates (log)" }, featuresHint: "What is turned off is not shown in the panel, but what was already written is kept.",
     checklistProgress: "The checklist controls progress", checklistProgressHint: "Progress becomes the share of ticked items, and is recalculated every time you tick.",
+    moreViewsGroup: "More views", moreViewsHint: "Which extra views appear in the More views list. Data is kept even when a view is switched off.", workloadField: "Workload counts", workloadCap: "Workload: flag above (0 = never)",
     importFields: "Unknown columns on import become custom fields", importFieldsHint: "A column in an imported file that is not recognised becomes a custom field (a list if the values repeat) instead of text in the description.",
     hidePastSeries: "Hide past occurrences in series", hidePastSeriesHint: "Occurrences of a recurring series whose date has passed are not shown in the views (they are kept).",
     boardGroup: "Board columns", boardGroupHint: "What the board columns are. Can also be changed in the toolbar.",
@@ -207,6 +208,15 @@ export const enDict: Dict = {
   views: {
     label: "Views", hint: "Save how you look at the project (view, zoom, filters, columns, grouping) under a name and return to it with one click.",
     none: "No saved views yet.", name: "Name of the view", namePlaceholder: "Name, for example Overdue M3", save: "Save current view", removeOf: (n: string) => `Delete the view ${n}`,
+  },
+  ov: {
+    more: "More views", calendar: "Calendar", week: "My week", workload: "Workload", portfolio: "Portfolio",
+    weekdays: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"], prev: "Previous", next: "Next", today: "Today", month: "Month", weekMode: "Week", mode: "Display",
+    weekNo: (n: number) => `week ${n}`, moreItems: (n: number) => `+${n} more`, fewer: "Show fewer", noItems: "Nothing here.",
+    dragHint: "Drag an item to another day to move it. Open the item to change dates with the keyboard.",
+    myWeek: { overdue: "Overdue", today: "Today", thisWeek: "Rest of the week", nextWeek: "Next week", empty: "Nothing overdue and nothing to do in the next two weeks.", project: (n: string) => `Project ${n}`, intro: "What is overdue, in progress today, or in this or next week, across all projects. Done items and items without a real date are not included." },
+    work: { intro: "Items that are not done per assignee and week. An item counts in every week it overlaps.", person: "Assignee", total: "Total", none: "No assignee", over: "Over capacity", cell: (n: string, who: string, from: string) => `${n} for ${who}, week from ${from}`, count: "Number of items", sumOf: (f: string) => `Sum of ${f}`, itemsIn: (who: string, from: string) => `Items for ${who}, week from ${from}`, back: "Earlier weeks", forward: "Later weeks", shown: "Weeks" },
+    port: { intro: "All projects in one table. Done is the share of the items (groups do not count).", name: "Project", period: "Period", items: "Items", done: "Done", overdue: "Overdue", nextMs: "Next milestone", open: "Open", openOf: (n: string) => `Open the project ${n}`, noDates: "No dates", none: "None" },
   },
   quick: { label: "Add task", placeholder: "Add task...  (Enter)" },
   today: "Today",
