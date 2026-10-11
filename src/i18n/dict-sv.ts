@@ -257,6 +257,10 @@ export const svDict = {
     confirmDelete: (n: string) => `Ta bort mallen ${n}?`, deleteYes: "Ta bort", cancel: "Avbryt", hint: "En mall sparar posten eller gruppen med hela sitt innehåll, datumen som avstånd och beroenden mellan posterna. Status, framsteg, ansvariga, kommentarer och logg följer inte med.",
     save: "Spara som mall...", saveName: "Namn på mallen", saveGo: "Spara mall", saved: (n: string) => `Mallen ${n} sparades.`, made: (n: number) => `Skapade ${n} ${n === 1 ? "post" : "poster"} från mallen.`,
   },
+  critical: {
+    button: "Kritisk linje", hint: "Markerar de poster som styr projektets slut: kan en av dem bli senare blir slutet senare. Räknas på datumen som de är nu.", sr: "på den kritiska linjen", tip: "På den kritiska linjen (ingen marginal)",
+    slack: (n: number) => (n <= 0 ? "Ingen marginal: på den kritiska linjen." : `Marginal: ${n} ${n === 1 ? "dag" : "dagar"} innan projektets slut påverkas.`), title: "Kritisk linje", show: "Kritisk linje i tidslinjen", showHint: "Visa knappen Kritisk linje i listraden. Den markerar de poster som styr projektets slut.",
+  },
   settings: {
     button: "Inställningar", title: "Inställningar",
     tabs: { label: "Inställningar, avsnitt", list: "Listvy", board: "Boardvy", views: "Fler vyer", item: "Posten", rules: "Regler", people: "Personer", reminders: "Påminnelser", backup: "Säkerhetskopia", start: "Start", touch: "Pekskärm", info: "Information och hjälp" },

@@ -684,6 +684,8 @@ span.health-chip { cursor: default; }
 .wl-cap { font-size: 11px; }
 .board-who-co { opacity: 0.8; }
 .board-estimate { font-size: 11px; padding: 0 6px; border: var(--line-width) solid var(--line); border-radius: var(--radius-pill); }
+.gantt_task_line.critical { outline: 3px solid var(--text); outline-offset: 1px; }
+.gantt_task_link.critical-link .gantt_line_wrapper div { background: var(--text); box-shadow: 0 0 0 1px var(--text); }
 .panel-kind-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .code-tag { font-family: var(--font-title); font-size: 11px; letter-spacing: 0.04em; padding: 0 6px; border: var(--line-width) solid var(--line); border-radius: var(--radius-pill); white-space: nowrap; user-select: all; }
 .grid-code { font-family: var(--font-title); font-size: 11px; letter-spacing: 0.03em; white-space: nowrap; }

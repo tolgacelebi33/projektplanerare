@@ -44,6 +44,7 @@ import { StatusesDialog } from "./views/StatusesDialog";
 import { TemplatesDialog } from "./views/TemplatesDialog";
 import { defOf, statusDefs, statusPatch } from "./data/statuses";
 import { dueSummary, type DueSummary } from "./data/reminders";
+import { criticalPath } from "./data/critical";
 import { CommandPalette, type PaletteCommand } from "./views/CommandPalette";
 import { buildBackup, firstSeenAt, lastBackupAt, markBackupSaved, parseBackup, reminderDue, restoreBackup, MAX_BACKUP_BYTES, type BackupSummary } from "./data/backup";
 import { CalendarView } from "./views/CalendarView";
@@ -278,6 +279,8 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
   // Samma lista (samma objekt) så länge statusarna inte ändrats: annars ritas rutnätet om varje gång projektet läses om
   const statusKey = JSON.stringify(project?.statuses ?? null);
   const statusList = useMemo(() => statusDefs(project), [statusKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Kritisk linje: räknas på alla poster i projektet (inte bara de som syns), och bara när den är påslagen
+  const critical = useMemo(() => (settings.showCritical && state.kind === "ready" ? criticalPath(state.items, state.deps) : null), [settings.showCritical, state]);
   const statusCounts = useMemo(() => { const m = new Map<string, number>(); if (state.kind === "ready") for (const i of state.items) if (i.type !== "epic") { const id = defOf(i, statusList).id; m.set(id, (m.get(id) ?? 0) + 1); } return m; }, [state, statusList]);
   const [fieldsOpen, setFieldsOpen] = useState(false);
   const savedViews = project?.views ?? [];
@@ -814,6 +817,9 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
           <button type="button" className="mini" disabled={!project} onClick={() => setStatusesOpen(true)}>{sv.statuses.button}</button>
           {project && <SavedViews views={savedViews} current={currentView()} onApply={applyView} onSave={saveView} onRemove={removeView} />}
           {view === "gantt" && project && state.kind === "ready" && (
+            <button type="button" className="mini" aria-pressed={settings.showCritical} title={sv.critical.hint} onClick={() => setSettings({ ...settings, showCritical: !settings.showCritical })}>{sv.critical.button}</button>
+          )}
+          {view === "gantt" && project && state.kind === "ready" && (
             <BaselineBar baseline={project.baseline} count={state.items.length} onSave={saveBaseline} onRemove={async () => { await projects.setBaseline(project.id, null); }} />
           )}
           {view === "gantt" && (<>
@@ -868,7 +874,7 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
         {state.kind === "ready" && projects.projectId && view === "gantt" && (
           <div className="gantt-wrap">
           <div className="gantt-main">
-          <DhtmlxGantt statuses={statusList} fieldDefs={fieldDefs} key={`${theme}-${settings.touch}`} touchMode={settings.touch} selected={selected} onSelect={selectRow} colors={colors} collapse={collapse} gridWidth={gridWidth} columns={columns} columnWidths={colWidths} onResizeColumn={resizeColumn} users={users} onEditField={editField} revealId={reveal} todayToken={todayToken} onPersisted={() => void refresh()}
+          <DhtmlxGantt critical={view === "gantt" ? critical : null} statuses={statusList} fieldDefs={fieldDefs} key={`${theme}-${settings.touch}`} touchMode={settings.touch} selected={selected} onSelect={selectRow} colors={colors} collapse={collapse} gridWidth={gridWidth} columns={columns} columnWidths={colWidths} onResizeColumn={resizeColumn} users={users} onEditField={editField} revealId={reveal} todayToken={todayToken} onPersisted={() => void refresh()}
             onNotice={setWriteError}
             onCreateAt={({ rowId, date }) => void addItem("task", { anchorId: rowId, start: date }).catch(() => undefined)}
             onRename={(id) => { setJustCreated(id); setEditId(id); }}
@@ -883,7 +889,7 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
        </Suspense>
       </main>
       {editId && (
-        <ItemPanel key="panel" me={settings.me} onMe={(id) => setSettings({ ...settingsRef.current, me: id })} baseline={project?.baseline ?? null} fieldDefs={fieldDefs} onDuplicate={(id) => void doDuplicateItem(id)} onNewSeries={(it, n) => { if (it.recur) { setRecurInit({ title: it.title, kind: it.recur, count: n }); setRecurOpen(true); } }} nextDate={state.kind === "ready" ? (() => { const cur = state.items.find((i) => i.id === editId); if (!cur?.series) return null; const nx = nextOccurrenceIds(state.items, todayISO()); return state.items.find((i) => i.series === cur.series && nx.has(i.id))?.start ?? null; })() : null} features={settings.features} checklistProgress={settings.checklistProgress} store={store} projectId={projects.projectId!} itemId={editId} dataVersion={state.kind === "ready" ? state.items : undefined} autoSelectTitle={editId === justCreated} focusField={panelFocus} onFocusDone={() => setPanelFocus(null)}
+        <ItemPanel key="panel" critical={critical} me={settings.me} onMe={(id) => setSettings({ ...settingsRef.current, me: id })} baseline={project?.baseline ?? null} fieldDefs={fieldDefs} onDuplicate={(id) => void doDuplicateItem(id)} onNewSeries={(it, n) => { if (it.recur) { setRecurInit({ title: it.title, kind: it.recur, count: n }); setRecurOpen(true); } }} nextDate={state.kind === "ready" ? (() => { const cur = state.items.find((i) => i.id === editId); if (!cur?.series) return null; const nx = nextOccurrenceIds(state.items, todayISO()); return state.items.find((i) => i.series === cur.series && nx.has(i.id))?.start ?? null; })() : null} features={settings.features} checklistProgress={settings.checklistProgress} store={store} projectId={projects.projectId!} itemId={editId} dataVersion={state.kind === "ready" ? state.items : undefined} autoSelectTitle={editId === justCreated} focusField={panelFocus} onFocusDone={() => setPanelFocus(null)}
           onClose={() => setEditId(null)} onChanged={() => void refresh()} onOpen={setEditId} />
       )}
       </div>

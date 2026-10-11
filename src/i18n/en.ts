@@ -252,6 +252,10 @@ export const enDict: Dict = {
     confirmDelete: (n: string) => `Remove the template ${n}?`, deleteYes: "Remove", cancel: "Cancel", hint: "A template saves the item or group with all its contents, the dates as distances and the dependencies between the items. Status, progress, assignees, comments and log are not included.",
     save: "Save as template...", saveName: "Name of the template", saveGo: "Save template", saved: (n: string) => `The template ${n} was saved.`, made: (n: number) => `Created ${n} ${n === 1 ? "item" : "items"} from the template.`,
   },
+  critical: {
+    button: "Critical path", hint: "Marks the items that determine the end of the project: if one of them gets later, the end gets later. Calculated on the dates as they are now.", sr: "on the critical path", tip: "On the critical path (no slack)",
+    slack: (n: number) => (n <= 0 ? "No slack: on the critical path." : `Slack: ${n} ${n === 1 ? "day" : "days"} before the end of the project is affected.`), title: "Critical path", show: "Critical path in the timeline", showHint: "Show the Critical path button in the list row. It marks the items that determine the end of the project.",
+  },
   settings: {
     button: "Settings", title: "Settings",
     tabs: { label: "Settings, sections", list: "List view", board: "Board view", views: "More views", item: "Item", rules: "Rules", people: "People", reminders: "Reminders", backup: "Backup", start: "Start", touch: "Touch screen", info: "Information and help" },

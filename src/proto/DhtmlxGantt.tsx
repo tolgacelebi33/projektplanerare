@@ -8,6 +8,7 @@ import type { ISODate } from "../data/types";
 import { isOverdue } from "../data/rules";
 import type { Baseline, Dependency, Item, Status, StatusDef, User } from "../data/types";
 import { defOf, defaultStatusDefs } from "../data/statuses";
+import type { CriticalResult } from "../data/critical";
 import { sv } from "../i18n/sv";
 import { datePatch, persistPatch } from "./persist";
 import { STATUS_GLYPH } from "./statusUi";
@@ -34,7 +35,7 @@ import { consumeFocusMedian, scrollCarry } from "../scrollCarry";
 
 const LINK_TYPE: Record<string, string> = { finish_to_start: "0", start_to_start: "1", finish_to_finish: "2", start_to_finish: "3" };
 const DEP_TYPE: Record<string, "finish_to_start" | "start_to_start" | "finish_to_finish" | "start_to_finish"> = { "0": "finish_to_start", "1": "start_to_start", "2": "finish_to_finish", "3": "start_to_finish" };
-interface TaskRow { sid: string; sname: string; ss: string; sm: string; code: string; cf: Record<string, string | number | null>; od: boolean; und: boolean; rec: boolean; color: string; id: string; text: string; start_date: Date; end_date: Date; type: string; kind: Item["type"]; parent: string | number; status: Status; priority: Item["priority"]; assignee: string; progress: number; open: boolean }
+interface TaskRow { cr: boolean; sid: string; sname: string; ss: string; sm: string; code: string; cf: Record<string, string | number | null>; od: boolean; und: boolean; rec: boolean; color: string; id: string; text: string; start_date: Date; end_date: Date; type: string; kind: Item["type"]; parent: string | number; status: Status; priority: Item["priority"]; assignee: string; progress: number; open: boolean }
 interface LinkRow { id: string; source: string; target: string; type: string }
 
 /** Förväntad ordning för träd i djupet först, syskon efter sort_order. Används för att avgöra om strukturen ändrats. */
@@ -49,7 +50,9 @@ function treeOrder(items: Item[]): string[] {
 
 export interface ContextArgs { id: string | null; x: number; y: number; date: ISODate | null }
 
-export function DhtmlxGantt({ store, items, deps, zoom, onError, onPersisted, revealId, onNotice, onCreateAt, onRename, onContext, onToggleDone, onMoveRow, onAddInGroup, onEditField, onSelect, selected, touchMode, fieldDefs, gridWidth, columns, users, collapse, colors, todayToken, seriesMarks, onOpenItem, baseline, columnWidths, onResizeColumn, statuses }: {
+export function DhtmlxGantt({ store, items, deps, zoom, onError, onPersisted, revealId, onNotice, onCreateAt, onRename, onContext, onToggleDone, onMoveRow, onAddInGroup, onEditField, onSelect, selected, touchMode, fieldDefs, gridWidth, columns, users, collapse, colors, todayToken, seriesMarks, onOpenItem, baseline, columnWidths, onResizeColumn, statuses, critical }: {
+  /** Kritisk linje: poster och länkar som markeras (null: ingen markering). */
+  critical?: CriticalResult | null;
   /** Projektets statusar (egna eller grundstatusarna), för statuskolumnen och verktygstipsen. */
   statuses?: StatusDef[];
   /** Egna kolumnbredder, och hur de ändras (id "title" = rutnätets bredd; null = tillbaka till standard). */
@@ -118,6 +121,8 @@ export function DhtmlxGantt({ store, items, deps, zoom, onError, onPersisted, re
   selectedRef.current = selected ?? selectedRef.current;
   const gridWidthRef = useRef(gridWidth);
   const columnsRef = useRef(columns);
+  const criticalRef = useRef<CriticalResult | null>(null);
+  criticalRef.current = critical ?? null;
   const statusesRef = useRef<StatusDef[]>(statuses ?? defaultStatusDefs());
   statusesRef.current = statuses ?? defaultStatusDefs();
   const widthsRef = useRef<ColumnWidths>(columnWidths ?? {});
@@ -137,6 +142,7 @@ export function DhtmlxGantt({ store, items, deps, zoom, onError, onPersisted, re
   const mapped = useMemo(() => {
     known.current = new Map(items.map((i) => [i.id, i]));
     const marks = marksRef.current;
+    const crit = criticalRef.current;
     const sdefs = statusesRef.current, ssig = JSON.stringify(sdefs);
     const tasks: TaskRow[] = [...items].sort((a, b) => a.sort_order - b.sort_order).map((i) => ({
       id: i.id,
@@ -146,12 +152,12 @@ export function DhtmlxGantt({ store, items, deps, zoom, onError, onPersisted, re
       type: TYPE[i.type],
       kind: i.type,
       parent: i.parent_id ?? 0,
-      sid: defOf(i, sdefs).id, sname: defOf(i, sdefs).name, ss: ssig, sm: (marks.get(i.id) ?? []).map((m) => `${m.id}|${m.start}|${m.status}|${m.title}`).join(";"), code: i.code ?? "", status: i.status, priority: i.priority, assignee: i.assignee_id ?? "", progress: i.progress, color: colors.get(i.id) ?? "none", rec: !!i.series, und: !!i.undated, od: isOverdue(i, todayISO()), cf: i.fields ?? {},
+      cr: !!crit?.ids.has(i.id), sid: defOf(i, sdefs).id, sname: defOf(i, sdefs).name, ss: ssig, sm: (marks.get(i.id) ?? []).map((m) => `${m.id}|${m.start}|${m.status}|${m.title}`).join(";"), code: i.code ?? "", status: i.status, priority: i.priority, assignee: i.assignee_id ?? "", progress: i.progress, color: colors.get(i.id) ?? "none", rec: !!i.series, und: !!i.undated, od: isOverdue(i, todayISO()), cf: i.fields ?? {},
       open: true,
     }));
     const links: LinkRow[] = deps.map((d) => ({ id: d.id, source: d.from_item_id, target: d.to_item_id, type: LINK_TYPE[d.type] ?? "0" }));
     return { tasks, links, order: treeOrder(items) };
-  }, [items, deps, colors, seriesMarks, statuses]);
+  }, [items, deps, colors, seriesMarks, statuses, critical]);
 
   // Engångsinställning och initiering
   useEffect(() => {
@@ -180,7 +186,8 @@ export function DhtmlxGantt({ store, items, deps, zoom, onError, onPersisted, re
     };
     gantt.locale.date.month_full = [...sv.dates.monthsFull] as typeof gantt.locale.date.month_full;
     gantt.locale.date.month_short = [...sv.dates.monthsShort] as typeof gantt.locale.date.month_short;
-    gantt.templates.task_class = (_s, _e, t) => `st-${(t as unknown as { status: Status }).status}${(t as unknown as { kind: string }).kind === "epic" ? " epic" : ""}${(t as unknown as TaskRow).und ? " undated" : ""}`;
+    gantt.templates.link_class = (link) => (criticalRef.current?.links.has(String(link.id)) ? "critical-link" : "");
+    gantt.templates.task_class = (_s, _e, t) => `st-${(t as unknown as { status: Status }).status}${(t as unknown as { kind: string }).kind === "epic" ? " epic" : ""}${(t as unknown as TaskRow).und ? " undated" : ""}${(t as unknown as TaskRow).cr ? " critical" : ""}`;
     gantt.templates.grid_row_class = (_s, _e, t) => `${(t as unknown as { kind: string }).kind === "epic" ? "epic-row" : ""} grp-${(t as unknown as TaskRow).color}${(t as unknown as TaskRow).rec ? " has-series" : ""}${(t as unknown as TaskRow).und ? " undated-row" : ""}${(t as unknown as TaskRow).od ? " overdue-row" : ""}${selectedRef.current.has(String(t.id)) ? " sel-row" : ""}`;
     gantt.templates.task_row_class = (_s, _e, t) => `${(t as unknown as { kind: string }).kind === "epic" ? "epic-row" : ""}${selectedRef.current.has(String(t.id)) ? " sel-row" : ""}`;
     gantt.templates.task_row_class = (_s, _e, t) => ((t as unknown as { kind: string }).kind === "epic" ? "epic-row" : "");
@@ -203,7 +210,7 @@ export function DhtmlxGantt({ store, items, deps, zoom, onError, onPersisted, re
     gantt.templates.task_text = (_s, _e, t) => {
       const status = (t as unknown as { status: Status }).status;
       const { glyph, title } = label(t as never);
-      const sr = `<span class="sr-only">${esc((t as unknown as TaskRow).sname)}. </span>`;
+      const sr = `<span class="sr-only">${esc((t as unknown as TaskRow).sname)}${(t as unknown as TaskRow).cr ? `, ${esc(sv.critical.sr)}` : ""}. </span>`;
       if (!fits(t)) return sr; // titeln visas till höger, se rightside_text
       return `<span class="bar-glyph" aria-hidden="true">${glyph}</span>${sr}${title}`;
     };
@@ -309,7 +316,7 @@ export function DhtmlxGantt({ store, items, deps, zoom, onError, onPersisted, re
     gantt.templates.tooltip_text = (start, end, t) => {
       const status = (t as unknown as { status: Status }).status;
       const last = addDays(fromLocalDate(end), -1);
-      return `<b>${t.text}</b><br/>${sv.dates.range(fromLocalDate(start), last)}<br/>${STATUS_GLYPH[status]} ${String((t as unknown as TaskRow).sname).replace(/&/g, "&amp;").replace(/</g, "&lt;")}`;
+      return `<b>${t.text}</b><br/>${sv.dates.range(fromLocalDate(start), last)}<br/>${STATUS_GLYPH[status]} ${String((t as unknown as TaskRow).sname).replace(/&/g, "&amp;").replace(/</g, "&lt;")}${(t as unknown as TaskRow).cr ? `<br/><b>${sv.critical.tip}</b>` : ""}`;
     };
     // Slutdatumet i en dämpad kolumn: titel, datum och status ska inte ha samma tyngd (som listorna i Asana och monday)
     // Slutdagen: biblioteket räknar slutet exklusivt, och en milstolpe har sitt datum i startdatumet
@@ -576,9 +583,9 @@ export function DhtmlxGantt({ store, items, deps, zoom, onError, onPersisted, re
           // Bara det som ändrats ritas om. Ritas alla staplar om vid varje sparning byts staplen man är på väg att klicka på ut under klicket.
           for (const t of tasks) {
             const g = gantt.getTask(t.id) as unknown as Record<string, unknown>;
-            const same = g.text === t.text && g.code === t.code && g.sm === t.sm && g.sid === t.sid && g.sname === t.sname && g.ss === t.ss && g.status === t.status && g.priority === t.priority && g.assignee === t.assignee && g.progress === t.progress && g.color === t.color && g.und === t.und && g.od === t.od && JSON.stringify(g.cf) === JSON.stringify(t.cf) && (g.start_date as Date).getTime() === t.start_date.getTime() && (g.end_date as Date).getTime() === t.end_date.getTime();
+            const same = g.text === t.text && g.cr === t.cr && g.code === t.code && g.sm === t.sm && g.sid === t.sid && g.sname === t.sname && g.ss === t.ss && g.status === t.status && g.priority === t.priority && g.assignee === t.assignee && g.progress === t.progress && g.color === t.color && g.und === t.und && g.od === t.od && JSON.stringify(g.cf) === JSON.stringify(t.cf) && (g.start_date as Date).getTime() === t.start_date.getTime() && (g.end_date as Date).getTime() === t.end_date.getTime();
             if (same) continue;
-            g.text = t.text; g.code = t.code; g.sm = t.sm; g.sid = t.sid; g.sname = t.sname; g.ss = t.ss; g.start_date = t.start_date; g.end_date = t.end_date; g.status = t.status; g.priority = t.priority; g.assignee = t.assignee; g.progress = t.progress; g.color = t.color; g.und = t.und; g.od = t.od; g.cf = t.cf;
+            g.text = t.text; g.cr = t.cr; g.code = t.code; g.sm = t.sm; g.sid = t.sid; g.sname = t.sname; g.ss = t.ss; g.start_date = t.start_date; g.end_date = t.end_date; g.status = t.status; g.priority = t.priority; g.assignee = t.assignee; g.progress = t.progress; g.color = t.color; g.und = t.und; g.od = t.od; g.cf = t.cf;
             gantt.updateTask(t.id);
           }
         });
@@ -608,6 +615,7 @@ export function DhtmlxGantt({ store, items, deps, zoom, onError, onPersisted, re
     const id = pendingFocus.current;
     if (id) requestAnimationFrame(() => { host.current?.querySelector<HTMLElement>(`[data-check="${CSS.escape(id)}"]`)?.focus(); });
   }, [mapped]);
+  useEffect(() => { gantt.getLinks().forEach((l) => { try { gantt.refreshLink(l.id); } catch { /* länken är borta */ } }); }, [critical]);
   useEffect(() => { const id = requestAnimationFrame(() => { drawMarksRef.current?.(); drawResizersRef.current?.(); }); return () => cancelAnimationFrame(id); }, [mapped, seriesMarks, baseline, gridWidth, columns, columnWidths]);
 
   useEffect(() => {

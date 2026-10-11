@@ -28,10 +28,12 @@ type SaveState = { kind: "idle" } | { kind: "saving" } | { kind: "saved" } | { k
  * Detaljpanel för en post, fast bredd, dockad till höger. Ändringar sparas per fält direkt (inget spara-steg), så att man
  * kan hoppa mellan poster utan att tappa något. Läser alltid färska data från DataStore (drag i vyerna sparas direkt i storen).
  */
-export function ItemPanel({ me = "", onMe, baseline, fieldDefs = [], onDuplicate, onNewSeries, nextDate, features = DEFAULT_FEATURES, checklistProgress = false, store, projectId, itemId, dataVersion, autoSelectTitle = false, focusField = null, onFocusDone, onClose, onChanged, onOpen }: {
+export function ItemPanel({ critical, me = "", onMe, baseline, fieldDefs = [], onDuplicate, onNewSeries, nextDate, features = DEFAULT_FEATURES, checklistProgress = false, store, projectId, itemId, dataVersion, autoSelectTitle = false, focusField = null, onFocusDone, onClose, onChanged, onOpen }: {
   features?: Features; checklistProgress?: boolean;
   /** Projektets egna fält. */
   fieldDefs?: FieldDef[];
+  /** Kritisk linje (om den är påslagen): marginalen visas på posten. */
+  critical?: import("../data/critical").CriticalResult | null;
   /** Person som skriver kommentarer (id) och hur valet ändras. */
   me?: string; onMe?: (id: string) => void;
   /** Projektets baslinje (om den finns), för att visa postens plan och glidning. */
@@ -422,6 +424,9 @@ export function ItemPanel({ me = "", onMe, baseline, fieldDefs = [], onDuplicate
           {err("order")}
         </section>
 
+        {critical && !epic && critical.slack.has(item.id) && (
+          <section className="panel-section" data-section="critical"><h3>{sv.critical.title}</h3><p className="panel-muted">{sv.critical.slack(critical.slack.get(item.id)!)}</p></section>
+        )}
         {baseline && (() => {
           const e = baseline.items[item.id];
           return (
