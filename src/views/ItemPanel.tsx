@@ -247,7 +247,7 @@ export function ItemPanel({ fieldDefs = [], onDuplicate, onNewSeries, nextDate, 
 
   return (
     <aside className="panel" aria-label={sv.panel.label} data-item-id={item.id}>
-      <PanelHead onClose={onClose} kind={sv.panel.type[item.type]} crumbs={chain} saveState={save} />
+      <PanelHead onClose={onClose} kind={sv.panel.type[item.type]} code={item.code} refCode={item.ref} crumbs={chain} saveState={save} />
       <div className="panel-body">
         <label className="panel-field panel-title">
           <span className="sr-only">{sv.panel.name}</span>
@@ -397,6 +397,11 @@ export function ItemPanel({ fieldDefs = [], onDuplicate, onNewSeries, nextDate, 
             <section className="panel-section" data-section="series">
               <h3>{sv.recur.series}</h3>
               <p className="panel-muted">{sv.recur.info(sv.recur.kinds[item.recur], mem.length)}{nextDate ? ` ${sv.extras.next(nextDate)}` : ""}</p>
+              <ul className="occ-list" aria-label={sv.recur.occurrences}>
+                {[...mem].sort((a, b) => (a.start < b.start ? -1 : a.start > b.start ? 1 : 0)).map((m) => (
+                  <li key={m.id}><button type="button" className="panel-link" aria-current={m.id === item.id ? "true" : undefined} data-occ={m.id} onClick={() => onOpen(m.id)}>{STATUS_GLYPH[m.status]} {m.start}{m.code ? ` ${m.code}` : ""}</button></li>
+                ))}
+              </ul>
               <label className="panel-field"><span>{sv.recur.renameAll}</span>
                 <div className="panel-row">
                   <input name="series-title" value={seriesTitle || item.title} maxLength={200} onChange={(e) => setSeriesTitle(e.target.value)} />
@@ -464,11 +469,12 @@ export function ItemPanel({ fieldDefs = [], onDuplicate, onNewSeries, nextDate, 
   );
 }
 
-function PanelHead({ onClose, kind, crumbs = [], saveState }: { onClose: () => void; kind: string; crumbs?: string[]; saveState?: SaveState }) {
+function PanelHead({ onClose, kind, code, refCode, crumbs = [], saveState }: { onClose: () => void; kind: string; code?: string; refCode?: string; crumbs?: string[]; saveState?: SaveState }) {
   return (
     <header className="panel-head">
       <div className="panel-head-text">
-        <span className="panel-kind">{kind}</span>
+        <div className="panel-kind-row"><span className="panel-kind">{kind}</span>{code && <span className="code-tag" title={sv.panel.codeHint} data-code={code}>{code}</span>}</div>
+        {refCode && <span className="panel-crumbs">{sv.panel.refLabel}: {refCode}</span>}
         {crumbs.length > 0 && <span className="panel-crumbs">{sv.panel.inEpic}: {crumbs.join(" / ")}</span>}
       </div>
       <span className="panel-state" role="status" aria-live="polite">

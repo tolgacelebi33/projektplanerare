@@ -2,7 +2,7 @@ import { Suspense, lazy, useEffect, useMemo, useRef, useState } from "react";
 import { downloadText } from "./download";
 import { MAX_IMPORT_BYTES, ImportError, parseUpload } from "./data/exchange";
 import { duplicateProject, exportProject, importParsed, type ExportFormat, type ImportResult } from "./data/importExport";
-import { bulkDelete, bulkMove, bulkStatus, canMove, createSeries, inOneStep, deleteSubtree, descendants, epicChoices, filterActive, filterView, hidePastSeries, duplicateItem, nextOccurrenceIds, moveTargets, newItemDraft, planMove, rangeIds, selectionRoots, swapWithSibling, type BulkResult } from "./data/actions";
+import { collapseSeries, bulkDelete, bulkMove, bulkStatus, canMove, createSeries, inOneStep, deleteSubtree, descendants, epicChoices, filterActive, filterView, hidePastSeries, duplicateItem, nextOccurrenceIds, moveTargets, newItemDraft, planMove, rangeIds, selectionRoots, swapWithSibling, type BulkResult } from "./data/actions";
 import { BulkBar } from "./views/BulkBar";
 import { allLabels } from "./data/extras";
 import { boardColumns, planColumnDrop, planColumnMoves } from "./data/boardColumns";
@@ -25,7 +25,7 @@ import { ProjectBar } from "./views/ProjectBar";
 import { LANGS, setLang, storedLang, sv, type Lang } from "./i18n/sv";
 import { focusMedianOnNextProject, rememberScroll, uiCarry } from "./scrollCarry";
 import { clampGrid, loadGridWidth, saveGridWidth } from "./layout";
-import { columnWidth, loadColumns, saveColumns, type ColumnId } from "./columns";
+import { COLUMN_ORDER, columnWidth, loadColumns, saveColumns, type ColumnId } from "./columns";
 import { ColumnPicker } from "./views/ColumnPicker";
 import { HelpDialog } from "./views/HelpDialog";
 import { effectiveColors } from "./data/colors";
@@ -92,6 +92,9 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
   const [view, setView] = useState<ViewId>(uiCarry.view ?? (new URLSearchParams(window.location.search).get("view") ? VIEW0 : settings.startView));
   const [year, setYear] = useState<number | null>(uiCarry.year ?? null);
   uiCarry.zoom = zoom; uiCarry.view = view; uiCarry.year = year;
+  // "Visa serier som en rad": bara listan, tidslinjen och boarden. Kalendern och de andra vyerna visar alla tillfällen.
+  const collapsed = useMemo(() => (settings.collapseSeries && (view === "gantt" || view === "board") ? collapseSeries(shown, todayISO()) : null), [settings.collapseSeries, view, shown]);
+  const listItems = collapsed?.items ?? shown.items, listDeps = collapsed?.deps ?? shown.deps;
   const [theme, setTheme] = useState<Theme>(getTheme);
   const firstYear = state.kind === "ready" && state.items.length ? Number(state.items.map((i) => i.start).sort()[0].slice(0, 4)) : new Date().getFullYear();
   const effectiveYear = year ?? firstYear;
@@ -417,12 +420,13 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
   const [columns, setColumns] = useState<ColumnId[]>(() => (typeof window !== "undefined" && window.innerWidth < 700 ? loadColumns().filter((c) => c !== "end") : loadColumns())); // telefon: bara titeln i listan, så att den går att läsa
   const toggleColumn = (c: ColumnId) => {
     const on = columns.includes(c);
-    const staticIds = ["status", "assignee", "priority", "start", "end", "progress"] as ColumnId[];
+    const staticIds = COLUMN_ORDER as ColumnId[];
     const next = [...staticIds.filter((x) => (x === c ? !on : columns.includes(x))), ...(columns.filter((x) => x.startsWith("f:") && x !== c) as ColumnId[]), ...(c.startsWith("f:") && !on ? [c] : [])];
     setColumns(next); saveColumns(next);
     changeGrid(gridRef.current + (on ? -columnWidth(c) : columnWidth(c))); commitGrid();
   };
   const [users, setUsers] = useState<User[]>([]);
+  const reloadUsers = async () => { setUsers(await store.listUsers()); };
   useEffect(() => { let on = true; void store.listUsers().then((u) => { if (on) setUsers(u); }).catch(() => undefined); return () => { on = false; }; }, [store]);
   /** Status, prioritet eller ansvarig ändrad direkt i en rad. */
   const editField = async (id: string, field: "status" | "priority" | "assignee", value: string) => {
@@ -660,7 +664,7 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
         {projects.projects && projects.projects.length === 0 && (
           <div className="empty-state"><p>{sv.project.none}</p><button type="button" className="btn btn-primary" onClick={() => void projects.create(sv.project.defaultName)}>{sv.project.createFirst}</button></div>
         )}
-        {state.kind === "ready" && projects.projectId && view === "board" && <BoardView fields={fieldDefs} nextIds={nextIds} groupBy={boardGroup} cardFields={settings.cardFields} highlightOverdue={settings.highlightOverdue} markUndated={settings.markUndated} items={shown.items} allItems={state.items} users={users} colors={colors} openId={editId} selected={selected} onOpen={setEditId} onSelect={selectRow} onBackground={dropSelection} onDrop={(m, k, b) => void dropCards(m, k, b)} onMoveTo={moveCardTo} onContext={openMenu} />}
+        {state.kind === "ready" && projects.projectId && view === "board" && <BoardView fields={fieldDefs} nextIds={nextIds} groupBy={boardGroup} cardFields={settings.cardFields} highlightOverdue={settings.highlightOverdue} markUndated={settings.markUndated} items={listItems} allItems={state.items} users={users} colors={colors} openId={editId} selected={selected} onOpen={setEditId} onSelect={selectRow} onBackground={dropSelection} onDrop={(m, k, b) => void dropCards(m, k, b)} onMoveTo={moveCardTo} onContext={openMenu} />}
         {state.kind === "ready" && projects.projectId && view === "calendar" && <CalendarView items={shown.items} today={todayISO()} markUndated={settings.markUndated} colors={colors} openId={editId} onOpen={setEditId} onShift={(id, d) => void shiftItem(id, d)} />}
         {state.kind === "ready" && projects.projectId && view === "workload" && <WorkloadView items={shown.items} users={users} fieldDefs={fieldDefs} fieldId={settings.workloadField} cap={settings.workloadCap} today={todayISO()} onOpen={setEditId} />}
         {view === "week" && projects.projects && projects.projects.length > 0 && <MyWeekView groups={myWeekGroups(allData, todayISO())} users={users} multi={projects.projects.length > 1} onOpen={openInProject} />}
@@ -674,7 +678,7 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
             onCreateAt={({ rowId, date }) => void addItem("task", { anchorId: rowId, start: date }).catch(() => undefined)}
             onRename={(id) => { setJustCreated(id); setEditId(id); }}
             onContext={openMenu}
-            onToggleDone={(id) => void toggleDone(id)} onMoveRow={moveRow} onAddInGroup={(gid) => void addItem("task", { anchorId: gid }).catch(() => undefined)} store={store} items={shown.items} deps={shown.deps} zoom={zoom}
+            onToggleDone={(id) => void toggleDone(id)} onMoveRow={moveRow} onAddInGroup={(gid) => void addItem("task", { anchorId: gid }).catch(() => undefined)} store={store} items={listItems} deps={listDeps} seriesMarks={collapsed?.marks} onOpenItem={setEditId} zoom={zoom}
             onError={(e) => { setWriteError(typeof e === "string" ? e : friendlyError(e)); reload(); }} />
           <GridResizer width={gridWidth} onChange={changeGrid} onCommit={commitGrid} onFit={fitGrid} />
           </div>
@@ -689,7 +693,7 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
       )}
       </div>
       {fieldsOpen && project && <FieldsDialog fields={fieldDefs} onSave={(f) => projects.setFields(project.id, f)} onRemove={async (id) => { await removeFieldDef(store, project, id); await projects.reload(project.id); await refresh(); }} onClose={() => setFieldsOpen(false)} />}
-      {settingsOpen && <SettingsDialog fieldDefs={fieldDefs} settings={settings} onChange={setSettings} onClose={() => setSettingsOpen(false)} />}
+      {settingsOpen && <SettingsDialog fieldDefs={fieldDefs} settings={settings} people={{ users, onAdd: async (n) => { await store.addUser(n); await reloadUsers(); }, onRename: async (id, n) => { await store.renameUser(id, n); await reloadUsers(); await refresh(); }, onRemove: async (id) => { const n = await store.removeUser(id); await reloadUsers(); await refresh(); setAttrFilter((f) => ({ ...f, assignees: f.assignees.filter((x) => x !== id) })); return n; } }} onChange={setSettings} onClose={() => setSettingsOpen(false)} />}
       {recurOpen && <RecurringDialog key={recurInit ? "from" : "new"} today={todayISO()} initial={recurInit ?? undefined} onCreate={(a) => void addSeries(a)} onClose={() => setRecurOpen(false)} />}
       {menu && <ContextMenu x={menu.x} y={menu.y} items={menuItems} confirm={confirmRemove} onPick={(id) => void pickMenu(id)} onClose={() => setMenu(null)} />}
     </div>

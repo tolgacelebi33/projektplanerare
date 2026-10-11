@@ -70,7 +70,8 @@ export async function importParsed(store: MemoryStore, workspaceId: string, pars
     const ordered = [...parsed.items].sort((a, b) => depth(a.id) - depth(b.id) || a.sort_order - b.sort_order);
     const idMap = new Map<string, string>();
     for (const it of ordered) {
-      const { id, assignee, parent_id, ...rest } = it;
+      const { id, assignee, parent_id, code, ...rest } = it; // koden delas ut av lagret, den gamla blir en hänvisning
+      if (code && !rest.ref) rest.ref = code.slice(0, 60);
       if (rest.fields) { const mapped: NonNullable<Item["fields"]> = {}; for (const [k, v] of Object.entries(rest.fields)) { const nk = fieldMap.get(k); if (nk) mapped[nk] = v; } rest.fields = Object.keys(mapped).length ? mapped : undefined; }
       // Flera ansvariga kan stå i samma cell (A; B eller A/B). Första som är en känd användare blir ansvarig, resten (och okända) hamnar i beskrivningen.
       let assignee_id: string | null = null;

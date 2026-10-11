@@ -159,7 +159,7 @@ test.describe("text i staplar", () => {
 });
 
 test.describe("typografi: enhetlig färg, storlek och vikt, och läsbar kontrast", () => {
-  const lum = (rgb: string) => { const [r, g, b] = (rgb.match(/[\d.]+/g) ?? []).slice(0, 3).map(Number).map((v) => { const c = v / 255; return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; }); return 0.2126 * r + 0.7152 * g + 0.0722 * b; };
+  const lum = (rgb: string) => { const scale = rgb.startsWith("color(") ? 1 : 255; /* färger som räknats ur color-mix kommer som color(srgb 0-1) */ const [r, g, b] = (rgb.match(/[\d.]+/g) ?? []).slice(0, 3).map(Number).map((v) => { const c = v / scale; return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; }); return 0.2126 * r + 0.7152 * g + 0.0722 * b; };
   const contrast = (a: string, b: string) => { const [hi, lo] = [lum(a), lum(b)].sort((x, y) => y - x); return (hi + 0.05) / (lo + 0.05); };
   for (const th of ["Standard", "Ljust", "Mörkt"]) {
     test(`Y all text i staplar har samma färg, storlek, vikt och typsnitt, och kontrasten räcker (${th})`, async ({ page }) => {

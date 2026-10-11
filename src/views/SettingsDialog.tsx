@@ -1,103 +1,185 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { DEFAULT_SETTINGS, MORE_VIEWS, type Settings } from "../settings";
-import type { FieldDef } from "../data/types";
+import type { FieldDef, User } from "../data/types";
 import { sv } from "../i18n/sv";
 
 /** Inställningar: ändras direkt och sparas i webbläsaren. Esc, Stäng eller klick utanför stänger. */
-export function SettingsDialog({ fieldDefs = [], settings, onChange, onClose }: { fieldDefs?: FieldDef[]; settings: Settings; onChange: (s: Settings) => void; onClose: () => void }) {
+const TABS = ["list", "board", "views", "item", "people", "start", "touch", "info"] as const;
+type Tab = (typeof TABS)[number];
+const KEYS = ["N", "M", "G", "/", "T", "1, 2, 3", "?", "Cmd/Ctrl + Z", "Cmd/Ctrl + Shift + Z, Cmd/Ctrl + Y", "Alt + ↑ / ↓", "Esc"]; // samma på alla språk, texterna står i ordlistan i samma ordning
+const TAB0_KEY = "projektplanerare.settingsTab";
+
+export interface PeopleApi { users: User[]; onAdd: (name: string) => Promise<void>; onRename: (id: string, name: string) => Promise<void>; onRemove: (id: string) => Promise<number> }
+
+export function SettingsDialog({ fieldDefs = [], settings, people, onChange, onClose }: { fieldDefs?: FieldDef[]; settings: Settings; people?: PeopleApi; onChange: (s: Settings) => void; onClose: () => void }) {
   const root = useRef<HTMLDivElement>(null);
+  const [tab, setTab] = useState<Tab>(() => { try { const v = sessionStorage.getItem(TAB0_KEY); return (TABS as readonly string[]).includes(v ?? "") ? (v as Tab) : "list"; } catch { return "list"; } });
+  const pick = (t: Tab) => { setTab(t); try { sessionStorage.setItem(TAB0_KEY, t); } catch { /* ignoreras */ } };
   useEffect(() => {
     const esc = (e: KeyboardEvent) => { if (e.key === "Escape") { e.stopPropagation(); onClose(); } };
     document.addEventListener("keydown", esc, true);
-    root.current?.querySelector<HTMLElement>("select, input")?.focus();
+    root.current?.querySelector<HTMLElement>('[role="tabpanel"] select, [role="tabpanel"] input')?.focus();
     return () => document.removeEventListener("keydown", esc, true);
   }, [onClose]);
   const set = <K extends keyof Settings>(k: K, v: Settings[K]) => onChange({ ...settings, [k]: v });
   const t = sv.settings;
+  const onTabKey = (e: React.KeyboardEvent) => {
+    const i = TABS.indexOf(tab);
+    const to = e.key === "ArrowDown" || e.key === "ArrowRight" ? TABS[(i + 1) % TABS.length] : e.key === "ArrowUp" || e.key === "ArrowLeft" ? TABS[(i + TABS.length - 1) % TABS.length] : e.key === "Home" ? TABS[0] : e.key === "End" ? TABS[TABS.length - 1] : null;
+    if (!to) return;
+    e.preventDefault(); pick(to);
+    requestAnimationFrame(() => root.current?.querySelector<HTMLElement>(`#settings-tab-${to}`)?.focus());
+  };
+  const check = (label: string, hint: string | null, on: boolean, change: (v: boolean) => void) => (
+    <label className="settings-check"><input type="checkbox" checked={on} onChange={(e) => change(e.target.checked)} /><span>{label}{hint && <small>{hint}</small>}</span></label>
+  );
   return (
     <div className="modal-back" onPointerDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="modal settings" role="dialog" aria-modal="true" aria-label={t.title} ref={root}>
         <div className="help-head"><h2>{t.title}</h2><button type="button" className="panel-x" aria-label={t.close} onClick={onClose}>×</button></div>
-        <section>
-          <h3>{t.panelGroup}</h3>
-          <label className="settings-check"><input type="checkbox" checked={settings.closeOnEmpty} onChange={(e) => set("closeOnEmpty", e.target.checked)} /><span>{t.closeOnEmpty}<small>{t.closeOnEmptyHint}</small></span></label>
-          <label className="settings-check"><input type="checkbox" checked={settings.markUndated} onChange={(e) => set("markUndated", e.target.checked)} /><span>{t.markUndated}<small>{t.markUndatedHint}</small></span></label>
-        </section>
-        <section>
-          <h3>{t.listGroup}</h3>
-          <label className="settings-check"><input type="checkbox" checked={settings.highlightOverdue} onChange={(e) => set("highlightOverdue", e.target.checked)} /><span>{t.highlightOverdue}<small>{t.highlightOverdueHint}</small></span></label>
-          <label className="settings-check"><input type="checkbox" checked={settings.quickFilters} onChange={(e) => set("quickFilters", e.target.checked)} /><span>{t.quickFilters}<small>{t.quickFiltersHint}</small></span></label>
-        </section>
-        <section>
-          <h3>{t.cardsGroup}</h3>
-          <div className="settings-cards">
-            {(Object.keys(settings.cardFields) as (keyof Settings["cardFields"])[]).map((k) => (
-              <label key={k} className="settings-check"><input type="checkbox" checked={settings.cardFields[k]} onChange={(e) => onChange({ ...settings, cardFields: { ...settings.cardFields, [k]: e.target.checked } })} /><span>{t.cardFields[k]}</span></label>
+        <div className="settings-layout">
+          <div className="settings-tabs" role="tablist" aria-orientation="vertical" aria-label={t.tabs.label} onKeyDown={onTabKey}>
+            {TABS.map((k) => (
+              <button key={k} type="button" role="tab" id={`settings-tab-${k}`} aria-selected={tab === k} aria-controls="settings-panel" tabIndex={tab === k ? 0 : -1} className="settings-tab" onClick={() => pick(k)}>{t.tabs[k]}</button>
             ))}
           </div>
-          <label className="panel-field"><span>{t.boardGroup}</span>
-            <select name="set-boardgroup" value={settings.boardGroup} onChange={(e) => set("boardGroup", e.target.value as Settings["boardGroup"])}>
-              {(["status", "assignee", "priority", "group"] as const).map((g) => <option key={g} value={g}>{sv.board.groups[g]}</option>)}
-              {fieldDefs.filter((d) => d.type === "select").map((d) => <option key={d.id} value={`field:${d.id}`}>{d.name}</option>)}
-            </select></label>
-          <p className="panel-muted">{t.boardGroupHint}</p>
-        </section>
-        <section>
-          <h3>{t.featuresGroup}</h3>
-          <div className="settings-cards">
-            {(Object.keys(settings.features) as (keyof Settings["features"])[]).map((k) => (
-              <label key={k} className="settings-check"><input type="checkbox" checked={settings.features[k]} onChange={(e) => onChange({ ...settings, features: { ...settings.features, [k]: e.target.checked } })} /><span>{t.features[k]}</span></label>
-            ))}
+          <div className="settings-panel" role="tabpanel" id="settings-panel" aria-labelledby={`settings-tab-${tab}`}>
+            <h3>{t.tabs[tab]}</h3>
+            {tab === "list" && (<section>
+              {check(t.closeOnEmpty, t.closeOnEmptyHint, settings.closeOnEmpty, (v) => set("closeOnEmpty", v))}
+              {check(t.markUndated, t.markUndatedHint, settings.markUndated, (v) => set("markUndated", v))}
+              {check(t.highlightOverdue, t.highlightOverdueHint, settings.highlightOverdue, (v) => set("highlightOverdue", v))}
+              {check(t.quickFilters, t.quickFiltersHint, settings.quickFilters, (v) => set("quickFilters", v))}
+              {check(t.collapseSeries, t.collapseSeriesHint, settings.collapseSeries, (v) => set("collapseSeries", v))}
+            </section>)}
+            {tab === "board" && (<section>
+              <div className="settings-cards">
+                {(Object.keys(settings.cardFields) as (keyof Settings["cardFields"])[]).map((k) => (
+                  <label key={k} className="settings-check"><input type="checkbox" checked={settings.cardFields[k]} onChange={(e) => onChange({ ...settings, cardFields: { ...settings.cardFields, [k]: e.target.checked } })} /><span>{t.cardFields[k]}</span></label>
+                ))}
+              </div>
+              <label className="panel-field"><span>{t.boardGroup}</span>
+                <select name="set-boardgroup" value={settings.boardGroup} onChange={(e) => set("boardGroup", e.target.value as Settings["boardGroup"])}>
+                  {(["status", "assignee", "priority", "group"] as const).map((g) => <option key={g} value={g}>{sv.board.groups[g]}</option>)}
+                  {fieldDefs.filter((d) => d.type === "select").map((d) => <option key={d.id} value={`field:${d.id}`}>{d.name}</option>)}
+                </select></label>
+              <p className="panel-muted">{t.boardGroupHint}</p>
+            </section>)}
+            {tab === "views" && (<section>
+              <p className="panel-muted">{t.moreViewsHint}</p>
+              <div className="settings-cards">
+                {MORE_VIEWS.map((v) => (
+                  <label key={v} className="settings-check"><input type="checkbox" checked={settings.moreViews[v]} onChange={(e) => onChange({ ...settings, moreViews: { ...settings.moreViews, [v]: e.target.checked } })} /><span>{sv.ov[v]}</span></label>
+                ))}
+              </div>
+              <div className="modal-row settings-row">
+                <label className="panel-field"><span>{t.workloadField}</span>
+                  <select name="set-wlfield" value={settings.workloadField} onChange={(e) => set("workloadField", e.target.value)}>
+                    <option value="">{sv.ov.work.count}</option>
+                    {fieldDefs.filter((d) => d.type === "number").map((d) => <option key={d.id} value={d.id}>{sv.ov.work.sumOf(d.name)}</option>)}
+                  </select></label>
+                <label className="panel-field"><span>{t.workloadCap}</span>
+                  <input name="set-wlcap" type="number" min={0} max={999} step={1} value={settings.workloadCap} onChange={(e) => { const n = Math.floor(Number(e.target.value)); if (Number.isFinite(n) && n >= 0 && n <= 999) set("workloadCap", n); }} /></label>
+              </div>
+            </section>)}
+            {tab === "item" && (<section>
+              <div className="settings-cards">
+                {(Object.keys(settings.features) as (keyof Settings["features"])[]).map((k) => (
+                  <label key={k} className="settings-check"><input type="checkbox" checked={settings.features[k]} onChange={(e) => onChange({ ...settings, features: { ...settings.features, [k]: e.target.checked } })} /><span>{t.features[k]}</span></label>
+                ))}
+              </div>
+              <p className="panel-muted">{t.featuresHint}</p>
+              {check(t.checklistProgress, t.checklistProgressHint, settings.checklistProgress, (v) => set("checklistProgress", v))}
+              {check(t.hidePastSeries, t.hidePastSeriesHint, settings.hidePastSeries, (v) => set("hidePastSeries", v))}
+              {check(t.importFields, t.importFieldsHint, settings.importExtraAsFields, (v) => set("importExtraAsFields", v))}
+            </section>)}
+            {tab === "people" && people && <PeopleTab api={people} />}
+            {tab === "start" && (<section>
+              <div className="modal-row settings-row">
+                <label className="panel-field"><span>{t.startView}</span>
+                  <select name="set-view" value={settings.startView} onChange={(e) => set("startView", e.target.value as Settings["startView"])}>
+                    <option value="gantt">{sv.view.gantt}</option><option value="wheel">{sv.view.wheel}</option><option value="board">{sv.view.board}</option>
+                  </select></label>
+                <label className="panel-field"><span>{t.startZoom}</span>
+                  <select name="set-zoom" value={settings.startZoom} onChange={(e) => set("startZoom", e.target.value as Settings["startZoom"])}>
+                    <option value="day">{sv.zoom.day}</option><option value="week">{sv.zoom.week}</option><option value="month">{sv.zoom.month}</option>
+                  </select></label>
+              </div>
+            </section>)}
+            {tab === "touch" && (<section>
+              <label className="panel-field"><span>{t.touch}</span>
+                <select name="set-touch" value={settings.touch} onChange={(e) => set("touch", e.target.value as Settings["touch"])}>
+                  <option value="auto">{t.touchAuto}</option><option value="on">{t.touchOn}</option><option value="off">{t.touchOff}</option>
+                </select></label>
+              <p className="panel-muted">{t.touchHint}</p>
+            </section>)}
+            {tab === "info" && (<section>
+              <p>{t.infoStorage}</p>
+              <p>{t.infoCodes}</p>
+              <h4>{t.shortcutsTitle}</h4>
+              <p className="panel-muted">{t.shortcutsHint}</p>
+              <dl className="settings-keys">
+                {t.shortcuts.map((d, n) => <div key={KEYS[n]}><dt><kbd>{KEYS[n]}</kbd></dt><dd>{d}</dd></div>)}
+              </dl>
+              <div><button type="button" className="mini" onClick={() => { onClose(); window.dispatchEvent(new CustomEvent("pp:help")); }}>{t.openHelp}</button></div>
+            </section>)}
           </div>
-          <p className="panel-muted">{t.featuresHint}</p>
-          <label className="settings-check"><input type="checkbox" checked={settings.checklistProgress} onChange={(e) => set("checklistProgress", e.target.checked)} /><span>{t.checklistProgress}<small>{t.checklistProgressHint}</small></span></label>
-          <label className="settings-check"><input type="checkbox" checked={settings.importExtraAsFields} onChange={(e) => set("importExtraAsFields", e.target.checked)} /><span>{t.importFields}<small>{t.importFieldsHint}</small></span></label>
-          <label className="settings-check"><input type="checkbox" checked={settings.hidePastSeries} onChange={(e) => set("hidePastSeries", e.target.checked)} /><span>{t.hidePastSeries}<small>{t.hidePastSeriesHint}</small></span></label>
-        </section>
-        <section>
-          <h3>{t.moreViewsGroup}</h3>
-          <p className="panel-muted">{t.moreViewsHint}</p>
-          <div className="settings-cards">
-            {MORE_VIEWS.map((v) => (
-              <label key={v} className="settings-check"><input type="checkbox" checked={settings.moreViews[v]} onChange={(e) => onChange({ ...settings, moreViews: { ...settings.moreViews, [v]: e.target.checked } })} /><span>{sv.ov[v]}</span></label>
-            ))}
-          </div>
-          <div className="modal-row settings-row">
-            <label className="panel-field"><span>{t.workloadField}</span>
-              <select name="set-wlfield" value={settings.workloadField} onChange={(e) => set("workloadField", e.target.value)}>
-                <option value="">{sv.ov.work.count}</option>
-                {fieldDefs.filter((d) => d.type === "number").map((d) => <option key={d.id} value={d.id}>{sv.ov.work.sumOf(d.name)}</option>)}
-              </select></label>
-            <label className="panel-field"><span>{t.workloadCap}</span>
-              <input name="set-wlcap" type="number" min={0} max={999} step={1} value={settings.workloadCap} onChange={(e) => { const n = Math.floor(Number(e.target.value)); if (Number.isFinite(n) && n >= 0 && n <= 999) set("workloadCap", n); }} /></label>
-          </div>
-        </section>
-        <section>
-          <h3>{t.startGroup}</h3>
-          <div className="modal-row settings-row">
-            <label className="panel-field"><span>{t.startView}</span>
-              <select name="set-view" value={settings.startView} onChange={(e) => set("startView", e.target.value as Settings["startView"])}>
-                <option value="gantt">{sv.view.gantt}</option><option value="wheel">{sv.view.wheel}</option><option value="board">{sv.view.board}</option>
-              </select></label>
-            <label className="panel-field"><span>{t.startZoom}</span>
-              <select name="set-zoom" value={settings.startZoom} onChange={(e) => set("startZoom", e.target.value as Settings["startZoom"])}>
-                <option value="day">{sv.zoom.day}</option><option value="week">{sv.zoom.week}</option><option value="month">{sv.zoom.month}</option>
-              </select></label>
-          </div>
-        </section>
-        <section>
-          <h3>{t.touchGroup}</h3>
-          <label className="panel-field"><span>{t.touch}</span>
-            <select name="set-touch" value={settings.touch} onChange={(e) => set("touch", e.target.value as Settings["touch"])}>
-              <option value="auto">{t.touchAuto}</option><option value="on">{t.touchOn}</option><option value="off">{t.touchOff}</option>
-            </select></label>
-          <p className="panel-muted">{t.touchHint}</p>
-        </section>
+        </div>
         <div className="panel-row modal-actions">
           <button type="button" className="mini" onClick={() => onChange({ ...DEFAULT_SETTINGS })}>{t.reset}</button>
           <button type="button" className="mini mini-primary" onClick={onClose}>{t.close}</button>
         </div>
       </div>
     </div>
+  );
+}
+
+const errText = (e: unknown) => (e instanceof Error ? e.message : String(e));
+
+/** Personer: namnet ändras direkt (Enter eller när fältet lämnas), nya läggs till, och borttagning kräver en bekräftelse. */
+function PeopleTab({ api }: { api: PeopleApi }) {
+  const t = sv.settings.people;
+  const [msg, setMsg] = useState<{ kind: "error" | "info"; text: string } | null>(null);
+  const [adding, setAdding] = useState("");
+  const [confirmId, setConfirmId] = useState<string | null>(null);
+  const [draft, setDraft] = useState<Record<string, string>>({});
+  const run = async (fn: () => Promise<unknown>, ok?: (r: unknown) => string) => {
+    try { const r = await fn(); setMsg(ok ? { kind: "info", text: ok(r) } : null); return true; } catch (e) { setMsg({ kind: "error", text: errText(e) }); return false; }
+  };
+  const commitName = async (u: User) => {
+    const v = (draft[u.id] ?? u.name).trim();
+    if (v === u.name) { setDraft((d) => { const n = { ...d }; delete n[u.id]; return n; }); return; }
+    if (await run(() => api.onRename(u.id, v))) setDraft((d) => { const n = { ...d }; delete n[u.id]; return n; });
+  };
+  return (
+    <section>
+      <p className="panel-muted">{t.intro}</p>
+      {api.users.length === 0 && <p className="panel-muted">{t.none}</p>}
+      <ul className="people-list">
+        {api.users.map((u) => (
+          <li key={u.id}>
+            {confirmId === u.id ? (
+              <div className="people-confirm" role="group" aria-label={t.confirm(u.name)}>
+                <span>{t.confirm(u.name)}</span>
+                <button type="button" className="mini mini-danger" onClick={() => void run(() => api.onRemove(u.id), (n) => t.removed(n as number)).then(() => setConfirmId(null))}>{t.confirmYes}</button>
+                <button type="button" className="mini" onClick={() => setConfirmId(null)}>{t.cancel}</button>
+              </div>
+            ) : (
+              <>
+                <input aria-label={t.nameOf(u.name)} value={draft[u.id] ?? u.name} maxLength={60}
+                  onChange={(e) => setDraft((d) => ({ ...d, [u.id]: e.target.value }))} onBlur={() => void commitName(u)}
+                  onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); void commitName(u); } else if (e.key === "Escape" && draft[u.id] !== undefined) { e.stopPropagation(); setDraft((d) => { const n = { ...d }; delete n[u.id]; return n; }); } }} />
+                <button type="button" className="mini" aria-label={`${t.remove} ${u.name}`} onClick={() => { setMsg(null); setConfirmId(u.id); }}>{t.remove}</button>
+              </>
+            )}
+          </li>
+        ))}
+      </ul>
+      <form className="people-add" onSubmit={(e) => { e.preventDefault(); if (adding.trim()) void run(() => api.onAdd(adding)).then((ok) => { if (ok) setAdding(""); }); }}>
+        <input aria-label={t.newName} placeholder={t.newName} value={adding} maxLength={60} onChange={(e) => setAdding(e.target.value)} />
+        <button type="submit" className="mini" disabled={!adding.trim()}>{t.add}</button>
+      </form>
+      {msg && <p role={msg.kind === "error" ? "alert" : "status"} className={msg.kind === "error" ? "people-error" : "panel-muted"}>{msg.text}</p>}
+    </section>
   );
 }

@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { openApp } from "./helpers";
+const openTab = (page: Page, name: string) => page.getByRole("dialog", { name: "Inställningar" }).getByRole("tab", { name, exact: true }).click();
 
 type Row = { id: string; title: string; status: string; progress: number; labels?: string[]; checklist?: { id: string; text: string; done: boolean }[]; links?: { title: string; url: string }[]; log?: { at: string; text: string }[]; parent_id: string | null; series?: string };
 const items = (page: Page) => page.evaluate(() => (window as any).__store.listItems("proj_1")) as Promise<Row[]>;
@@ -43,7 +44,8 @@ test("B2 etiketter filtrerar listan, visas som chips på korten, och kan döljas
   await page.getByRole("group", { name: "Vy" }).getByRole("button", { name: "Board" }).click();
   await expect(page.locator('article[data-id="i6"] .card-chips .chip')).toHaveText("M3");
   await settingsBtn(page).click();
-  await dlg(page).locator("section", { hasText: "Kort i boarden" }).getByLabel("Etiketter", { exact: true }).uncheck();
+  await openTab(page, "Boardvy");
+  await dlg(page).getByLabel("Etiketter", { exact: true }).uncheck();
   await page.keyboard.press("Escape");
   await expect(page.locator('article[data-id="i6"] .card-chips')).toHaveCount(0);
 });
@@ -62,6 +64,7 @@ test("B3 checklista: lägg till, bocka, ändra text, ta bort, räknare på korte
   const p0 = (await get(page, "i7")).progress;
   expect(p0).not.toBe(67); // framsteget är oberoende tills man väljer annat
   await settingsBtn(page).click();
+  await openTab(page, "Posten");
   await dlg(page).getByLabel("Checklistan styr framsteget").check();
   await page.keyboard.press("Escape");
   await s.getByRole("checkbox", { name: "Tredje" }).check();
@@ -105,6 +108,7 @@ test("B5 uppdateringslogg: ny rad med tid, senaste överst, ta bort, och senaste
   await page.getByRole("group", { name: "Vy" }).getByRole("button", { name: "Board" }).click();
   await expect(page.locator('article[data-id="i7"] .board-last')).toHaveCount(0);
   await settingsBtn(page).click();
+  await openTab(page, "Boardvy");
   await dlg(page).getByLabel("Senaste uppdatering").check();
   await page.keyboard.press("Escape");
   await expect(page.locator('article[data-id="i7"] .board-last')).toHaveText("Andra");
@@ -116,13 +120,15 @@ test("B6 delar av posten kan stängas av i inställningarna, och det som skrivit
   await sec(page, "labels").getByLabel("Ny etikett", { exact: true }).fill("Kvar"); await sec(page, "labels").getByLabel("Ny etikett", { exact: true }).press("Enter");
   await expect.poll(async () => (await get(page, "i7")).labels).toEqual(["Kvar"]);
   await settingsBtn(page).click();
-  const parts = dlg(page).locator("section", { hasText: "Delar av posten" });
+  await openTab(page, "Posten");
+  const parts = dlg(page);
   for (const n of ["Etiketter", "Checklista", "Länkar", "Uppdateringar (logg)"]) await parts.getByLabel(n, { exact: true }).uncheck();
   await page.keyboard.press("Escape");
   for (const n of ["labels", "checklist", "links", "log"]) await expect(sec(page, n)).toHaveCount(0);
   expect((await get(page, "i7")).labels).toEqual(["Kvar"]);
   await settingsBtn(page).click();
-  await dlg(page).locator("section", { hasText: "Delar av posten" }).getByLabel("Etiketter", { exact: true }).check();
+  await openTab(page, "Posten");
+  await dlg(page).getByLabel("Etiketter", { exact: true }).check();
   await page.keyboard.press("Escape");
   await expect(sec(page, "labels").locator(".chip")).toHaveText(/Kvar/);
 });
@@ -163,6 +169,7 @@ test("B8 serier: nästa tillfälle märks på kortet och i panelen, passerade ka
   await d2.getByLabel("Titel").fill("Möte två"); await d2.getByRole("button", { name: "Skapa" }).click();
   await expect.poll(async () => (await items(page)).filter((i) => i.series).length).toBe(12);
   await settingsBtn(page).click();
+  await openTab(page, "Posten");
   await dlg(page).getByLabel("Dölj passerade tillfällen i serier").check();
   await page.keyboard.press("Escape");
   const shown = await page.locator("article.board-card").evaluateAll((a) => a.map((x) => x.getAttribute("data-id")));

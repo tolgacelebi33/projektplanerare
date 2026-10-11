@@ -110,7 +110,7 @@ export function filterView(items: Item[], deps: Dependency[], f: ViewFilter): { 
   const byId = new Map(items.map((i) => [i.id, i]));
   const show = new Set<string>();
   nextItem: for (const i of items) {
-    if (q && !i.title.toLowerCase().includes(q) && !i.description.toLowerCase().includes(q)) continue;
+    if (q && !i.title.toLowerCase().includes(q) && !i.description.toLowerCase().includes(q) && !(i.code ?? "").toLowerCase().includes(q) && !(i.ref ?? "").toLowerCase().includes(q)) continue;
     // En grupps egen status, prioritet och ansvarig är inte det man filtrerar på: den visas bara om något i den matchar (eller om sökningen träffar dess namn)
     if (i.type === "epic") { if (attr) continue; }
     else {
@@ -343,6 +343,26 @@ export function hidePastSeries(view: { items: Item[]; deps: Dependency[] }, toda
   const hide = new Set(view.items.filter((i) => i.series && i.end < today).map((i) => i.id));
   if (!hide.size) return view;
   return { items: view.items.filter((i) => !hide.has(i.id)), deps: view.deps.filter((d) => !hide.has(d.from_item_id) && !hide.has(d.to_item_id)) };
+}
+
+/**
+ * "Visa serier som en rad": en serie visas som en enda rad (nästa tillfälle som inte är klart, annars det sista), och de andra tillfällena
+ * returneras som markeringar att rita på raden. Datan ändras inte, det är bara vyn. Beroenden som rör dolda tillfällen följer inte med.
+ */
+export function collapseSeries(view: { items: Item[]; deps: Dependency[] }, today: string): { items: Item[]; deps: Dependency[]; marks: Map<string, Item[]> } {
+  const bySeries = new Map<string, Item[]>();
+  for (const i of view.items) if (i.series) bySeries.set(i.series, [...(bySeries.get(i.series) ?? []), i]);
+  const next = nextOccurrenceIds(view.items, today);
+  const hide = new Set<string>(), marks = new Map<string, Item[]>();
+  for (const members of bySeries.values()) {
+    if (members.length < 2) continue;
+    const sorted = [...members].sort((a, b) => (a.start < b.start ? -1 : a.start > b.start ? 1 : a.id < b.id ? -1 : 1));
+    const rep = sorted.find((m) => next.has(m.id)) ?? sorted[sorted.length - 1];
+    marks.set(rep.id, sorted.filter((m) => m.id !== rep.id));
+    for (const m of sorted) if (m.id !== rep.id) hide.add(m.id);
+  }
+  if (!hide.size) return { ...view, marks };
+  return { items: view.items.filter((i) => !hide.has(i.id)), deps: view.deps.filter((d) => !hide.has(d.from_item_id) && !hide.has(d.to_item_id)), marks };
 }
 
 /** Id för nästa tillfälle i varje serie: det första (efter datum) som inte är klart och inte passerat. */

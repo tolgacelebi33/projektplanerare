@@ -4,7 +4,7 @@ import type { FieldDef } from "../data/types";
 import { sv } from "../i18n/sv";
 
 const NAME: Record<StaticColumnId, () => string> = {
-  status: () => sv.panel.status, assignee: () => sv.panel.assignee, priority: () => sv.panel.priority,
+  code: () => sv.cols.code,  status: () => sv.panel.status, assignee: () => sv.panel.assignee, priority: () => sv.panel.priority,
   start: () => sv.panel.start, end: () => sv.grid.end, progress: () => sv.panel.progress,
 };
 

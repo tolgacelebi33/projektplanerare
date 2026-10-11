@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { openApp } from "./helpers";
+const openTab = (page: Page, name: string) => page.getByRole("dialog", { name: "Inställningar" }).getByRole("tab", { name, exact: true }).click();
 
 const panel = (page: Page) => page.locator("aside.panel");
 const bar = (page: Page) => page.getByRole("group", { name: "Projekt" });
@@ -60,8 +61,10 @@ test("UX3 ett klick på tom yta stänger panelen också i årshjulet, och en dra
 test("UX4 inställningar: dialogen öppnas från sidhuvudet, ändringar sparas och finns kvar efter omladdning, och Esc stänger", async ({ page }) => {
   await openApp(page, "dhtmlx");
   await settingsBtn(page).click();
+  await openTab(page, "Listvy");
   await expect(dlg(page)).toBeVisible();
   await dlg(page).getByLabel("Klick på en tom yta stänger panelen").uncheck();
+  await openTab(page, "Start");
   await dlg(page).locator('select[name="set-view"]').selectOption("board");
   await dlg(page).locator('select[name="set-zoom"]').selectOption("month");
   await page.keyboard.press("Escape");
@@ -77,6 +80,7 @@ test("UX4 inställningar: dialogen öppnas från sidhuvudet, ändringar sparas o
 test("UX5 med 'klick på tom yta' avslaget stänger ett klick på tom yta inte panelen, och Återställ standard slår på det igen", async ({ page }) => {
   await openApp(page, "dhtmlx");
   await settingsBtn(page).click();
+  await openTab(page, "Listvy");
   await dlg(page).getByLabel("Klick på en tom yta stänger panelen").uncheck();
   await dlg(page).getByRole("button", { name: "Stäng", exact: true }).last().click();
   await page.getByRole("button", { name: "Fäll ihop alla" }).click();
@@ -85,6 +89,7 @@ test("UX5 med 'klick på tom yta' avslaget stänger ett klick på tom yta inte p
   await page.mouse.click(p.x, p.y);
   await expect(panel(page)).toBeVisible();
   await settingsBtn(page).click();
+  await openTab(page, "Listvy");
   await dlg(page).getByRole("button", { name: "Återställ standard" }).click();
   await expect(dlg(page).getByLabel("Klick på en tom yta stänger panelen")).toBeChecked();
 });
@@ -94,10 +99,12 @@ test("UX6 pekläget går att välja: På slår på bibliotekets pekläge också 
   const touch = () => page.evaluate(() => (window as any).__dhx.config.touch);
   expect(await touch()).toBe(false); // automatiskt: en dator med mus
   await settingsBtn(page).click();
+  await openTab(page, "Pekskärm");
   await dlg(page).locator('select[name="set-touch"]').selectOption("on");
   await page.keyboard.press("Escape");
   await expect.poll(touch).toBe("force");
   await settingsBtn(page).click();
+  await openTab(page, "Pekskärm");
   await dlg(page).locator('select[name="set-touch"]').selectOption("off");
   await page.keyboard.press("Escape");
   await expect.poll(touch).toBe(false);
@@ -157,6 +164,7 @@ test("UX9 ett nytt datum gör posten schemalagd, och Behåll datumen gör det ut
 test("UX10 märkningen går att stänga av i inställningarna, och datumen i boarden visas då som vanligt", async ({ page }) => {
   await importUndated(page);
   await settingsBtn(page).click();
+  await openTab(page, "Listvy");
   await dlg(page).getByLabel("Märk poster utan datum").uncheck();
   await page.keyboard.press("Escape");
   const dashed = await page.locator(".gantt_task_line.undated").first().evaluate((e) => getComputedStyle(e).borderTopStyle);

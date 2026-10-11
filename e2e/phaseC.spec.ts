@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { openApp } from "./helpers";
+const openTab = (page: Page, name: string) => page.getByRole("dialog", { name: "Inställningar" }).getByRole("tab", { name, exact: true }).click();
 
 type Row = { id: string; title: string; fields?: Record<string, string | number>; status: string };
 const items = (page: Page) => page.evaluate(() => (window as any).__store.listItems("proj_1")) as Promise<Row[]>;
@@ -150,6 +151,7 @@ test("C6 en CSV med okända kolumner ger egna fält (och text i beskrivningen om
   expect(Object.values(got.a.fields)).toEqual(["Affär", 4]);
   expect(got.a.description).toBe("");
   await page.getByRole("button", { name: "Inställningar" }).click();
+  await openTab(page, "Posten");
   await page.getByRole("dialog", { name: "Inställningar" }).getByLabel("Okända kolumner vid import blir egna fält").uncheck();
   await page.keyboard.press("Escape");
   await page.getByRole("group", { name: "Projekt" }).getByLabel("Importfil").setInputFiles({ name: "g.csv", mimeType: "text/csv", buffer: Buffer.from(csv, "utf8") });

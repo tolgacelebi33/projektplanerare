@@ -115,6 +115,7 @@ export function parseJson(text: string): ParsedProject {
       ...(Array.isArray(x.links) ? { links: x.links as Item["links"] } : {}),
       ...(Array.isArray(x.log) ? { log: x.log as Item["log"] } : {}),
       ...(isObj(x.fields) ? { fields: x.fields as Item["fields"] } : {}),
+      ...(typeof x.ref === "string" && x.ref ? { ref: x.ref.slice(0, 60) } : typeof x.code === "string" && x.code ? { ref: x.code.slice(0, 60) } : {}),
       ...(typeof x.series === "string" && x.series ? { series: x.series } : {}),
       ...(typeof x.recur === "string" ? { recur: x.recur as ParsedItem["recur"] } : {}),
     };
@@ -164,7 +165,7 @@ export function toCsv(p: ParsedProject): string {
   for (const d of p.deps) preds.set(d.to, [...(preds.get(d.to) ?? []), d.from]);
   const rows = treeOrder(p.items).map((i) => [
     i.id, sv.panel.type[i.type], i.title, i.parent_id ?? "", i.start, i.type === "milestone" ? i.start : i.end, sv.status[i.status], i.assignee ?? "",
-    sv.panel.priorities[i.priority], String(i.progress), i.description, (preds.get(i.id) ?? []).join(", "),
+    sv.panel.priorities[i.priority], String(i.progress), i.description, (preds.get(i.id) ?? []).join(", "), i.code ?? "",
   ]);
   return "﻿" + [[...sv.ex.header], ...rows].map((r) => r.map(cell).join(";")).join("\r\n") + "\r\n";
 }
@@ -217,6 +218,7 @@ const ALIASES: Record<string, string[]> = {
   checklist: ["checklista", "checklist", "delmoment", "deluppgifter", "subtasks", "todo"],
   recur: ["återkommer", "aterkommer", "upprepning", "upprepas", "recurrence", "repeat", "repeats", "frekvens", "intervall", "återkommande"],
   repeatcount: ["antaltillfällen", "tillfällen", "occurrences", "repeatcount", "antalupprepningar", "antalgånger"],
+  code: ["kod", "code", "referens", "reference"],
   category: ["kategori", "category", "grupp", "group", "avdelning"],
   area: ["area", "område"], contacts: ["contacts", "kontakter", "contact"], origstatus: ["originalstatus", "ursprungligstatus"],
   basis: ["basis", "underlag", "grund"], asof: ["statusasof", "statusper"], effmin: ["efforthoursmin"], effmax: ["efforthoursmax"],
@@ -415,6 +417,7 @@ export function parseRows(rows: string[][], name: string, today: string = todayI
       assignee: get(r, "assignee") || null, description, priority, progress, sort_order: idx + 1,
       ...(labels.length ? { labels } : {}), ...(links.length ? { links } : {}), ...(checklist.length ? { checklist } : {}),
       ...(Object.keys(cf).length ? { fields: cf } : {}),
+      ...(get(r, "code") ? { ref: get(r, "code").slice(0, 60) } : {}),
     };
     try { validateItemShape({ ...it, workspace_id: "", project_id: "", assignee_id: null }); }
     catch (e) { throw err(friendlyError(e)); }

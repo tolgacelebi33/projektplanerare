@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { openApp } from "./helpers";
+const openTab = (page: Page, name: string) => page.getByRole("dialog", { name: "Inställningar" }).getByRole("tab", { name, exact: true }).click();
 
 type Row = { id: string; title: string; start: string; end: string; status: string; type: string };
 const items = (page: Page) => page.evaluate(() => (window as any).__store.listItems("proj_1")) as Promise<Row[]>;
@@ -80,6 +81,7 @@ test("D5 Portfölj visar alla projekt och Öppna byter projekt och går till Gan
 
 test("D6 inställningar: en avstängd vy försvinner ur listan, och belastningsgränsen kan ändras", async ({ page }) => {
   await page.getByRole("button", { name: "Inställningar" }).click();
+  await openTab(page, "Fler vyer");
   const d = page.getByRole("dialog", { name: "Inställningar" });
   await d.getByRole("checkbox", { name: "Portfölj" }).uncheck();
   await d.getByRole("checkbox", { name: "Kalender" }).uncheck();

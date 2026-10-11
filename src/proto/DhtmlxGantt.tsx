@@ -25,13 +25,13 @@ const ZOOM = {
 } as const;
 
 import { GRID_MIN } from "../layout";
-import { COLUMN_WIDTH, FIELD_COLUMN_WIDTH, type ColumnId, type StaticColumnId } from "../columns";
+import { COLUMN_ORDER, COLUMN_WIDTH, FIELD_COLUMN_WIDTH, type ColumnId, type StaticColumnId } from "../columns";
 import type { FieldDef } from "../data/types";
 import { setDragParent, startRowDragFeedback } from "./rowDrag";
 import { consumeFocusMedian, scrollCarry } from "../scrollCarry";
 /** Rutnätets fasta bredd är GRID_WIDTH (layout.ts). Panelen till höger tar plats från tidslinjen, aldrig från rutnätet. */
 
-interface TaskRow { cf: Record<string, string | number | null>; od: boolean; und: boolean; rec: boolean; color: string; id: string; text: string; start_date: Date; end_date: Date; type: string; kind: Item["type"]; parent: string | number; status: Status; priority: Item["priority"]; assignee: string; progress: number; open: boolean }
+interface TaskRow { sm: string; code: string; cf: Record<string, string | number | null>; od: boolean; und: boolean; rec: boolean; color: string; id: string; text: string; start_date: Date; end_date: Date; type: string; kind: Item["type"]; parent: string | number; status: Status; priority: Item["priority"]; assignee: string; progress: number; open: boolean }
 interface LinkRow { id: string; source: string; target: string; type: string }
 
 /** Förväntad ordning för träd i djupet först, syskon efter sort_order. Används för att avgöra om strukturen ändrats. */
@@ -46,7 +46,11 @@ function treeOrder(items: Item[]): string[] {
 
 export interface ContextArgs { id: string | null; x: number; y: number; date: ISODate | null }
 
-export function DhtmlxGantt({ store, items, deps, zoom, onError, onPersisted, revealId, onNotice, onCreateAt, onRename, onContext, onToggleDone, onMoveRow, onAddInGroup, onEditField, onSelect, selected, touchMode, fieldDefs, gridWidth, columns, users, collapse, colors, todayToken }: {
+export function DhtmlxGantt({ store, items, deps, zoom, onError, onPersisted, revealId, onNotice, onCreateAt, onRename, onContext, onToggleDone, onMoveRow, onAddInGroup, onEditField, onSelect, selected, touchMode, fieldDefs, gridWidth, columns, users, collapse, colors, todayToken, seriesMarks, onOpenItem }: {
+  /** Serier som visas som en rad: raden (id) och de andra tillfällena, som ritas som romber på raden. */
+  seriesMarks?: ReadonlyMap<string, Item[]>;
+  /** Klick på en romb: öppna det tillfället. */
+  onOpenItem?: (id: string) => void;
   /** Markerade rader (flerval). Klick med Ctrl/Cmd växlar, Shift markerar en följd, ett vanligt klick avmarkerar. */
   selected?: ReadonlySet<string>;
   /** Pekläge: automatiskt (bara enheter med enbart pekskärm), alltid på, eller av. */
@@ -89,6 +93,11 @@ export function DhtmlxGantt({ store, items, deps, zoom, onError, onPersisted, re
   const zoomRef = useRef(zoom);
   zoomRef.current = zoom;
   const workspaceId = items[0]?.workspace_id ?? "";
+  const marksRef = useRef<ReadonlyMap<string, Item[]>>(new Map());
+  marksRef.current = seriesMarks ?? new Map();
+  const drawMarksRef = useRef<(() => void) | null>(null);
+  const openItemRef = useRef(onOpenItem);
+  openItemRef.current = onOpenItem;
   const latest = useRef({ store, onError, workspaceId, onPersisted, onNotice, onCreateAt, onRename, onContext, onToggleDone, onMoveRow, onAddInGroup, onEditField, onSelect, users });
   latest.current = { store, onError, workspaceId, onPersisted, onNotice, onCreateAt, onRename, onContext, onToggleDone, onMoveRow, onAddInGroup, onEditField, onSelect, users };
   const selectedRef = useRef<ReadonlySet<string>>(selected ?? new Set());
@@ -106,6 +115,7 @@ export function DhtmlxGantt({ store, items, deps, zoom, onError, onPersisted, re
 
   const mapped = useMemo(() => {
     known.current = new Map(items.map((i) => [i.id, i]));
+    const marks = marksRef.current;
     const tasks: TaskRow[] = [...items].sort((a, b) => a.sort_order - b.sort_order).map((i) => ({
       id: i.id,
       text: i.title,
@@ -114,12 +124,12 @@ export function DhtmlxGantt({ store, items, deps, zoom, onError, onPersisted, re
       type: TYPE[i.type],
       kind: i.type,
       parent: i.parent_id ?? 0,
-      status: i.status, priority: i.priority, assignee: i.assignee_id ?? "", progress: i.progress, color: colors.get(i.id) ?? "none", rec: !!i.series, und: !!i.undated, od: isOverdue(i, todayISO()), cf: i.fields ?? {},
+      sm: (marks.get(i.id) ?? []).map((m) => `${m.id}|${m.start}|${m.status}|${m.title}`).join(";"), code: i.code ?? "", status: i.status, priority: i.priority, assignee: i.assignee_id ?? "", progress: i.progress, color: colors.get(i.id) ?? "none", rec: !!i.series, und: !!i.undated, od: isOverdue(i, todayISO()), cf: i.fields ?? {},
       open: true,
     }));
     const links: LinkRow[] = deps.map((d) => ({ id: d.id, source: d.from_item_id, target: d.to_item_id, type: "0" }));
     return { tasks, links, order: treeOrder(items) };
-  }, [items, deps, colors]);
+  }, [items, deps, colors, seriesMarks]);
 
   // Engångsinställning och initiering
   useEffect(() => {
@@ -180,6 +190,39 @@ export function DhtmlxGantt({ store, items, deps, zoom, onError, onPersisted, re
       const { glyph, title } = label(t as never);
       return `<span class="bar-glyph" aria-hidden="true">${glyph}</span>${title}`;
     };
+    // Serier som en rad: en romb för varje tillfälle utom det som raden själv visar. Ritas som ett eget lager över tidslinjen (Community-utgåvan har inga egna lager).
+    // Ett klick på en romb öppnar tillfället.
+    const drawMarks = () => {
+      const area = (gantt as unknown as { $task_data?: HTMLElement }).$task_data;
+      const host = (area?.querySelector(".gantt_data_area") as HTMLElement | null) ?? area ?? null;
+      if (!host) return;
+      host.querySelectorAll(":scope > .series-marks").forEach((e) => e.remove());
+      if (!marksRef.current.size) return;
+      const wrap = document.createElement("div");
+      wrap.className = "series-marks";
+      wrap.style.cssText = "position:absolute;left:0;top:0;width:0;height:0;z-index:3;";
+      for (const [repId, others] of marksRef.current) {
+        if (!gantt.isTaskExists(repId) || !gantt.isTaskVisible(repId)) continue;
+        const task = gantt.getTask(repId);
+        const pos = gantt.getTaskPosition(task, task.start_date as Date, task.end_date as Date);
+        for (const m of others) {
+          const d = toLocalDate(m.start);
+          const cell = gantt.getTaskPosition(task, d, toLocalDate(addDays(m.start, 1)));
+          const b = document.createElement("button");
+          b.type = "button"; b.className = `series-mark st-${m.status}`; b.dataset.id = m.id; b.dataset.series = repId;
+          b.style.left = `${(cell.left as number) + (cell.width as number) / 2 - 8}px`;
+          b.style.top = `${pos.top + Math.max(0, ((pos.height as number) - 16) / 2)}px`;
+          b.title = `${m.title}, ${m.start}`; b.setAttribute("aria-label", `${m.title}, ${m.start}`);
+          b.addEventListener("click", (e) => { e.stopPropagation(); openItemRef.current?.(m.id); });
+          b.addEventListener("dblclick", (e) => e.stopPropagation());
+          b.addEventListener("pointerdown", (e) => e.stopPropagation());
+          wrap.appendChild(b);
+        }
+      }
+      host.appendChild(wrap);
+    };
+    drawMarksRef.current = drawMarks;
+    const markEvents = ["onGanttRender", "onDataRender", "onAfterTaskUpdate", "onAfterTaskAdd", "onAfterTaskDelete", "onGanttScroll"].map((ev) => gantt.attachEvent(ev as never, (() => { drawMarks(); return true; }) as never));
     gantt.plugins({ tooltip: true });
     gantt.templates.tooltip_text = (start, end, t) => {
       const status = (t as unknown as { status: Status }).status;
@@ -210,6 +253,7 @@ export function DhtmlxGantt({ store, items, deps, zoom, onError, onPersisted, re
       `<select class="cell-select ${cls}" data-id="${t.id}" data-field="${field}" aria-label="${esc(`${label}: ${t.text}`)}">${options.map(([v, l]) => `<option value="${esc(v)}"${v === value ? " selected" : ""}>${esc(l)}</option>`).join("")}</select>`;
     const dayOf = (d: Date) => `${d.getDate()} ${gantt.locale.date.month_short[d.getMonth()]}`;
     const COLS: Record<StaticColumnId, unknown> = {
+      code: { name: "code", label: sv.cols.code, width: COLUMN_WIDTH.code, template: (t: Task) => `<span class="grid-code">${esc((t as unknown as TaskRow).code)}</span>` },
       status: { name: "status", label: sv.panel.status, width: COLUMN_WIDTH.status, template: (t: Task) => select(t, "status", sv.panel.status, (t as unknown as TaskRow).status,
         (["not_started", "in_progress", "done", "blocked"] as Status[]).map((s) => [s, `${STATUS_GLYPH[s]} ${sv.status[s]}`] as [string, string]), `chip st-${(t as unknown as TaskRow).status}`) },
       assignee: { name: "assignee", label: sv.panel.assignee, width: COLUMN_WIDTH.assignee, template: (t: Task) => select(t, "assignee", sv.panel.assignee, (t as unknown as TaskRow).assignee,
@@ -226,7 +270,7 @@ export function DhtmlxGantt({ store, items, deps, zoom, onError, onPersisted, re
       return { name: `field_${def.id}`, label: def.name, width: FIELD_COLUMN_WIDTH, template: (t: Task) => `<span class="grid-field">${esc(String(((t as unknown as TaskRow).cf ?? {})[def.id] ?? ""))}</span>` };
     };
     buildColumnsRef.current = () => [titleColumn,
-      ...(["status", "assignee", "priority", "start", "end", "progress"] as StaticColumnId[]).filter((c) => columnsRef.current.includes(c)).map((c) => COLS[c]),
+      ...COLUMN_ORDER.filter((c) => columnsRef.current.includes(c)).map((c) => COLS[c]),
       ...columnsRef.current.filter((c) => c.startsWith("f:")).map(fieldCol).filter(Boolean)];
     gantt.config.columns = buildColumnsRef.current() as never;
     gantt.plugins({ keyboard_navigation: true });
@@ -406,7 +450,7 @@ export function DhtmlxGantt({ store, items, deps, zoom, onError, onPersisted, re
     // Panelen till höger tar plats: DHTMLX måste få veta när behållaren ändrar storlek
     const ro = new ResizeObserver(() => gantt.setSizes());
     ro.observe(host.current!);
-    return () => { scrollCarry.read = null; hostEl.removeEventListener("change", onCellChange, true); hostEl.removeEventListener("keydown", onCheckKey, true); hostEl.removeEventListener("keyup", onCheckKey, true); hostEl.removeEventListener("click", onSelectClick, true); hostEl.removeEventListener("click", onCheck, true); document.removeEventListener("pointermove", onAnyMove, true); document.removeEventListener("pointerleave", hideTip, true); window.removeEventListener("blur", hideTip); hostEl.removeEventListener("pointerdown", onPtrDown, true); hostEl.removeEventListener("pointerup", onPtrUp, true); document.removeEventListener("keydown", forget, true); hostEl.removeEventListener("contextmenu", onContextMenu, true); ro.disconnect(); ids.forEach((id) => gantt.detachEvent(id)); stopDragFeedback?.(); gantt.clearAll(); };
+    return () => { scrollCarry.read = null; hostEl.removeEventListener("change", onCellChange, true); hostEl.removeEventListener("keydown", onCheckKey, true); hostEl.removeEventListener("keyup", onCheckKey, true); hostEl.removeEventListener("click", onSelectClick, true); hostEl.removeEventListener("click", onCheck, true); document.removeEventListener("pointermove", onAnyMove, true); document.removeEventListener("pointerleave", hideTip, true); window.removeEventListener("blur", hideTip); hostEl.removeEventListener("pointerdown", onPtrDown, true); hostEl.removeEventListener("pointerup", onPtrUp, true); document.removeEventListener("keydown", forget, true); hostEl.removeEventListener("contextmenu", onContextMenu, true); ro.disconnect(); ids.forEach((id) => gantt.detachEvent(id)); markEvents.forEach((id) => gantt.detachEvent(id)); drawMarksRef.current = null; stopDragFeedback?.(); gantt.clearAll(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -451,9 +495,9 @@ export function DhtmlxGantt({ store, items, deps, zoom, onError, onPersisted, re
           // Bara det som ändrats ritas om. Ritas alla staplar om vid varje sparning byts staplen man är på väg att klicka på ut under klicket.
           for (const t of tasks) {
             const g = gantt.getTask(t.id) as unknown as Record<string, unknown>;
-            const same = g.text === t.text && g.status === t.status && g.priority === t.priority && g.assignee === t.assignee && g.progress === t.progress && g.color === t.color && g.und === t.und && g.od === t.od && JSON.stringify(g.cf) === JSON.stringify(t.cf) && (g.start_date as Date).getTime() === t.start_date.getTime() && (g.end_date as Date).getTime() === t.end_date.getTime();
+            const same = g.text === t.text && g.code === t.code && g.sm === t.sm && g.status === t.status && g.priority === t.priority && g.assignee === t.assignee && g.progress === t.progress && g.color === t.color && g.und === t.und && g.od === t.od && JSON.stringify(g.cf) === JSON.stringify(t.cf) && (g.start_date as Date).getTime() === t.start_date.getTime() && (g.end_date as Date).getTime() === t.end_date.getTime();
             if (same) continue;
-            g.text = t.text; g.start_date = t.start_date; g.end_date = t.end_date; g.status = t.status; g.priority = t.priority; g.assignee = t.assignee; g.progress = t.progress; g.color = t.color; g.und = t.und; g.od = t.od; g.cf = t.cf;
+            g.text = t.text; g.code = t.code; g.sm = t.sm; g.start_date = t.start_date; g.end_date = t.end_date; g.status = t.status; g.priority = t.priority; g.assignee = t.assignee; g.progress = t.progress; g.color = t.color; g.und = t.und; g.od = t.od; g.cf = t.cf;
             gantt.updateTask(t.id);
           }
         });
@@ -483,6 +527,7 @@ export function DhtmlxGantt({ store, items, deps, zoom, onError, onPersisted, re
     const id = pendingFocus.current;
     if (id) requestAnimationFrame(() => { host.current?.querySelector<HTMLElement>(`[data-check="${CSS.escape(id)}"]`)?.focus(); });
   }, [mapped]);
+  useEffect(() => { const id = requestAnimationFrame(() => drawMarksRef.current?.()); return () => cancelAnimationFrame(id); }, [mapped, seriesMarks]);
 
   useEffect(() => {
     gantt.config.scales = ZOOM[zoom].scales as never;

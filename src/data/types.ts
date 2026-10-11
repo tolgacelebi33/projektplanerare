@@ -18,6 +18,8 @@ export interface Project {
   fields?: FieldDef[];
   /** Sparade vyer (vy, filter, kolumner, gruppering under ett namn). */
   views?: SavedView[];
+  /** Läsbar kod (PRJ0001). Delas ut av lagret, aldrig av användaren, och återanvänds aldrig. */
+  code?: string;
 }
 
 export type FieldType = "text" | "number" | "date" | "select";
@@ -77,6 +79,10 @@ export interface Item {
   series?: string | null;
   /** Hur ofta serien upprepas. Samma på alla poster i serien. */
   recur?: Recurrence | null;
+  /** Läsbar kod (till exempel MIL0001-0041). Delas ut av lagret när posten skapas och kan inte ändras. */
+  code?: string;
+  /** Kod eller ID som posten hade i en importerad fil eller en kopierad post. Bara en hänvisning, ingen nyckel. */
+  ref?: string;
   sort_order: number;
 }
 

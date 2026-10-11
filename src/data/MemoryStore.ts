@@ -1,12 +1,18 @@
 import type { DataStore } from "./DataStore";
 import { RuleError, rederiveEpics, shiftSuccessors, validateDependency, validateFieldDefs, validateItemShape, validateParent, validateSavedViews } from "./rules";
 import { addDays } from "./dates";
+import { PLACEHOLDER_RENAMES, placeholderOldName } from "./fixtures";
+import { countersFor, validCounters, type Counters, emptyCounters, itemCode, nextNumber, parseProjectCode, projectCode } from "./codes";
 import { applyPatch, isPatchList, json, makePatch, type Entry, type Patch } from "./patch";
 import type { Dependency, DependencyMode, FieldDef, Fixture, Item, Project, SavedView, User } from "./types";
 
 /** Allt lagret håller, för att kunna sparas och återställas. */
 export interface Snapshot {
   projects: Project[]; items: Item[]; dependencies: Dependency[]; users: User[]; seq: number;
+  /** Senast utdelade projektnummer (för koder). Saknas i äldre sparad data. */
+  project_seq?: number;
+  /** Hur långt varje posttyps följd har kommit, per projekt. Ligger utanför ångra-historiken: ett nummer som delats ut går aldrig tillbaka. */
+  counters?: Record<string, Counters>;
 }
 
 export interface MemoryStoreOptions {
@@ -32,6 +38,9 @@ export class MemoryStore implements DataStore {
   protected deps = this.track<Dependency>("deps");
   protected users: User[] = [];
   protected seq = 0;
+  /** Senast utdelade projektnummer. Går aldrig tillbaka, inte ens när projekt tas bort eller steg ångras. */
+  protected projectSeq = 0;
+  protected counters = new Map<string, Counters>();
   private calls = 0;
   /** Logg över skrivanrop, används av tester för att bevisa att UI går via storen. */
   readonly writes: { method: string; args: unknown[] }[] = [];
@@ -42,6 +51,7 @@ export class MemoryStore implements DataStore {
       fixture.items.forEach((i) => this.items.set(i.id, { ...i }));
       fixture.dependencies.forEach((d) => this.deps.set(d.id, { ...d }));
       this.users = fixture.users.map((u) => ({ ...u }));
+      this.backfillCodes();
     }
     this.suppress = false;
   }
@@ -177,9 +187,15 @@ export class MemoryStore implements DataStore {
     const now = this.snapshot();
     const target = applyPatch(now, patch);
     to.push(makePatch(target, now)); // från målläget tillbaka till nuläget, för att kunna gå åt andra hållet
-    const seq = this.seq;
+    const seq = this.seq, projectSeq = this.projectSeq, counters = this.counters;
     this.restore(target);
+    this.projectSeq = Math.max(projectSeq, this.projectSeq); // projektnummer och räkneverk går aldrig tillbaka, inte heller vid ångra
+    for (const [pid, c] of counters) {
+      const cur = this.counters.get(pid);
+      if (this.projects.has(pid)) this.counters.set(pid, cur ? { epic: Math.max(cur.epic, c.epic), milestone: Math.max(cur.milestone, c.milestone), task: Math.max(cur.task, c.task) } : c);
+    }
     this.seq = Math.max(seq, target.seq); // id återanvänds aldrig
+    this.backfillCodes(); // ett steg från före kodernas tid kan ge tillbaka poster utan kod
     this.lastCommitAt = 0; this.closeStep();
     this.afterWrite();
     this.listeners.forEach((l) => l());
@@ -196,6 +212,8 @@ export class MemoryStore implements DataStore {
       dependencies: [...this.deps.values()],
       users: this.users.map((u) => ({ ...u })),
       seq: this.seq,
+      project_seq: this.projectSeq,
+      counters: Object.fromEntries(this.counters),
     };
   }
 
@@ -206,6 +224,9 @@ export class MemoryStore implements DataStore {
     this.deps = this.track<Dependency>("deps"); snap.dependencies.forEach((d) => this.deps.set(d.id, { ...d }));
     this.users = snap.users.map((u) => ({ ...u }));
     this.seq = snap.seq;
+    this.projectSeq = snap.project_seq ?? 0;
+    this.counters = new Map();
+    for (const [pid, c] of Object.entries(snap.counters ?? {})) if (this.projects.has(pid) && validCounters(c)) this.counters.set(pid, { ...c });
     this.suppress = false;
     this.closeStep();
   }
@@ -213,6 +234,79 @@ export class MemoryStore implements DataStore {
   private checkAssignee(item: Item) {
     if (item.assignee_id !== null && !this.users.some((u) => u.id === item.assignee_id))
       throw new RuleError("bad_assignee", `Ansvarig finns inte: ${item.assignee_id}`);
+  }
+
+  /**
+   * Ger projekt och poster som saknar kod en kod (äldre data, och steg som ångras till före kodernas tid). Projekt i listans ordning, poster i listans
+   * ordning (sort_order) per posttyp. Ger ingen historik: det är ett fält som läggs till, inte en ändring användaren gjort. Returnerar om något ändrades.
+   */
+  backfillCodes(): boolean {
+    const prev = this.suppress; this.suppress = true;
+    let changed = false;
+    try {
+      for (const p of this.projects.values()) { const n = parseProjectCode(p.code); if (n !== null && n > this.projectSeq) this.projectSeq = n; }
+      for (const p of [...this.projects.values()]) {
+        let proj = p;
+        if (parseProjectCode(proj.code) === null) { this.projectSeq = nextNumber(this.projectSeq); proj = { ...proj, code: projectCode(this.projectSeq) }; }
+        const pn = parseProjectCode(proj.code)!;
+        const items = [...this.items.values()].filter((i) => i.project_id === proj.id);
+        const counters = countersFor(this.counters.get(proj.id), items, pn);
+        const todo = items.filter((i) => !i.code).sort((a, b) => a.sort_order - b.sort_order || (a.id < b.id ? -1 : 1));
+        for (const i of todo) { counters[i.type] = nextNumber(counters[i.type]); this.items.set(i.id, { ...i, code: itemCode(i.type, pn, counters[i.type]) }); changed = true; }
+        if (proj !== p) { this.projects.set(proj.id, proj); changed = true; }
+        if (JSON.stringify(counters) !== JSON.stringify(this.counters.get(proj.id))) { this.counters.set(proj.id, counters); changed = true; }
+      }
+    } finally { this.suppress = prev; }
+    return changed;
+  }
+
+  /**
+   * Byter platshållarnamnen från provdatan (Anna Lind, Erik Berg, Maria Holm) mot de verkliga, men bara de som fortfarande har sitt ursprungsnamn
+   * (en person användaren redan döpt om rörs inte). Id är oförändrade, så tilldelningar följer med. Ger ingen historik. Returnerar om något ändrades.
+   */
+  renamePlaceholderUsers(): boolean {
+    let changed = false;
+    this.users = this.users.map((u) => {
+      const to = PLACEHOLDER_RENAMES[u.id];
+      if (to && u.name === placeholderOldName(u.id) && !this.users.some((o) => o.name === to)) { changed = true; return { ...u, name: to }; }
+      return u;
+    });
+    return changed;
+  }
+
+  private checkUserName(name: string, exceptId?: string): string {
+    const n = name.trim();
+    if (!n) throw new RuleError("empty_name", "Namn saknas");
+    if (n.length > 60) throw new RuleError("name_too_long", "Namnet är för långt (högst 60 tecken)");
+    if (this.users.some((u) => u.id !== exceptId && u.name.toLowerCase() === n.toLowerCase())) throw new RuleError("duplicate_name", "Det finns redan en person med det namnet");
+    return n;
+  }
+  async addUser(name: string): Promise<User> {
+    await this.tick("addUser");
+    if (this.users.length >= 50) throw new RuleError("too_many_users", "Högst 50 personer");
+    const user = { id: this.nextId("u"), name: this.checkUserName(name) };
+    this.users = [...this.users, user];
+    this.commit();
+    return { ...user };
+  }
+  async renameUser(id: string, name: string): Promise<User> {
+    await this.tick("renameUser");
+    const cur = this.users.find((u) => u.id === id);
+    if (!cur) throw new RuleError("not_found", "Personen finns inte");
+    const next = { ...cur, name: this.checkUserName(name, id) };
+    this.users = this.users.map((u) => (u.id === id ? next : u));
+    this.commit();
+    return { ...next };
+  }
+  /** Poster som hade personen blir utan ansvarig i alla projekt. Ångra-historiken töms (ett steg skulle annars kunna ge tillbaka en ansvarig som inte finns). */
+  async removeUser(id: string): Promise<number> {
+    await this.tick("removeUser");
+    if (!this.users.some((u) => u.id === id)) throw new RuleError("not_found", "Personen finns inte");
+    let n = 0;
+    for (const i of [...this.items.values()]) if (i.assignee_id === id) { this.items.set(i.id, { ...i, assignee_id: null }); n++; }
+    this.users = this.users.filter((u) => u.id !== id);
+    this.commit(true);
+    return n;
   }
 
   private nextId(prefix: string) {
@@ -230,8 +324,10 @@ export class MemoryStore implements DataStore {
   }
   async createProject(p: Omit<Project, "id" | "created_at">) {
     await this.tick("createProject");
-    const proj = { ...p, id: this.nextId("p"), created_at: new Date().toISOString() };
+    this.projectSeq = nextNumber(this.projectSeq);
+    const proj = { ...p, id: this.nextId("p"), created_at: new Date().toISOString(), code: projectCode(this.projectSeq) };
     this.projects.set(proj.id, proj);
+    this.counters.set(proj.id, emptyCounters());
     this.commit(true);
     return proj;
   }
@@ -258,6 +354,7 @@ export class MemoryStore implements DataStore {
     for (const itemId of gone) this.items.delete(itemId);
     for (const d of [...this.deps.values()]) if (gone.has(d.from_item_id) || gone.has(d.to_item_id)) this.deps.delete(d.id);
     this.projects.delete(id);
+    this.counters.delete(id);
     this.writes.push({ method: "deleteProject", args: [id] });
     this.commit(true);
   }
@@ -268,10 +365,23 @@ export class MemoryStore implements DataStore {
   async createItem(item: Omit<Item, "id">) {
     await this.tick("createItem");
     const created: Item = { ...item, id: this.nextId("i") };
+    delete created.code; // koden delas alltid ut här, aldrig av den som skapar
+    const proj = this.projects.get(created.project_id);
+    let counters: Counters | null = null;
+    if (proj) {
+      const pn = parseProjectCode(proj.code);
+      if (pn !== null) {
+        const saved = this.counters.get(proj.id);
+        counters = validCounters(saved) ? { ...saved } : countersFor(null, [...this.items.values()].filter((i) => i.project_id === proj.id), pn);
+        counters[created.type] = nextNumber(counters[created.type]);
+        created.code = itemCode(created.type, pn, counters[created.type]);
+      }
+    }
     this.checkAssignee(created);
     validateItemShape(created);
     validateParent(created, this.items);
     this.items.set(created.id, created);
+    if (counters && proj) this.counters.set(proj.id, counters);
     rederiveEpics(this.items, [created.parent_id]);
     this.writes.push({ method: "createItem", args: [item] });
     this.commit();
@@ -281,6 +391,7 @@ export class MemoryStore implements DataStore {
     await this.tick("updateItem");
     const cur = this.items.get(id);
     if (!cur) throw new RuleError("not_found", `Item ${id} finns inte`);
+    if (patch.code !== undefined && patch.code !== cur.code) throw new RuleError("code_fixed", "Koden kan inte ändras");
     const next: Item = { ...cur, ...patch };
     if (cur.undated && (next.start !== cur.start || next.end !== cur.end) && patch.undated === undefined) delete next.undated; // nya datum: posten är schemalagd
     // I läget "shift" får en uppgift inte flyttas till att börja före att dess föregångare är klar (som Asana och monday i strikt läge).

@@ -149,15 +149,16 @@ body {
   --bg-base: var(--sv-svart);
   --surface: color-mix(in srgb, var(--sv-svart) 90%, var(--sv-vit));
   --surface-alt: color-mix(in srgb, var(--sv-svart) 82%, var(--sv-vit));
-  --text: var(--sv-vit);
-  --text-muted: color-mix(in srgb, var(--sv-vit) 68%, transparent);
-  --placeholder: color-mix(in srgb, var(--sv-vit) 70%, transparent);
-  --line: color-mix(in srgb, var(--sv-vit) 70%, transparent);
+  /* Text: vit 80 % mot svart (#D5D4D3), valt av användaren 2026-10-11. Ren vit lyste för skarpt mot den mörka ytan. Kontrast 7,3 mot ytan. Staplarnas text förblir vit (riktlinjerna). */
+  --text: color-mix(in srgb, var(--sv-vit) 80%, var(--sv-svart));
+  --text-muted: color-mix(in srgb, var(--sv-vit) 64%, transparent); /* mätt: minst 4,5 mot både yta och förhöjd yta */
+  --placeholder: color-mix(in srgb, var(--sv-vit) 66%, transparent);
+  --line: color-mix(in srgb, var(--sv-vit) 56%, transparent);
   --grid-line: color-mix(in srgb, var(--sv-vit) 14%, transparent);
   --row-hover: color-mix(in srgb, var(--sv-vit) 7%, transparent);
   --row-select: color-mix(in srgb, var(--sv-guld) 28%, var(--sv-svart));
   --weekend: color-mix(in srgb, var(--sv-vit) 6%, transparent);
-  --link-color: color-mix(in srgb, var(--sv-vit) 70%, transparent);
+  --link-color: color-mix(in srgb, var(--sv-vit) 66%, transparent);
   --accent: var(--sv-guld);
   --bar-outline-color: var(--sv-vit);
   --grid-line-solid: #5C5856; /* vit 14 % över ytan */

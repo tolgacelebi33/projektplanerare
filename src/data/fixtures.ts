@@ -11,6 +11,11 @@ export const FIXTURE_USERS: User[] = [
   { id: "u_maria", name: "Maria Holm" },
 ];
 
+/** Platshållarna i provdatan byts mot de verkliga namnen i appen (id oförändrade, så tilldelningar följer med). Provdatan som testerna använder behåller sina namn. */
+export const PLACEHOLDER_RENAMES: Record<string, string> = { u_anna: "Tolga Celebi", u_erik: "Ulla Bella", u_maria: "Hjördis" };
+const PLACEHOLDER_OLD: Record<string, string> = { u_anna: "Anna Lind", u_erik: "Erik Berg", u_maria: "Maria Holm" };
+export const placeholderOldName = (id: string): string | undefined => PLACEHOLDER_OLD[id];
+
 const ASSIGNEES = ["u_anna", "u_erik", "u_maria", null] as const;
 const PRIORITIES: Priority[] = ["normal", "normal", "high", "low", "urgent"];
 
@@ -157,7 +162,7 @@ export function largeFixture(): Fixture {
 export function exampleAround(today: string): Fixture {
   const f = smallFixture();
   const delta = diffDays("2026-03-23", addDays(today, -2));
-  return { ...f, items: f.items.map((i) => ({ ...i, start: addDays(i.start, delta), end: addDays(i.end, delta) })) };
+  return { ...f, users: f.users.map((u) => ({ ...u, name: PLACEHOLDER_RENAMES[u.id] ?? u.name })), items: f.items.map((i) => ({ ...i, start: addDays(i.start, delta), end: addDays(i.end, delta) })) };
 }
 
 /** Mycket stor fixture för skalprov: `count` poster i grupper om 50 uppgifter, med ett beroende per uppgift (kedja inom gruppen). Bara för tester (?fixture=huge&n=3000). */

@@ -141,6 +141,7 @@ export function BoardView({ fields = [], nextIds, groupBy = "status", cardFields
                   )}
                   {cardFields.description && i.description.trim() && <div className="board-desc">{firstLine(i.description)}</div>}
                   <div className="board-meta">
+                    {cardFields.code && i.code && <span className="code-tag">{i.code}</span>}
                     {cardFields.date && (i.undated && markUndated ? <span className="board-undated">{sv.undated.tag}</span> : <span>{i.type === "milestone" ? i.end : `${i.start} – ${i.end}`}</span>)}
                     {cardFields.series && i.series && i.recur && <span className="board-series" title={sv.recur.series}>{"↻"} {sv.recur.kinds[i.recur]}{nextIds?.has(i.id) ? ` · ${sv.extras.nextBadge}` : ""}</span>}
                     {cardFields.checklist && (i.checklist?.length ?? 0) > 0 && <span title={sv.extras.checklist}>{((c) => sv.extras.checklistOnCard(c.done, c.total))(checklistCount(i.checklist))}</span>}

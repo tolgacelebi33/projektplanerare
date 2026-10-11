@@ -51,6 +51,7 @@ export function ProjectBar({ projects, projectId, itemCount, onSelect, onCreate,
             {projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
           </select>
         )}
+        {current?.code && <span className="code-tag" title={sv.project.codeHint}>{current.code}</span>}
         <button type="button" className="mini" onClick={() => { setName(""); setMode("new"); }}>{sv.project.new}</button>
         {current && <button type="button" className="mini" onClick={() => { setName(current.name); setMode("rename"); }}>{sv.project.rename}</button>}
         {current && <button type="button" className="mini" onClick={() => setMode("remove")}>{sv.project.remove}</button>}

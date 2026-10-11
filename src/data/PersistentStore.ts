@@ -90,7 +90,9 @@ export class PersistentStore extends MemoryStore {
         const { snapshot, history } = PersistentStore.normalize(raw);
         this.rev = (raw as { rev?: number }).rev ?? 0; // löpnumret fortsätter där det slutade
         this.restore(snapshot); this.setHistory(history);
-        this.finish(this.rescued); // en återställd reservkopia sparas i den vanliga lagringen
+        const numbered = this.backfillCodes(); // äldre data får koder (ett fält som läggs till), och sparas
+        const renamed = this.renamePlaceholderUsers(); // platshållarnamnen byts mot de verkliga (bara oförändrade)
+        this.finish(this.rescued || numbered || renamed); // en återställd reservkopia sparas i den vanliga lagringen
         return;
       }
       catch (e) { await this.setAside(raw, msg(e)); }
@@ -105,14 +107,15 @@ export class PersistentStore extends MemoryStore {
             this.restore(valid.snapshot); this.setHistory(valid.history);
             await this.backend.save(this.stored());
             const back = PersistentStore.normalize(await this.backend.load()); // det som sparades ska gå att läsa tillbaka lika
-            if (JSON.stringify(back.snapshot) !== JSON.stringify(valid.snapshot)) throw new Error("verifiering misslyckades");
+            const core = ({ project_seq: _a, counters: _b, ...rest }: Snapshot) => JSON.stringify(rest); // äldre data saknar räkneverken, som lagret lägger till
+            if (core(back.snapshot) !== core(valid.snapshot)) throw new Error("verifiering misslyckades");
             this.legacy.migrated();
           } catch (e) {
             // flytten kunde inte kontrolleras: fortsätt spara i den gamla lagringen, som är orörd
             this.loadWarning = sv.persist.migrationFailed(msg(e));
             this.backend = this.legacy.fallback();
           }
-          this.finish(); return;
+          { const a = this.backfillCodes(), b = this.renamePlaceholderUsers(); this.finish(a || b); } return;
         }
       }
     }
