@@ -8,7 +8,7 @@ const rows = (page: Page) => panel(page).locator('[data-section="log"] ul.activi
 
 test.beforeEach(async ({ page }) => {
   await page.setViewportSize({ width: 1500, height: 900 });
-  await page.clock.setFixedTime(new Date("2026-10-11T10:00:00"));
+  await page.clock.setFixedTime(new Date("2026-10-11T10:00:00+02:00"));
   await openApp(page, "dhtmlx");
   page.setDefaultTimeout(5000);
 });
