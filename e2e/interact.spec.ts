@@ -28,7 +28,7 @@ async function dragLink(page: Page, fromId: string, fromSide: "left" | "right", 
   await page.waitForTimeout(100); await page.mouse.up(); await page.waitForTimeout(500);
 }
 
-test.beforeEach(async ({ page }) => { await page.setViewportSize({ width: 1500, height: 850 }); });
+test.beforeEach(async ({ page }) => { await page.setViewportSize({ width: 1500, height: 1100 }); /* verktygsraderna tar plats, och listan ritar bara rader som ryms */ });
 
 test("H att peka på staplar flyttar inte tidslinjen", async ({ page }) => {
   await openApp(page, "dhtmlx");

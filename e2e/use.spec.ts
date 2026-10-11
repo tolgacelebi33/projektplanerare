@@ -7,7 +7,7 @@ const add = (page: Page, name: "Uppgift" | "Milstolpe" | "Grupp") => page.getByR
 type Row = { id: string; title: string; parent_id: string | null; type: string; start: string; end: string; sort_order: number };
 const all = (page: Page) => items(page) as unknown as Promise<Row[]>;
 
-test.beforeEach(async ({ page }) => { await page.setViewportSize({ width: 1500, height: 850 }); });
+test.beforeEach(async ({ page }) => { await page.setViewportSize({ width: 1500, height: 1100 }); /* verktygsraderna tar plats, och listan ritar bara rader som ryms */ });
 
 test.describe("skapa", () => {
   test("U1 ny uppgift utan val: överst, panelen öppnas med markerad titel, syns i vyn och lagret", async ({ page }) => {

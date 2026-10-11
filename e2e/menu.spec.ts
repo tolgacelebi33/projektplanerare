@@ -18,7 +18,7 @@ async function dateAtX(page: Page, clientX: number, dayPx: number) {
 }
 
 test.beforeEach(async ({ page }) => {
-  await page.setViewportSize({ width: 1500, height: 850 });
+  await page.setViewportSize({ width: 1500, height: 1100 }); /* verktygsraderna tar plats, och listan ritar bara rader som ryms */
   await page.clock.setFixedTime(new Date("2026-10-09T10:00:00"));
 });
 
@@ -163,6 +163,7 @@ test.describe("högerklick", () => {
   });
 
   test("M12 menyn går att styra med tangentbordet och ligger alltid inom fönstret", async ({ page }) => {
+    await page.setViewportSize({ width: 1500, height: 850 }); // provet nedan använder fönstrets nedre kant
     await openApp(page, "dhtmlx");
     await page.locator('.gantt_row[data-task-id="i7"] .grid-title').click({ button: "right" });
     await page.waitForTimeout(450); // en människa hinner inte trycka en tangent snabbare, och menyn har då tagit fokus

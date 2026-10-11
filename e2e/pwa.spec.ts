@@ -71,7 +71,7 @@ test.describe("påminnelser", () => {
   });
 
   test("RM1 raden visar antal försenade, idag och imorgon, Visa öppnar Min vecka, och Senare döljer den resten av dagen", async ({ page }) => {
-    await openApp(page, "dhtmlx");
+    await openApp(page, "dhtmlx", { reminders: true });
     const s = dueSummary([{ project: { id: "proj_1", workspace_id: "ws_1", name: "x", created_at: "" }, items: await items(page) }], "2026-04-02");
     expect(s.total).toBeGreaterThan(0);
     const bar = page.locator('[data-part="reminder"]');
@@ -86,7 +86,7 @@ test.describe("påminnelser", () => {
   });
 
   test("RM2 raden kan stängas av, och Bara mina utan matchande poster visar ingen rad", async ({ page }) => {
-    await openApp(page, "dhtmlx");
+    await openApp(page, "dhtmlx", { reminders: true });
     await expect(page.locator('[data-part="reminder"]')).toBeVisible();
     await page.getByRole("button", { name: "Inställningar" }).click();
     const d = page.getByRole("dialog", { name: "Inställningar" });
@@ -105,7 +105,7 @@ test.describe("påminnelser", () => {
       class N { static permission = "granted"; static requestPermission = async () => "granted"; constructor(title: string, o?: { body?: string }) { calls.push(`${title}|${o?.body ?? ""}`); } }
       (window as any).Notification = N;
     });
-    await openApp(page, "dhtmlx");
+    await openApp(page, "dhtmlx", { reminders: true });
     await page.getByRole("button", { name: "Inställningar" }).click();
     const d = page.getByRole("dialog", { name: "Inställningar" });
     await d.getByRole("tab", { name: "Påminnelser", exact: true }).click();

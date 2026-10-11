@@ -9,9 +9,10 @@ export const SEL = {
   dhtmlx: { ready: ".gantt_task_line", bar: (id: string) => `.gantt_task_line[data-task-id="${id}"]`, link: ".gantt_task_link" },
 } as const;
 
-export async function openApp(page: Page, lib: Lib, opts: { fixture?: "small" | "large"; extra?: string } = {}) {
+export async function openApp(page: Page, lib: Lib, opts: { fixture?: "small" | "large"; extra?: string; reminders?: boolean } = {}) {
   // Förhandsgranskningen vid import är på som standard. De flesta tester importerar direkt, så den stängs av här (om inget annat sparats), och egna tester slår på den.
-  await page.addInitScript(() => { try { const k = "projektplanerare.settings"; const o = JSON.parse(localStorage.getItem(k) ?? "{}") ?? {}; if (o.importPreview === undefined) { o.importPreview = false; localStorage.setItem(k, JSON.stringify(o)); } } catch { /* ignoreras */ } });
+  // Påminnelseraden (alla poster i fixturen är försenade) stängs av av samma skäl: den skjuter ned innehållet. Påminnelsetesterna slår på den med { reminders: true }.
+  await page.addInitScript((keepReminders) => { try { const k = "projektplanerare.settings"; const o = JSON.parse(localStorage.getItem(k) ?? "{}") ?? {}; let changed = false; if (o.importPreview === undefined) { o.importPreview = false; changed = true; } if (!keepReminders && o.reminders === undefined) { o.reminders = { banner: false, os: false, scope: "all" }; changed = true; } if (changed) localStorage.setItem(k, JSON.stringify(o)); } catch { /* ignoreras */ } }, !!opts.reminders);
   await page.goto(`/?lib=${lib}&fixture=${opts.fixture ?? "small"}&latency=0${opts.extra ?? ""}`);
   await page.waitForSelector(SEL[lib].ready);
 }
