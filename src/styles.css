@@ -606,6 +606,7 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--text); }
 .baseline-bar.early { opacity: 0.9; background: var(--status-done-bg); }
 .baseline-bar-ui { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: var(--fs-md); }
 .baseline-date { font-size: 12px; color: var(--text-muted); }
+.backup-nag { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .panel-kind-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .code-tag { font-family: var(--font-title); font-size: 11px; letter-spacing: 0.04em; padding: 0 6px; border: var(--line-width) solid var(--line); border-radius: var(--radius-pill); white-space: nowrap; user-select: all; }
 .grid-code { font-family: var(--font-title); font-size: 11px; letter-spacing: 0.03em; white-space: nowrap; }

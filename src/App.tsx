@@ -38,6 +38,8 @@ import { YearWheel } from "./views/YearWheel";
 import { BoardView } from "./views/BoardView";
 import { ImportPreview } from "./views/ImportPreview";
 import { BaselineBar } from "./views/BaselineBar";
+import { BackupRestore } from "./views/BackupRestore";
+import { buildBackup, firstSeenAt, lastBackupAt, markBackupSaved, parseBackup, reminderDue, restoreBackup, MAX_BACKUP_BYTES, type BackupSummary } from "./data/backup";
 import { CalendarView } from "./views/CalendarView";
 import { MyWeekView } from "./views/MyWeekView";
 import { WorkloadView } from "./views/WorkloadView";
@@ -383,6 +385,34 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
     const out = await exportProject(store, projects.projectId, format);
     downloadText(out.filename, out.mime, out.text);
   };
+  // Säkerhetskopia: spara som fil, återställ som nya projekt, och en påminnelse när det gått länge
+  const [lastBackup, setLastBackup] = useState<string | null>(lastBackupAt);
+  const [backupPreview, setBackupPreview] = useState<{ file: string; summary: BackupSummary } | null>(null);
+  const [nagHidden, setNagHidden] = useState(false);
+  const saveBackupFile = async (): Promise<string> => {
+    const now = new Date();
+    const b = await buildBackup(store, now);
+    downloadText(b.filename, b.mime, b.text);
+    markBackupSaved(now); setLastBackup(lastBackupAt()); setNagHidden(true);
+    return sv.backup.saved(b.projects, b.items);
+  };
+  const pickBackup = async (file: File) => {
+    if (file.size > MAX_BACKUP_BYTES) throw new ImportError(sv.backup.tooBig);
+    setBackupPreview({ file: file.name, summary: parseBackup(await file.text()) });
+  };
+  const confirmRestore = async () => {
+    const p = backupPreview; setBackupPreview(null);
+    if (!p) return;
+    try {
+      const r = await restoreBackup(store, workspaceId, p.summary);
+      focusMedianOnNextProject();
+      await reloadUsers();
+      await projects.reload(r.firstProjectId);
+      setWriteError([sv.backup.restored(r.projects, r.items), ...r.warnings].join(" "));
+    } catch (e) { setWriteError(friendlyError(e)); }
+  };
+  const nag = app.persistent && !nagHidden && settings.backupReminderDays > 0 && state.kind === "ready" && state.items.length > 0
+    ? reminderDue({ days: settings.backupReminderDays, hasData: true, last: lastBackup, firstSeen: firstSeenAt(new Date()), now: new Date() }) : null;
   const [preview, setPreview] = useState<{ file: string; parsed: ParsedProject; into: boolean } | null>(null);
   const doImport = async (file: File, into = false) => {
     if (file.size > MAX_IMPORT_BYTES) throw new ImportError(sv.ex.fileTooBig);
@@ -669,6 +699,13 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
           onClear={() => { selAnchor.current = null; setSelected(new Set()); }} />
       )}
       {persistent?.loadWarning && <div role="alert" className="notice">{persistent.loadWarning}</div>}
+      {nag?.due && (
+        <div role="status" className="notice backup-nag">
+          {nag.never ? sv.backup.nagNever : sv.backup.nag(nag.since)}
+          <button type="button" className="mini" onClick={() => void saveBackupFile().catch((e) => setWriteError(friendlyError(e)))}>{sv.backup.nagSave}</button>
+          <button type="button" className="mini" onClick={() => setNagHidden(true)}>{sv.backup.nagLater}</button>
+        </div>
+      )}
       {notice && <div role="alert" className="notice">{notice}{writeError && <button type="button" className="notice-x" aria-label={sv.dismiss} onClick={() => setWriteError(null)}>×</button>}</div>}
       {projects.error && <div role="alert" className="notice">{projects.error}</div>}
       <div className="app-body">
@@ -713,7 +750,8 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
       </div>
       {fieldsOpen && project && <FieldsDialog fields={fieldDefs} onSave={(f) => projects.setFields(project.id, f)} onRemove={async (id) => { await removeFieldDef(store, project, id); await projects.reload(project.id); await refresh(); }} onClose={() => setFieldsOpen(false)} />}
       {preview && <ImportPreview fileName={preview.file} parsed={preview.parsed} destination={{ into: preview.into ? project?.name ?? "" : null, name: preview.parsed.name }} onCancel={() => setPreview(null)} onConfirm={() => { const p = preview; setPreview(null); void commitImport(p.parsed, p.into).catch((e) => setWriteError(friendlyError(e))); }} />}
-      {settingsOpen && <SettingsDialog fieldDefs={fieldDefs} settings={settings} people={{ users, onAdd: async (n) => { await store.addUser(n); await reloadUsers(); }, onRename: async (id, n) => { await store.renameUser(id, n); await reloadUsers(); await refresh(); }, onRemove: async (id) => { const n = await store.removeUser(id); await reloadUsers(); await refresh(); setAttrFilter((f) => ({ ...f, assignees: f.assignees.filter((x) => x !== id) })); return n; } }} onChange={setSettings} onClose={() => setSettingsOpen(false)} />}
+      {settingsOpen && <SettingsDialog fieldDefs={fieldDefs} settings={settings} backup={{ lastSaved: lastBackup, onSave: saveBackupFile, onRestoreFile: pickBackup }} people={{ users, onAdd: async (n) => { await store.addUser(n); await reloadUsers(); }, onRename: async (id, n) => { await store.renameUser(id, n); await reloadUsers(); await refresh(); }, onRemove: async (id) => { const n = await store.removeUser(id); await reloadUsers(); await refresh(); setAttrFilter((f) => ({ ...f, assignees: f.assignees.filter((x) => x !== id) })); return n; } }} onChange={setSettings} onClose={() => setSettingsOpen(false)} />}
+      {backupPreview && <BackupRestore fileName={backupPreview.file} summary={backupPreview.summary} onCancel={() => setBackupPreview(null)} onConfirm={() => void confirmRestore()} />}
       {recurOpen && <RecurringDialog key={recurInit ? "from" : "new"} today={todayISO()} initial={recurInit ?? undefined} onCreate={(a) => void addSeries(a)} onClose={() => setRecurOpen(false)} />}
       {menu && <ContextMenu x={menu.x} y={menu.y} items={menuItems} confirm={confirmRemove} onPick={(id) => void pickMenu(id)} onClose={() => setMenu(null)} />}
     </div>

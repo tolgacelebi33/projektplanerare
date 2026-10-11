@@ -4,14 +4,15 @@ import type { FieldDef, User } from "../data/types";
 import { sv } from "../i18n/sv";
 
 /** Inställningar: ändras direkt och sparas i webbläsaren. Esc, Stäng eller klick utanför stänger. */
-const TABS = ["list", "board", "views", "item", "rules", "people", "start", "touch", "info"] as const;
+const TABS = ["list", "board", "views", "item", "rules", "people", "start", "touch", "backup", "info"] as const;
 type Tab = (typeof TABS)[number];
 const KEYS = ["N", "M", "G", "/", "T", "1, 2, 3", "?", "Cmd/Ctrl + Z", "Cmd/Ctrl + Shift + Z, Cmd/Ctrl + Y", "Alt + ↑ / ↓", "Esc"]; // samma på alla språk, texterna står i ordlistan i samma ordning
 const TAB0_KEY = "projektplanerare.settingsTab";
 
+export interface BackupApi { lastSaved: string | null; onSave: () => Promise<string>; onRestoreFile: (file: File) => Promise<void> }
 export interface PeopleApi { users: User[]; onAdd: (name: string) => Promise<void>; onRename: (id: string, name: string) => Promise<void>; onRemove: (id: string) => Promise<number> }
 
-export function SettingsDialog({ fieldDefs = [], settings, people, onChange, onClose }: { fieldDefs?: FieldDef[]; settings: Settings; people?: PeopleApi; onChange: (s: Settings) => void; onClose: () => void }) {
+export function SettingsDialog({ fieldDefs = [], settings, people, backup, onChange, onClose }: { fieldDefs?: FieldDef[]; settings: Settings; people?: PeopleApi; backup?: BackupApi; onChange: (s: Settings) => void; onClose: () => void }) {
   const root = useRef<HTMLDivElement>(null);
   const [tab, setTab] = useState<Tab>(() => { try { const v = sessionStorage.getItem(TAB0_KEY); return (TABS as readonly string[]).includes(v ?? "") ? (v as Tab) : "list"; } catch { return "list"; } });
   const pick = (t: Tab) => { setTab(t); try { sessionStorage.setItem(TAB0_KEY, t); } catch { /* ignoreras */ } };
@@ -120,6 +121,7 @@ export function SettingsDialog({ fieldDefs = [], settings, people, onChange, onC
                 </select></label>
               <p className="panel-muted">{t.touchHint}</p>
             </section>)}
+            {tab === "backup" && backup && <BackupTab api={backup} days={settings.backupReminderDays} onDays={(n) => set("backupReminderDays", n)} />}
             {tab === "info" && (<section>
               <p>{t.infoStorage}</p>
               <p>{t.infoCodes}</p>
@@ -186,6 +188,33 @@ function PeopleTab({ api }: { api: PeopleApi }) {
         <input aria-label={t.newName} placeholder={t.newName} value={adding} maxLength={60} onChange={(e) => setAdding(e.target.value)} />
         <button type="submit" className="mini" disabled={!adding.trim()}>{t.add}</button>
       </form>
+      {msg && <p role={msg.kind === "error" ? "alert" : "status"} className={msg.kind === "error" ? "people-error" : "panel-muted"}>{msg.text}</p>}
+    </section>
+  );
+}
+
+function BackupTab({ api, days, onDays }: { api: BackupApi; days: number; onDays: (n: number) => void }) {
+  const t = sv.backup;
+  const file = useRef<HTMLInputElement>(null);
+  const [msg, setMsg] = useState<{ kind: "error" | "info"; text: string } | null>(null);
+  const run = async (fn: () => Promise<unknown>, ok?: string) => { try { await fn(); setMsg(ok ? { kind: "info", text: ok } : null); } catch (e) { setMsg({ kind: "error", text: errText(e) }); } };
+  return (
+    <section>
+      <p>{t.intro}</p>
+      <div className="panel-row">
+        <button type="button" className="mini mini-primary" onClick={() => void (async () => { try { setMsg({ kind: "info", text: await api.onSave() }); } catch (e) { setMsg({ kind: "error", text: errText(e) }); } })()}>{t.save}</button>
+        <span className="panel-muted" data-part="last">{api.lastSaved ? t.lastSaved(api.lastSaved.slice(0, 10)) : t.never}</span>
+      </div>
+      <div className="panel-row">
+        <button type="button" className="mini" onClick={() => file.current?.click()}>{t.restore}</button>
+        <input ref={file} type="file" accept=".json,application/json" hidden aria-label={t.restoreFile} onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) void run(() => api.onRestoreFile(f)); }} />
+      </div>
+      <p className="panel-muted">{t.restoreHint}</p>
+      <label className="panel-field"><span>{t.reminder}</span>
+        <select name="set-backup-days" value={days} onChange={(e) => onDays(Number(e.target.value))}>
+          {[0, 7, 14, 30, 90].map((n) => <option key={n} value={n}>{n === 0 ? t.reminderOff : t.reminderDays(n)}</option>)}
+        </select></label>
+      <p className="panel-muted">{t.reminderHint}</p>
       {msg && <p role={msg.kind === "error" ? "alert" : "status"} className={msg.kind === "error" ? "people-error" : "panel-muted"}>{msg.text}</p>}
     </section>
   );

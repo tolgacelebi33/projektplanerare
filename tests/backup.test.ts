@@ -88,3 +88,21 @@ describe("säkerhetskopia", () => {
     expect(r.projects).toBe(0);
   });
 });
+
+import { reminderDue, daysBetween } from "../src/data/backup";
+describe("påminnelse om säkerhetskopia", () => {
+  const now = new Date("2026-10-11T12:00:00Z");
+  it("räknar dagar och påminner först när det gått så lång tid, bara om påminnelsen är på och det finns data", () => {
+    expect(daysBetween("2026-10-01T12:00:00Z", now)).toBe(10);
+    expect(daysBetween("2026-12-01T12:00:00Z", now)).toBe(0); // framtid ger 0, aldrig negativt
+    const base = { days: 30, hasData: true, last: "2026-09-20T12:00:00Z", firstSeen: "2026-01-01T00:00:00Z", now };
+    expect(reminderDue(base)).toMatchObject({ due: false, since: 21, never: false });
+    expect(reminderDue({ ...base, last: "2026-09-11T12:00:00Z" })).toMatchObject({ due: true, since: 30 });
+    expect(reminderDue({ ...base, days: 0, last: "2020-01-01T00:00:00Z" }).due).toBe(false); // av
+    expect(reminderDue({ ...base, hasData: false, last: "2020-01-01T00:00:00Z" }).due).toBe(false); // inget att spara
+  });
+  it("utan någon sparad kopia räknas det från första användningen, så en ny installation inte tjatar direkt", () => {
+    expect(reminderDue({ days: 30, hasData: true, last: null, firstSeen: "2026-10-10T12:00:00Z", now })).toMatchObject({ due: false, never: true });
+    expect(reminderDue({ days: 30, hasData: true, last: null, firstSeen: "2026-08-01T12:00:00Z", now })).toMatchObject({ due: true, never: true });
+  });
+});

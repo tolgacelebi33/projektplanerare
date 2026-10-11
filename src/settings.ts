@@ -26,6 +26,8 @@ export interface Settings {
   collapseSeries: boolean;
   /** Visa en förhandsgranskning (kolumner, grupper, serier, antal) innan en fil läggs in. */
   importPreview: boolean;
+  /** Påminnelse om säkerhetskopia efter så många dagar (0 = aldrig). */
+  backupReminderDays: number;
   /** Baslinjen (om projektet har en) ritas som tunna staplar under de verkliga. */
   showBaseline: boolean;
   /** Enkla regler (inget eget regelspråk): fasta val som gäller alla poster. */
@@ -47,7 +49,7 @@ export const DEFAULT_FEATURES: Features = { labels: true, checklist: true, links
 export interface CardFields { date: boolean; assignee: boolean; priority: boolean; description: boolean; series: boolean; progress: boolean; labels: boolean; checklist: boolean; links: boolean; lastUpdate: boolean; code: boolean }
 export type BoardGroup = "status" | "assignee" | "priority" | "group" | `field:${string}`;
 export const DEFAULT_CARD_FIELDS: CardFields = { date: true, assignee: true, priority: true, description: false, series: true, progress: false, labels: true, checklist: true, links: true, lastUpdate: false, code: false };
-export const DEFAULT_SETTINGS: Settings = { touch: "auto", closeOnEmpty: true, markUndated: true, startView: "gantt", startZoom: "week", cardFields: { ...DEFAULT_CARD_FIELDS }, highlightOverdue: true, quickFilters: true, boardGroup: "status", features: { ...DEFAULT_FEATURES }, checklistProgress: false, hidePastSeries: false, collapseSeries: false, importPreview: true, showBaseline: true, rules: { doneSetsProgress: false, seriesNext: false }, importExtraAsFields: true, moreViews: { calendar: true, week: true, workload: true, portfolio: true }, workloadField: "", workloadCap: 5 };
+export const DEFAULT_SETTINGS: Settings = { touch: "auto", closeOnEmpty: true, markUndated: true, startView: "gantt", startZoom: "week", cardFields: { ...DEFAULT_CARD_FIELDS }, highlightOverdue: true, quickFilters: true, boardGroup: "status", features: { ...DEFAULT_FEATURES }, checklistProgress: false, hidePastSeries: false, collapseSeries: false, importPreview: true, backupReminderDays: 30, showBaseline: true, rules: { doneSetsProgress: false, seriesNext: false }, importExtraAsFields: true, moreViews: { calendar: true, week: true, workload: true, portfolio: true }, workloadField: "", workloadCap: 5 };
 const KEY = "projektplanerare.settings";
 const bool = (v: unknown, d: boolean) => (typeof v === "boolean" ? v : d);
 const pick = <T extends string>(v: unknown, ok: readonly T[], d: T): T => (ok.includes(v as T) ? (v as T) : d);
@@ -69,6 +71,7 @@ export function normalizeSettings(raw: unknown): Settings {
     hidePastSeries: bool(o.hidePastSeries, DEFAULT_SETTINGS.hidePastSeries),
     collapseSeries: bool(o.collapseSeries, DEFAULT_SETTINGS.collapseSeries),
     importPreview: bool(o.importPreview, DEFAULT_SETTINGS.importPreview),
+    backupReminderDays: [0, 7, 14, 30, 90].includes(o.backupReminderDays as number) ? (o.backupReminderDays as number) : DEFAULT_SETTINGS.backupReminderDays,
     showBaseline: bool(o.showBaseline, DEFAULT_SETTINGS.showBaseline),
     rules: ((r) => ({ doneSetsProgress: bool(r.doneSetsProgress, false), seriesNext: bool(r.seriesNext, false) }))((o.rules && typeof o.rules === "object" ? o.rules : {}) as Record<string, unknown>),
     importExtraAsFields: bool(o.importExtraAsFields, DEFAULT_SETTINGS.importExtraAsFields),

@@ -76,3 +76,20 @@ export async function restoreBackup(store: MemoryStore, workspaceId: string, b: 
   if (!made && b.projects.length) throw new ImportError(warnings.join(" "));
   return { projects: made, items, warnings, firstProjectId: first };
 }
+
+const LAST_KEY = "projektplanerare.lastBackup";
+const SEEN_KEY = "projektplanerare.firstSeen";
+export const REMINDER_CHOICES = [0, 7, 14, 30, 90] as const;
+
+/** När den senaste säkerhetskopian sparades i den här webbläsaren (ISO), eller null. */
+export function lastBackupAt(): string | null { try { return localStorage.getItem(LAST_KEY); } catch { return null; } }
+export function markBackupSaved(now: Date): void { try { localStorage.setItem(LAST_KEY, now.toISOString()); } catch { /* lagring blockerad */ } }
+/** Första gången appen användes här (för påminnelsen: räknar från start om ingen säkerhetskopia sparats). Sätts vid första anropet. */
+export function firstSeenAt(now: Date): string { try { const v = localStorage.getItem(SEEN_KEY); if (v) return v; localStorage.setItem(SEEN_KEY, now.toISOString()); } catch { /* ignoreras */ } return now.toISOString(); }
+export const daysBetween = (fromIso: string, now: Date): number => Math.max(0, Math.floor((now.getTime() - new Date(fromIso).getTime()) / 86_400_000));
+/** Dags att påminna? Bara om påminnelsen är på, det finns något att spara, och det gått minst så många dagar sedan senaste kopian (eller sedan första användningen). */
+export function reminderDue(opts: { days: number; hasData: boolean; last: string | null; firstSeen: string; now: Date }): { due: boolean; since: number; never: boolean } {
+  const from = opts.last ?? opts.firstSeen;
+  const since = daysBetween(from, opts.now);
+  return { due: opts.days > 0 && opts.hasData && since >= opts.days, since, never: !opts.last };
+}

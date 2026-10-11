@@ -201,7 +201,7 @@ export const enDict: Dict = {
   },
   settings: {
     button: "Settings", title: "Settings",
-    tabs: { label: "Settings, sections", list: "List view", board: "Board view", views: "More views", item: "Item", rules: "Rules", people: "People", start: "Start", touch: "Touch screen", info: "Information and help" },
+    tabs: { label: "Settings, sections", list: "List view", board: "Board view", views: "More views", item: "Item", rules: "Rules", people: "People", backup: "Backup", start: "Start", touch: "Touch screen", info: "Information and help" },
     people: { intro: "The people you can choose as assignee. A name changes right away. If a person is removed, their items have no assignee in any project.", nameOf: (n: string) => `Name: ${n}`, newName: "Name of new person", add: "Add", remove: "Remove", confirm: (n: string) => `Remove ${n}? The items will have no assignee in any project and the undo history is cleared.`, confirmYes: "Remove", cancel: "Cancel", none: "No people yet.", removed: (n: number) => `The person was removed. ${n} items now have no assignee.` },
     rulesIntro: "A few fixed rules that apply to all items. All are off by default.",
     rules: { doneSetsProgress: "When status becomes Done, set progress to 100", doneSetsProgressHint: "Applies to tasks and milestones. If progress is changed in the same edit (for example in the panel) that value is kept.", seriesNext: "When an occurrence in a series is done, create the next one after the last", seriesNextHint: "The series keeps going on its own, with the same repetition. A series has at most 120 occurrences." },

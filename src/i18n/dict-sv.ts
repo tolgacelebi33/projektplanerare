@@ -206,7 +206,7 @@ export const svDict = {
   },
   settings: {
     button: "Inställningar", title: "Inställningar",
-    tabs: { label: "Inställningar, avsnitt", list: "Listvy", board: "Boardvy", views: "Fler vyer", item: "Posten", rules: "Regler", people: "Personer", start: "Start", touch: "Pekskärm", info: "Information och hjälp" },
+    tabs: { label: "Inställningar, avsnitt", list: "Listvy", board: "Boardvy", views: "Fler vyer", item: "Posten", rules: "Regler", people: "Personer", backup: "Säkerhetskopia", start: "Start", touch: "Pekskärm", info: "Information och hjälp" },
     people: { intro: "Personerna du kan välja som ansvarig. Ett namn ändras direkt. Tas en person bort blir hens poster utan ansvarig i alla projekt.", nameOf: (n: string) => `Namn: ${n}`, newName: "Namn på ny person", add: "Lägg till", remove: "Ta bort", confirm: (n: string) => `Ta bort ${n}? Posterna blir utan ansvarig i alla projekt och ångra-historiken töms.`, confirmYes: "Ta bort", cancel: "Avbryt", none: "Inga personer än.", removed: (n: number) => `Personen togs bort. ${n} poster blev utan ansvarig.` },
     rulesIntro: "Några fasta regler som gäller alla poster. Alla är av som standard.",
     rules: { doneSetsProgress: "När status blir Klar, sätt framsteg till 100", doneSetsProgressHint: "Gäller uppgifter och milstolpar. Ändras framsteget i samma ändring (till exempel i panelen) står det värdet kvar.", seriesNext: "När ett tillfälle i en serie blir klart, skapa nästa efter det sista", seriesNextHint: "Serien fortsätter framåt av sig själv, med samma upprepning. En serie har högst 120 tillfällen." },
