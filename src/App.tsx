@@ -39,6 +39,7 @@ import { BoardView } from "./views/BoardView";
 import { ImportPreview } from "./views/ImportPreview";
 import { BaselineBar } from "./views/BaselineBar";
 import { BackupRestore } from "./views/BackupRestore";
+import { StatusDialog } from "./views/StatusDialog";
 import { CommandPalette, type PaletteCommand } from "./views/CommandPalette";
 import { buildBackup, firstSeenAt, lastBackupAt, markBackupSaved, parseBackup, reminderDue, restoreBackup, MAX_BACKUP_BYTES, type BackupSummary } from "./data/backup";
 import { CalendarView } from "./views/CalendarView";
@@ -75,6 +76,8 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
   const setSettings = (s: Settings) => { saveSettings(s); setSettingsState(s); };
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const [statusOpen, setStatusOpen] = useState(false);
+  const [statusUpdates, setStatusUpdates] = useState<import("./data/types").StatusUpdate[]>([]);
   const [paletteData, setPaletteData] = useState<{ project: Project; items: Item[] }[] | null>(null);
   const settingsRef = useRef(settings); settingsRef.current = settings;
   useEffect(() => { store.rules = settings.rules; }, [store, settings.rules]);
@@ -177,6 +180,14 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
     void Promise.all(projects.projects.map(async (p) => ({ project: p, items: await store.listItems(p.id) }))).then((r) => { if (on) setPaletteData(r); }).catch(() => { if (on) setPaletteData([]); });
     return () => { on = false; };
   }, [paletteOpen, projects.projects, store]);
+  useEffect(() => {
+    let on = true;
+    const load = () => void store.listStatusUpdates().then((u) => { if (on) setStatusUpdates(u); }).catch(() => undefined);
+    load();
+    const un = store.subscribe(load);
+    return () => { on = false; un(); };
+  }, [store]);
+  const latestHealth = useMemo(() => { const mine = statusUpdates.filter((u) => u.project_id === projects.projectId); return mine.length ? mine[mine.length - 1].health : null; }, [statusUpdates, projects.projectId]);
   const openInProject = (pid: string, iid: string) => {
     if (pid === projects.projectId) { setEditId(iid); setReveal(iid); return; }
     pendingOpen.current = iid; projects.select(pid);
@@ -648,7 +659,7 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
       </header>
       <div className="toolbar project-row">
         {projects.projects && (
-          <ProjectBar projects={projects.projects} projectId={projects.projectId} itemCount={state.kind === "ready" ? state.items.length : 0}
+          <ProjectBar health={latestHealth} onHealth={() => setStatusOpen(true)} projects={projects.projects} projectId={projects.projectId} itemCount={state.kind === "ready" ? state.items.length : 0}
             onSelect={(id) => { focusMedianOnNextProject(); projects.select(id); }} onCreate={(n) => { focusMedianOnNextProject(); return projects.create(n); }} onRename={projects.rename} onRemove={(id) => { focusMedianOnNextProject(); return projects.remove(id); }} onDependencyMode={projects.setDependencyMode}
             onDuplicate={doDuplicate} onExport={doExport} onImport={doImport} />
         )}
@@ -788,7 +799,7 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
         {state.kind === "ready" && projects.projectId && view === "calendar" && <CalendarView items={shown.items} today={todayISO()} markUndated={settings.markUndated} colors={colors} openId={editId} onOpen={setEditId} onShift={(id, d) => void shiftItem(id, d)} />}
         {state.kind === "ready" && projects.projectId && view === "workload" && <WorkloadView items={shown.items} users={users} fieldDefs={fieldDefs} fieldId={settings.workloadField} cap={settings.workloadCap} today={todayISO()} onOpen={setEditId} />}
         {view === "week" && projects.projects && projects.projects.length > 0 && <MyWeekView groups={myWeekGroups(allData, todayISO())} users={users} multi={projects.projects.length > 1} onOpen={openInProject} />}
-        {view === "portfolio" && projects.projects && projects.projects.length > 0 && <PortfolioView rows={portfolioRows(allData, todayISO())} currentId={projects.projectId} onOpen={(pid) => { focusMedianOnNextProject(); projects.select(pid); setView("gantt"); }} />}
+        {view === "portfolio" && projects.projects && projects.projects.length > 0 && <PortfolioView rows={portfolioRows(allData, todayISO(), statusUpdates)} currentId={projects.projectId} onOpen={(pid) => { focusMedianOnNextProject(); projects.select(pid); setView("gantt"); }} />}
         {state.kind === "ready" && projects.projectId && view === "wheel" && <YearWheel items={shown.items} year={effectiveYear} colors={colors} selectedId={editId} onOpen={setEditId} onContext={openMenu} />}
         {state.kind === "ready" && projects.projectId && view === "gantt" && (
           <div className="gantt-wrap">
@@ -814,6 +825,7 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
       </div>
       {fieldsOpen && project && <FieldsDialog fields={fieldDefs} onSave={(f) => projects.setFields(project.id, f)} onRemove={async (id) => { await removeFieldDef(store, project, id); await projects.reload(project.id); await refresh(); }} onClose={() => setFieldsOpen(false)} />}
       {preview && <ImportPreview fileName={preview.file} parsed={preview.parsed} destination={{ into: preview.into ? project?.name ?? "" : null, name: preview.parsed.name }} onCancel={() => setPreview(null)} onConfirm={() => { const p = preview; setPreview(null); void commitImport(p.parsed, p.into).catch((e) => setWriteError(friendlyError(e))); }} />}
+      {statusOpen && project && <StatusDialog project={project} updates={statusUpdates} onClose={() => setStatusOpen(false)} onPublish={async (h, t) => { await store.addStatusUpdate({ project_id: project.id, health: h, text: t }); }} />}
       {paletteOpen && <CommandPalette data={paletteData ?? []} loading={paletteData === null} commands={paletteCommands} onClose={() => setPaletteOpen(false)}
         onOpenItem={(pid, iid) => { openInProject(pid, iid); }} onOpenProject={(pid) => { focusMedianOnNextProject(); projects.select(pid); }} />}
       {settingsOpen && <SettingsDialog fieldDefs={fieldDefs} settings={settings} backup={{ lastSaved: lastBackup, onSave: saveBackupFile, onRestoreFile: pickBackup }} people={{ users, onAdd: async (n) => { await store.addUser(n); await reloadUsers(); }, onRename: async (id, n) => { await store.renameUser(id, n); await reloadUsers(); await refresh(); }, onRemove: async (id) => { const n = await store.removeUser(id); await reloadUsers(); await refresh(); setAttrFilter((f) => ({ ...f, assignees: f.assignees.filter((x) => x !== id) })); return n; } }} onChange={setSettings} onClose={() => setSettingsOpen(false)} />}

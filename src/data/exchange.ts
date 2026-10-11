@@ -7,6 +7,7 @@ import { sv } from "../i18n/sv";
 import { enDict, svDict } from "../i18n/sv";
 import { friendlyError } from "../i18n/errors";
 import { DEPENDENCY_TYPES, MAX_LAG, type DependencyType } from "./types";
+import { PROJECT_HEALTH, STATUS_UPDATE_LIMITS, type ProjectHealth, type StatusUpdate } from "./types";
 import type { Activity, ActivityKind, Baseline, Comment, Dependency, DependencyMode, FieldDef, ISODate, Item, ItemType, Priority, Project, Recurrence, SavedView, Status, User } from "./types";
 
 /**
@@ -45,6 +46,8 @@ export interface ParsedProject {
   /** Kommentarer (JSON): `item` och `id`/`parent` är filens id, författaren ett namn. */
   /** Loggen (JSON): `item` är filens id, `actor` ett namn. */
   activity?: { item: string; at: string; actor: string | null; kind: ActivityKind; field?: string; from?: string; to?: string; other?: string; dir?: "pred" | "succ"; dep_type?: DependencyType; lag?: number; auto?: boolean; undo?: boolean }[];
+  /** Projektets statusuppdateringar (JSON): hälsa, text, tid och namn. */
+  status_updates?: { at: string; actor: string | null; health: ProjectHealth; text: string }[];
   comments?: { id: string; item: string; parent?: string; author: string | null; text: string; at: string; edited?: string }[];
 }
 
@@ -74,7 +77,7 @@ const TYPES: ItemType[] = ["epic", "milestone", "task"];
 export class ImportError extends Error {}
 
 /** Lagrets poster som en neutral beskrivning (ansvarig som namn, inga projekt- eller workspace-id). */
-export function toParsed(project: Pick<Project, "name" | "dependency_mode"> & Partial<Pick<Project, "fields" | "views" | "baseline">>, items: Item[], deps: Dependency[], users: User[], comments: Comment[] = [], activity: Activity[] = []): ParsedProject {
+export function toParsed(project: Pick<Project, "name" | "dependency_mode"> & Partial<Pick<Project, "fields" | "views" | "baseline">>, items: Item[], deps: Dependency[], users: User[], comments: Comment[] = [], activity: Activity[] = [], statusUpdates: StatusUpdate[] = []): ParsedProject {
   const name = new Map(users.map((u) => [u.id, u.name]));
   const ids = new Set(items.map((i) => i.id));
   return {
@@ -82,6 +85,7 @@ export function toParsed(project: Pick<Project, "name" | "dependency_mode"> & Pa
     dependency_mode: project.dependency_mode ?? "shift",
     ...(project.fields?.length ? { fields: project.fields } : {}), ...(project.views?.length ? { views: project.views } : {}),
     ...(project.baseline && Object.keys(project.baseline.items).length ? { baseline: { saved_at: project.baseline.saved_at, items: Object.fromEntries(Object.entries(project.baseline.items).filter(([k]) => ids.has(k))) } } : {}),
+    ...(statusUpdates.length ? { status_updates: statusUpdates.map((u) => ({ at: u.at, actor: u.actor_name || null, health: u.health, text: u.text })) } : {}),
     ...(activity.length ? { activity: activity.filter((a) => ids.has(a.item_id)).map((a) => ({ item: a.item_id, at: a.at, actor: a.actor_name || null, kind: a.kind, ...(a.field ? { field: a.field } : {}), ...(a.from !== undefined ? { from: a.from } : {}), ...(a.to !== undefined ? { to: a.to } : {}), ...(a.other ? { other: a.other } : {}), ...(a.dir ? { dir: a.dir } : {}), ...(a.dep_type ? { dep_type: a.dep_type } : {}), ...(a.lag ? { lag: a.lag } : {}), ...(a.auto ? { auto: true } : {}), ...(a.undo ? { undo: true } : {}) })) } : {}),
     ...(comments.length ? { comments: comments.filter((c) => ids.has(c.item_id)).map((c) => ({ id: c.id, item: c.item_id, ...(c.parent_id ? { parent: c.parent_id } : {}), author: (c.author_id ? name.get(c.author_id) : undefined) ?? (c.author_name || null), text: c.text, at: c.created_at, ...(c.edited_at ? { edited: c.edited_at } : {}) })) } : {}),
     items: items.map(({ workspace_id: _w, project_id: _p, assignee_id, ...rest }) => ({ ...rest, assignee: assignee_id ? name.get(assignee_id) ?? null : null })),
@@ -93,7 +97,7 @@ export function toParsed(project: Pick<Project, "name" | "dependency_mode"> & Pa
 // ---------- JSON ----------
 
 export function toJson(p: ParsedProject, exportedAt: string): string {
-  return JSON.stringify({ format: FORMAT, version: 1, exported_at: exportedAt, project: { name: p.name, dependency_mode: p.dependency_mode, ...(p.fields?.length ? { fields: p.fields } : {}), ...(p.views?.length ? { views: p.views } : {}), ...(p.baseline ? { baseline: p.baseline } : {}) }, items: p.items, dependencies: p.deps, ...(p.comments?.length ? { comments: p.comments } : {}), ...(p.activity?.length ? { activity: p.activity } : {}) }, null, 2);
+  return JSON.stringify({ format: FORMAT, version: 1, exported_at: exportedAt, project: { name: p.name, dependency_mode: p.dependency_mode, ...(p.fields?.length ? { fields: p.fields } : {}), ...(p.views?.length ? { views: p.views } : {}), ...(p.baseline ? { baseline: p.baseline } : {}), ...(p.status_updates?.length ? { status_updates: p.status_updates } : {}) }, items: p.items, dependencies: p.deps, ...(p.comments?.length ? { comments: p.comments } : {}), ...(p.activity?.length ? { activity: p.activity } : {}) }, null, 2);
 }
 
 function shapeCheck(it: ParsedItem, n: number) {
@@ -190,6 +194,12 @@ export function parseJson(text: string): ParsedProject {
       if (!ids.has(c.item)) return []; // kommentar på en post som inte finns i filen
       try { validateCommentText(c.text); } catch (er) { throw new ImportError(sv.ex.commentBad(i + 1, friendlyError(er))); }
       return [{ id: c.id, item: c.item, ...(typeof c.parent === "string" ? { parent: c.parent } : {}), author: typeof c.author === "string" && c.author.trim() ? c.author.trim().slice(0, 60) : null, text: c.text, at: typeof c.at === "string" && !Number.isNaN(Date.parse(c.at)) ? c.at : new Date(0).toISOString(), ...(typeof c.edited === "string" ? { edited: c.edited } : {}) }];
+    });
+  }
+  if (Array.isArray(proj.status_updates)) {
+    out.status_updates = (proj.status_updates as unknown[]).map((u, i) => {
+      if (!isObj(u) || !PROJECT_HEALTH.includes(u.health as ProjectHealth) || typeof u.at !== "string" || Number.isNaN(Date.parse(u.at))) throw new ImportError(sv.ex.statusUpdateShape(i + 1));
+      return { at: u.at, actor: typeof u.actor === "string" && u.actor.trim() ? u.actor.trim().slice(0, 60) : null, health: u.health as ProjectHealth, text: typeof u.text === "string" ? u.text.slice(0, STATUS_UPDATE_LIMITS.text) : "" };
     });
   }
   if (isObj(proj.baseline)) { try { validateBaseline(proj.baseline as unknown as Baseline); } catch (er) { throw new ImportError(friendlyError(er)); } out.baseline = proj.baseline as unknown as Baseline; }

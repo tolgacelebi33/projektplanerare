@@ -75,6 +75,7 @@ export const svDict = {
     xlsxBroken: "Excel-filen kunde inte läsas. Spara den som .xlsx (inte .xls) och försök igen.",
     xlsxSheet: (sheet: string, others: number, _names: string) => `Bladet "${sheet}" lästes. ${others} andra blad i filen importerades inte.`,
     depType: (n: number, t: string) => `Beroende ${n}: okänd typ "${t}".`, depLag: (n: number, max: number) => `Beroende ${n}: fördröjningen måste vara ett heltal mellan -${max} och ${max} dagar.`,
+    statusUpdateShape: (n: number) => `Statusuppdatering ${n} saknar giltig status eller tid.`,
     activityShape: (n: number) => `Loggrad ${n} saknar post, typ eller tid.`,
     commentSkipped: "En kommentar gick inte att lägga in och hoppades över.",
     commentShape: (n: number) => `Kommentar ${n} saknar post, id eller text.`, commentBad: (n: number, why: string) => `Kommentar ${n}: ${why}`,
@@ -228,6 +229,10 @@ export const svDict = {
     title: "Sök och kommandon", placeholder: "Sök poster, projekt eller skriv ett kommando...", results: "Träffar", items: "Poster", projects: "Projekt", commands: "Kommandon", none: "Inga träffar.", loading: "Läser in...",
     hint: "Pil upp och ner väljer, Enter öppnar, Esc stänger.", button: "Sök", buttonHint: "Sök överallt och kör kommandon (Cmd/Ctrl + K)",
     cmd: { newTask: "Ny uppgift", newMilestone: "Ny milstolpe", newGroup: "Ny grupp", newSeries: "Ny återkommande milstolpe", viewGantt: "Visa Gantt", viewWheel: "Visa Årshjul", viewBoard: "Visa Board", today: "Gå till idag", undo: "Ångra", redo: "Gör om", settings: "Öppna inställningar", help: "Öppna hjälpen", backup: "Spara säkerhetskopia", export: "Exportera projektet (JSON)" },
+  },
+  health: {
+    labels: { on_track: "På spåret", at_risk: "Risk", off_track: "Försenat", on_hold: "Pausat", done: "Klart" }, none: "Ingen status", hint: "Projektets status. Klicka för att uppdatera och se historiken.",
+    title: (n: string) => `Projektstatus: ${n}`, status: "Status", text: "Vad har hänt? (valfritt)", placeholder: "Några rader om läget, risker eller beslut...", publish: "Publicera uppdatering", history: "Tidigare uppdateringar", noHistory: "Inga uppdateringar än.", close: "Stäng", lastUpdate: "Senaste uppdatering",
   },
   settings: {
     button: "Inställningar", title: "Inställningar",

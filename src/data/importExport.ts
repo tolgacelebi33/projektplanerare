@@ -12,7 +12,7 @@ export async function exportProject(store: MemoryStore, projectId: string, forma
   const project = (await store.listProjects()).find((p) => p.id === projectId);
   if (!project) throw new Error(sv.ex.projectGone);
   const [items, deps, users, comments] = await Promise.all([store.listItems(projectId), store.listDependencies(projectId), store.listUsers(), store.listComments(projectId)]);
-  const parsed = toParsed(project, items, deps, users, comments, await store.listActivity(projectId));
+  const parsed = toParsed(project, items, deps, users, comments, await store.listActivity(projectId), (await store.listStatusUpdates()).filter((u) => u.project_id === projectId));
   const date = todayISO();
   const base = `${fileSlug(project.name)}-${date}`;
   return format === "json"
@@ -111,6 +111,9 @@ export async function importParsed(store: MemoryStore, workspaceId: string, pars
         store.addActivityRaw(item, { at: a.at, actor_id: null, actor_name: a.actor ?? "", kind: a.kind, ...(a.field ? { field: a.field } : {}), ...(a.from !== undefined ? { from: a.from } : {}), ...(a.to !== undefined ? { to: a.to } : {}), ...(a.other ? { other: a.other } : {}), ...(a.dir ? { dir: a.dir } : {}), ...(a.dep_type ? { dep_type: a.dep_type } : {}), ...(a.lag ? { lag: a.lag } : {}), ...(a.auto ? { auto: true } : {}), ...(a.undo ? { undo: true } : {}) });
       }
     }
+    if (parsed.status_updates?.length && !existing) {
+      for (const u of parsed.status_updates) await store.addStatusUpdate({ project_id: project.id, health: u.health, text: u.text, at: u.at, actor_name: u.actor ?? "" });
+    }
     const skippedDeps: string[] = [];
     for (const d of parsed.deps) {
       try { createdDeps.push((await store.createDependency({ workspace_id: workspaceId, from_item_id: idMap.get(d.from)!, to_item_id: idMap.get(d.to)!, type: d.type ?? "finish_to_start", ...(d.lag ? { lag: d.lag } : {}) })).id); }
@@ -142,5 +145,5 @@ export async function duplicateProject(store: MemoryStore, workspaceId: string, 
   const project = (await store.listProjects()).find((p) => p.id === projectId);
   if (!project) throw new Error(sv.ex.projectGone);
   const [items, deps, users, comments] = await Promise.all([store.listItems(projectId), store.listDependencies(projectId), store.listUsers(), store.listComments(projectId)]);
-  return importParsed(store, workspaceId, toParsed(project, items, deps, users, comments, await store.listActivity(projectId)), sv.ex.copy(project.name));
+  return importParsed(store, workspaceId, toParsed(project, items, deps, users, comments, await store.listActivity(projectId), (await store.listStatusUpdates()).filter((u) => u.project_id === projectId)), sv.ex.copy(project.name));
 }

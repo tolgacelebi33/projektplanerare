@@ -1,6 +1,6 @@
 import { addDays, diffDays, weekdayMon0, weekRange } from "./dates";
 import { isOverdue } from "./rules";
-import type { ISODate, Item, Project, User } from "./types";
+import type { ISODate, Item, Project, StatusUpdate, User } from "./types";
 
 /** Datumen i en månadsruta: sex veckor (42 dagar) som börjar på måndagen i veckan där månaden börjar, så att höjden aldrig hoppar. `anchor` är en dag i månaden. */
 export function monthGrid(anchor: ISODate): ISODate[] {
@@ -77,9 +77,9 @@ export function workloadTable(items: Item[], users: User[], weeks: WeekSpan[], f
   return [...rows.values()].sort((a, b) => (a.key === "" ? 1 : 0) - (b.key === "" ? 1 : 0));
 }
 
-export interface PortfolioRow { project: Project; items: number; done: number; percent: number; overdue: number; start: ISODate | null; end: ISODate | null; nextMilestone: Item | null }
+export interface PortfolioRow { project: Project; items: number; done: number; percent: number; overdue: number; start: ISODate | null; end: ISODate | null; nextMilestone: Item | null; /** Projektets status: den senaste uppdateringen (null: ingen). */ latest: StatusUpdate | null }
 /** Portfölj: en rad per projekt med period, antal poster, andel klara, antal försenade och nästa milstolpe. Grupper räknas inte som poster. */
-export function portfolioRows(all: { project: Project; items: Item[] }[], today: ISODate): PortfolioRow[] {
+export function portfolioRows(all: { project: Project; items: Item[] }[], today: ISODate, updates: StatusUpdate[] = []): PortfolioRow[] {
   return all.map(({ project, items }) => {
     const real = items.filter((i) => i.type !== "epic");
     const done = real.filter((i) => i.status === "done").length;
@@ -90,6 +90,7 @@ export function portfolioRows(all: { project: Project; items: Item[] }[], today:
       start: dated.length ? dated.reduce((m, i) => (i.start < m ? i.start : m), dated[0].start) : null,
       end: dated.length ? dated.reduce((m, i) => (i.end > m ? i.end : m), dated[0].end) : null,
       nextMilestone: ms,
+      latest: updates.filter((u) => u.project_id === project.id).sort((a, b) => (a.at < b.at ? -1 : a.at > b.at ? 1 : a.id < b.id ? -1 : 1)).at(-1) ?? null,
     };
   });
 }

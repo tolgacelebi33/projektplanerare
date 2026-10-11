@@ -54,6 +54,16 @@ export interface Activity {
 }
 export const ACTIVITY_LIMITS = { perItem: 300, total: 100_000 } as const;
 
+/** Projektets hälsa. Den aktuella är den senaste statusuppdateringen. Uppdateringarna är en historik (som loggen): de skrivs, de ändras inte. */
+export type ProjectHealth = "on_track" | "at_risk" | "off_track" | "on_hold" | "done";
+export const PROJECT_HEALTH: ProjectHealth[] = ["on_track", "at_risk", "off_track", "on_hold", "done"];
+export interface StatusUpdate {
+  id: string; workspace_id: string; project_id: string;
+  at: string; actor_id: string | null; actor_name: string;
+  health: ProjectHealth; text: string;
+}
+export const STATUS_UPDATE_LIMITS = { text: 1000, perProject: 200 } as const;
+
 export const COMMENT_LIMITS = { text: 2000, perItem: 500, total: 50_000 } as const;
 
 export interface Baseline { saved_at: string; items: Record<string, { start: string; end: string }> }

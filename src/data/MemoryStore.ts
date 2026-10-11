@@ -5,7 +5,7 @@ import { extendSeries } from "./actions";
 import { PLACEHOLDER_RENAMES, placeholderOldName } from "./fixtures";
 import { countersFor, validCounters, type Counters, emptyCounters, itemCode, nextNumber, parseProjectCode, projectCode } from "./codes";
 import { applyPatch, isPatchList, json, makePatch, type Entry, type Patch } from "./patch";
-import { ACTIVITY_LIMITS, COMMENT_LIMITS, type Activity } from "./types";
+import { ACTIVITY_LIMITS, COMMENT_LIMITS, PROJECT_HEALTH, STATUS_UPDATE_LIMITS, type Activity, type ProjectHealth, type StatusUpdate } from "./types";
 import { depDraft, describeChange } from "./activity";
 import type { Baseline, Comment, Dependency, DependencyMode, FieldDef, Fixture, Item, Project, SavedView, User } from "./types";
 
@@ -20,6 +20,8 @@ export interface Snapshot {
   comments?: Comment[];
   /** Loggen (historik över ändringar). Ligger utanför ångra-historiken. */
   activity?: Activity[];
+  /** Projektens statusuppdateringar. Ligger utanför ångra-historiken. */
+  status_updates?: StatusUpdate[];
 }
 
 export interface MemoryStoreOptions {
@@ -54,6 +56,8 @@ export class MemoryStore implements DataStore {
   protected comments: Comment[] = [];
   /** Loggen: vad som hänt med posterna, vem och när. Skrivs av lagret vid varje ändring, ligger utanför ångra-historiken, och finns kvar om en post tas bort (visas inte medan den saknas). */
   protected activity: Activity[] = [];
+  /** Projektstatus: historik över hälsa och text per projekt (den senaste gäller). Utanför ångra-historiken, tas bort med projektet. */
+  protected statusUpdates: StatusUpdate[] = [];
   private activityCount = new Map<string, number>();
   /** Den som gör ändringarna just nu (sätts av appen från "Skriv som"). Tomt namn visas som okänd. */
   actor: { id: string | null; name: string } = { id: null, name: "" };
@@ -235,11 +239,12 @@ export class MemoryStore implements DataStore {
     const now = this.snapshot();
     const target = applyPatch(now, patch);
     to.push(makePatch(target, now)); // från målläget tillbaka till nuläget, för att kunna gå åt andra hållet
-    const seq = this.seq, projectSeq = this.projectSeq, counters = this.counters, comments = this.comments, activity = this.activity;
+    const seq = this.seq, projectSeq = this.projectSeq, counters = this.counters, comments = this.comments, activity = this.activity, statusUpdates = this.statusUpdates;
     const was = new Map(this.items);
     this.logBase = new Map(); this.direct = new Set();
     this.restore(target);
     this.comments = comments; // Ångra och Gör om rör aldrig kommentarerna
+    this.statusUpdates = statusUpdates; // projektstatusen också
     this.activity = activity; this.rebuildActivityCount(); // och loggen står kvar, med själva Ångra som nya rader
     for (const [id, after] of this.items) { // vad Ångra eller Gör om ändrade, i loggen
       const before = was.get(id);
@@ -273,6 +278,7 @@ export class MemoryStore implements DataStore {
       counters: Object.fromEntries(this.counters),
       comments: this.comments,
       activity: this.activity,
+      status_updates: this.statusUpdates,
     };
   }
 
@@ -285,6 +291,7 @@ export class MemoryStore implements DataStore {
     this.seq = snap.seq;
     this.comments = (snap.comments ?? []).map((c) => ({ ...c }));
     this.activity = (snap.activity ?? []).map((a) => ({ ...a })); this.rebuildActivityCount();
+    this.statusUpdates = (snap.status_updates ?? []).map((u) => ({ ...u }));
     this.projectSeq = snap.project_seq ?? 0;
     this.counters = new Map();
     for (const [pid, c] of Object.entries(snap.counters ?? {})) if (this.projects.has(pid) && validCounters(c)) this.counters.set(pid, { ...c });
@@ -420,6 +427,7 @@ export class MemoryStore implements DataStore {
     this.counters.delete(id);
     this.comments = this.comments.filter((c) => c.project_id !== id);
     this.activity = this.activity.filter((a) => a.project_id !== id); this.rebuildActivityCount();
+    this.statusUpdates = this.statusUpdates.filter((u) => u.project_id !== id);
     this.writes.push({ method: "deleteProject", args: [id] });
     this.commit(true);
   }
@@ -544,6 +552,27 @@ export class MemoryStore implements DataStore {
     this.comments = this.comments.filter((c) => c.id !== id && c.parent_id !== id);
     this.commit();
     return before - this.comments.length;
+  }
+  /** Alla projektens statusuppdateringar, äldst först. */
+  async listStatusUpdates(): Promise<StatusUpdate[]> {
+    await this.tick("listStatusUpdates");
+    return this.statusUpdates.filter((u) => this.projects.has(u.project_id)).map((u) => ({ ...u })).sort((a, b) => (a.at < b.at ? -1 : a.at > b.at ? 1 : a.id < b.id ? -1 : 1));
+  }
+  /** En ny statusuppdatering: hälsa och (valfri) text, av den som är vald nu. Den senaste gäller som projektets status. */
+  async addStatusUpdate(input: { project_id: string; health: ProjectHealth; text: string; at?: string; actor_name?: string }): Promise<StatusUpdate> {
+    await this.tick("addStatusUpdate");
+    const project = this.projects.get(input.project_id);
+    if (!project) throw new RuleError("not_found", "Projektet finns inte");
+    if (!PROJECT_HEALTH.includes(input.health)) throw new RuleError("bad_health", "Ogiltig projektstatus");
+    const text = input.text.trim();
+    if (text.length > STATUS_UPDATE_LIMITS.text) throw new RuleError("update_too_long", `Texten är längre än ${STATUS_UPDATE_LIMITS.text} tecken`);
+    this.seq += 1;
+    const u: StatusUpdate = { id: `s_new${this.seq}`, workspace_id: project.workspace_id, project_id: project.id, at: input.at ?? new Date().toISOString(), actor_id: input.actor_name === undefined ? this.actor.id : null, actor_name: input.actor_name ?? this.actor.name, health: input.health, text };
+    this.statusUpdates = [...this.statusUpdates, u];
+    const mine = this.statusUpdates.filter((x) => x.project_id === project.id);
+    if (mine.length > STATUS_UPDATE_LIMITS.perProject) { const drop = mine[0].id; this.statusUpdates = this.statusUpdates.filter((x) => x.id !== drop); }
+    this.commit();
+    return { ...u };
   }
   /** Loggen för ett projekts poster (de som finns), äldst först. */
   async listActivity(projectId: string): Promise<Activity[]> {

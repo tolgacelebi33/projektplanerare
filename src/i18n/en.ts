@@ -75,6 +75,7 @@ export const enDict: Dict = {
     xlsxBroken: "The Excel file could not be read. Save it as .xlsx (not .xls) and try again.",
     xlsxSheet: (sheet: string, others: number, _names: string) => `Read the sheet "${sheet}". ${others} other sheets in the file were not imported.`,
     depType: (n: number, t: string) => `Dependency ${n}: unknown type "${t}".`, depLag: (n: number, max: number) => `Dependency ${n}: the lag must be a whole number between -${max} and ${max} days.`,
+    statusUpdateShape: (n: number) => `Status update ${n} has no valid status or time.`,
     activityShape: (n: number) => `Log entry ${n} has no item, kind or time.`,
     commentSkipped: "A comment could not be added and was skipped.",
     commentShape: (n: number) => `Comment ${n} has no item, id or text.`, commentBad: (n: number, why: string) => `Comment ${n}: ${why}`,
@@ -223,6 +224,10 @@ export const enDict: Dict = {
     title: "Search and commands", placeholder: "Search items, projects or type a command...", results: "Results", items: "Items", projects: "Projects", commands: "Commands", none: "No results.", loading: "Loading...",
     hint: "Arrow up and down selects, Enter opens, Esc closes.", button: "Search", buttonHint: "Search everywhere and run commands (Cmd/Ctrl + K)",
     cmd: { newTask: "New task", newMilestone: "New milestone", newGroup: "New group", newSeries: "New recurring milestone", viewGantt: "Show Gantt", viewWheel: "Show Year wheel", viewBoard: "Show Board", today: "Go to today", undo: "Undo", redo: "Redo", settings: "Open settings", help: "Open help", backup: "Save backup", export: "Export the project (JSON)" },
+  },
+  health: {
+    labels: { on_track: "On track", at_risk: "At risk", off_track: "Off track", on_hold: "On hold", done: "Done" }, none: "No status", hint: "The status of the project. Click to update and see the history.",
+    title: (n: string) => `Project status: ${n}`, status: "Status", text: "What has happened? (optional)", placeholder: "A few lines about the situation, risks or decisions...", publish: "Publish update", history: "Earlier updates", noHistory: "No updates yet.", close: "Close", lastUpdate: "Latest update",
   },
   settings: {
     button: "Settings", title: "Settings",

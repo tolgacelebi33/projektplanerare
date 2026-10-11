@@ -1,3 +1,4 @@
+import { HealthChip } from "./StatusDialog";
 import { useRef, useState } from "react";
 import type { ExportFormat } from "../data/importExport";
 import type { DependencyMode, Project } from "../data/types";
@@ -6,7 +7,9 @@ import { sv } from "../i18n/sv";
 type Mode = "idle" | "new" | "rename" | "remove";
 
 /** Projektval med nytt, byt namn och ta bort (med bekräftelse). Fel visas i raden. */
-export function ProjectBar({ projects, projectId, itemCount, onSelect, onCreate, onRename, onRemove, onDependencyMode, onDuplicate, onExport, onImport }: {
+export function ProjectBar({ health, onHealth, projects, projectId, itemCount, onSelect, onCreate, onRename, onRemove, onDependencyMode, onDuplicate, onExport, onImport }: {
+  /** Projektets status (senaste uppdateringen) och att öppna statusdialogen. */
+  health?: import("../data/types").ProjectHealth | null; onHealth?: () => void;
   projects: Project[]; projectId: string | null; itemCount: number;
   onSelect: (id: string) => void; onCreate: (name: string) => Promise<unknown>; onRename: (id: string, name: string) => Promise<unknown>; onRemove: (id: string) => Promise<unknown>; onDependencyMode: (id: string, mode: DependencyMode) => Promise<unknown>;
   onDuplicate: () => Promise<unknown>; onExport: (format: ExportFormat) => Promise<unknown>; onImport: (file: File, into: boolean) => Promise<unknown>;
@@ -51,6 +54,7 @@ export function ProjectBar({ projects, projectId, itemCount, onSelect, onCreate,
             {projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
           </select>
         )}
+        {current && onHealth && <HealthChip health={health ?? null} onClick={onHealth} />}
         {current?.code && <span className="code-tag" title={sv.project.codeHint}>{current.code}</span>}
         <button type="button" className="mini" onClick={() => { setName(""); setMode("new"); }}>{sv.project.new}</button>
         {current && <button type="button" className="mini" onClick={() => { setName(current.name); setMode("rename"); }}>{sv.project.rename}</button>}
