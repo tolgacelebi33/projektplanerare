@@ -229,9 +229,19 @@ export const enDict: Dict = {
     labels: { on_track: "On track", at_risk: "At risk", off_track: "Off track", on_hold: "On hold", done: "Done" }, none: "No status", hint: "The status of the project. Click to update and see the history.",
     title: (n: string) => `Project status: ${n}`, status: "Status", text: "What has happened? (optional)", placeholder: "A few lines about the situation, risks or decisions...", publish: "Publish update", history: "Earlier updates", noHistory: "No updates yet.", close: "Close", lastUpdate: "Latest update",
   },
+  reminders: {
+    tab: "Reminders", intro: "Reminders about what is overdue, due today or due tomorrow (items that are not done and have a real date), in all projects.", banner: "Show a line at the top", bannerHint: "A line with counts and a button to My week. Later hides it for the rest of the day.",
+    os: "System notification", osHint: "The browser asks for permission. One notification per day, while the app is open or installed and running.", scope: "Applies to", scopeAll: "All items", scopeMine: "Only mine (the person chosen as Write as)",
+    limit: "Reminders are not sent while the app is closed. That is not possible without a server.", unsupported: "This browser does not support system notifications.", denied: "The browser did not allow notifications. Change it in the browser settings for the site.",
+    bar: (o: number, t: number, m: number) => [o ? `${o} overdue` : "", t ? `${t} due today` : "", m ? `${m} due tomorrow` : ""].filter(Boolean).join(", "), show: "Show", later: "Later", osTitle: "Projektplanerare",
+  },
+  pwa: {
+    title: "Install as an app", intro: "The app can be installed on the phone and the computer and then starts in its own window, even without a network (the data is in the browser on that device).", install: "Install the app", installed: "The app is installed on this device.",
+    manual: "Install from the browser menu (Chrome and Edge: Install app). On iPhone: Share and then Add to Home Screen.",
+  },
   settings: {
     button: "Settings", title: "Settings",
-    tabs: { label: "Settings, sections", list: "List view", board: "Board view", views: "More views", item: "Item", rules: "Rules", people: "People", backup: "Backup", start: "Start", touch: "Touch screen", info: "Information and help" },
+    tabs: { label: "Settings, sections", list: "List view", board: "Board view", views: "More views", item: "Item", rules: "Rules", people: "People", reminders: "Reminders", backup: "Backup", start: "Start", touch: "Touch screen", info: "Information and help" },
     people: { intro: "The people you can choose as assignee. A name changes right away. If a person is removed, their items have no assignee in any project.", nameOf: (n: string) => `Name: ${n}`, newName: "Name of new person", add: "Add", remove: "Remove", confirm: (n: string) => `Remove ${n}? The items will have no assignee in any project and the undo history is cleared.`, confirmYes: "Remove", cancel: "Cancel", none: "No people yet.", removed: (n: number) => `The person was removed. ${n} items now have no assignee.` },
     rulesIntro: "A few fixed rules that apply to all items. All are off by default.",
     rules: { doneSetsProgress: "When status becomes Done, set progress to 100", doneSetsProgressHint: "Applies to tasks and milestones. If progress is changed in the same edit (for example in the panel) that value is kept.", seriesNext: "When an occurrence in a series is done, create the next one after the last", seriesNextHint: "The series keeps going on its own, with the same repetition. A series has at most 120 occurrences." },

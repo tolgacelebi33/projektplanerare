@@ -234,9 +234,19 @@ export const svDict = {
     labels: { on_track: "På spåret", at_risk: "Risk", off_track: "Försenat", on_hold: "Pausat", done: "Klart" }, none: "Ingen status", hint: "Projektets status. Klicka för att uppdatera och se historiken.",
     title: (n: string) => `Projektstatus: ${n}`, status: "Status", text: "Vad har hänt? (valfritt)", placeholder: "Några rader om läget, risker eller beslut...", publish: "Publicera uppdatering", history: "Tidigare uppdateringar", noHistory: "Inga uppdateringar än.", close: "Stäng", lastUpdate: "Senaste uppdatering",
   },
+  reminders: {
+    tab: "Påminnelser", intro: "Påminnelser om det som är försenat, förfaller idag eller förfaller imorgon (poster som inte är klara och har riktigt datum), i alla projekt.", banner: "Visa en rad högst upp", bannerHint: "En rad med antal och en knapp till Min vecka. Senare döljer den resten av dagen.",
+    os: "Systemnotis", osHint: "Webbläsaren frågar om lov. En notis per dag, när appen är öppen eller installerad och igång.", scope: "Gäller", scopeAll: "Alla poster", scopeMine: "Bara mina (den som är vald som Skriv som)",
+    limit: "Påminnelserna skickas inte när appen är stängd. Det går inte utan en server.", unsupported: "Den här webbläsaren stöder inte systemnotiser.", denied: "Webbläsaren tillät inte notiser. Ändra det i webbläsarens inställningar för sidan.",
+    bar: (o: number, t: number, m: number) => [o ? `${o} försenade` : "", t ? `${t} förfaller idag` : "", m ? `${m} förfaller imorgon` : ""].filter(Boolean).join(", "), show: "Visa", later: "Senare", osTitle: "Projektplanerare",
+  },
+  pwa: {
+    title: "Installera som app", intro: "Appen går att installera på telefonen och datorn och startar då i eget fönster, även utan nät (datan finns i webbläsaren på den enheten).", install: "Installera appen", installed: "Appen är installerad på den här enheten.",
+    manual: "Installera från webbläsarens meny (Chrome och Edge: Installera app). På iPhone: Dela och sedan Lägg till på hemskärmen.",
+  },
   settings: {
     button: "Inställningar", title: "Inställningar",
-    tabs: { label: "Inställningar, avsnitt", list: "Listvy", board: "Boardvy", views: "Fler vyer", item: "Posten", rules: "Regler", people: "Personer", backup: "Säkerhetskopia", start: "Start", touch: "Pekskärm", info: "Information och hjälp" },
+    tabs: { label: "Inställningar, avsnitt", list: "Listvy", board: "Boardvy", views: "Fler vyer", item: "Posten", rules: "Regler", people: "Personer", reminders: "Påminnelser", backup: "Säkerhetskopia", start: "Start", touch: "Pekskärm", info: "Information och hjälp" },
     people: { intro: "Personerna du kan välja som ansvarig. Ett namn ändras direkt. Tas en person bort blir hens poster utan ansvarig i alla projekt.", nameOf: (n: string) => `Namn: ${n}`, newName: "Namn på ny person", add: "Lägg till", remove: "Ta bort", confirm: (n: string) => `Ta bort ${n}? Posterna blir utan ansvarig i alla projekt och ångra-historiken töms.`, confirmYes: "Ta bort", cancel: "Avbryt", none: "Inga personer än.", removed: (n: number) => `Personen togs bort. ${n} poster blev utan ansvarig.` },
     rulesIntro: "Några fasta regler som gäller alla poster. Alla är av som standard.",
     rules: { doneSetsProgress: "När status blir Klar, sätt framsteg till 100", doneSetsProgressHint: "Gäller uppgifter och milstolpar. Ändras framsteget i samma ändring (till exempel i panelen) står det värdet kvar.", seriesNext: "När ett tillfälle i en serie blir klart, skapa nästa efter det sista", seriesNextHint: "Serien fortsätter framåt av sig själv, med samma upprepning. En serie har högst 120 tillfällen." },

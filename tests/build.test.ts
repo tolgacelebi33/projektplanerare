@@ -16,5 +16,12 @@ describe("bygge", () => {
     const html = readFileSync("dist/index.html", "utf8");
     expect(html).toContain("<title>Projektplanerare</title>");
     expect(html).not.toMatch(/localhost|127\.0\.0\.1/);
+    // installera som app: manifest, tjänstefil och ikoner följer med bygget
+    expect(html).toContain('rel="manifest"');
+    const manifest = JSON.parse(readFileSync("dist/manifest.webmanifest", "utf8"));
+    expect(manifest.display).toBe("standalone");
+    for (const icon of manifest.icons) expect(existsSync(`dist${icon.src}`), icon.src).toBe(true);
+    expect(readFileSync("dist/sw.js", "utf8")).toContain("addEventListener");
+    expect(existsSync("dist/icons/apple-touch-icon.png")).toBe(true);
   }, 120_000);
 });

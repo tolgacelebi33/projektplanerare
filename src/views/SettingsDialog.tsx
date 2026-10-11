@@ -4,15 +4,16 @@ import type { FieldDef, User } from "../data/types";
 import { sv } from "../i18n/sv";
 
 /** Inställningar: ändras direkt och sparas i webbläsaren. Esc, Stäng eller klick utanför stänger. */
-const TABS = ["list", "board", "views", "item", "rules", "people", "start", "touch", "backup", "info"] as const;
+const TABS = ["list", "board", "views", "item", "rules", "reminders", "people", "start", "touch", "backup", "info"] as const;
 type Tab = (typeof TABS)[number];
 const KEYS = ["N", "M", "G", "/", "Cmd/Ctrl + K", "T", "1, 2, 3", "?", "Cmd/Ctrl + Z", "Cmd/Ctrl + Shift + Z, Cmd/Ctrl + Y", "Alt + ↑ / ↓", "Esc"]; // samma på alla språk, texterna står i ordlistan i samma ordning
 const TAB0_KEY = "projektplanerare.settingsTab";
 
+export interface InstallApi { available: boolean; installed: boolean; onInstall: () => void }
 export interface BackupApi { lastSaved: string | null; onSave: () => Promise<string>; onRestoreFile: (file: File) => Promise<void> }
 export interface PeopleApi { users: User[]; onAdd: (name: string) => Promise<void>; onRename: (id: string, name: string) => Promise<void>; onRemove: (id: string) => Promise<number> }
 
-export function SettingsDialog({ fieldDefs = [], settings, people, backup, onChange, onClose }: { fieldDefs?: FieldDef[]; settings: Settings; people?: PeopleApi; backup?: BackupApi; onChange: (s: Settings) => void; onClose: () => void }) {
+export function SettingsDialog({ fieldDefs = [], settings, people, backup, install, onChange, onClose }: { fieldDefs?: FieldDef[]; settings: Settings; people?: PeopleApi; backup?: BackupApi; install?: InstallApi; onChange: (s: Settings) => void; onClose: () => void }) {
   const root = useRef<HTMLDivElement>(null);
   const [tab, setTab] = useState<Tab>(() => { try { const v = sessionStorage.getItem(TAB0_KEY); return (TABS as readonly string[]).includes(v ?? "") ? (v as Tab) : "list"; } catch { return "list"; } });
   const pick = (t: Tab) => { setTab(t); try { sessionStorage.setItem(TAB0_KEY, t); } catch { /* ignoreras */ } };
@@ -101,6 +102,7 @@ export function SettingsDialog({ fieldDefs = [], settings, people, backup, onCha
               {check(t.rules.doneSetsProgress, t.rules.doneSetsProgressHint, settings.rules.doneSetsProgress, (v) => onChange({ ...settings, rules: { ...settings.rules, doneSetsProgress: v } }))}
               {check(t.rules.seriesNext, t.rules.seriesNextHint, settings.rules.seriesNext, (v) => onChange({ ...settings, rules: { ...settings.rules, seriesNext: v } }))}
             </section>)}
+            {tab === "reminders" && <RemindersTab settings={settings} onChange={onChange} />}
             {tab === "people" && people && <PeopleTab api={people} />}
             {tab === "start" && (<section>
               <div className="modal-row settings-row">
@@ -130,6 +132,9 @@ export function SettingsDialog({ fieldDefs = [], settings, people, backup, onCha
               <dl className="settings-keys">
                 {t.shortcuts.map((d, n) => <div key={KEYS[n]}><dt><kbd>{KEYS[n]}</kbd></dt><dd>{d}</dd></div>)}
               </dl>
+              <h4>{sv.pwa.title}</h4>
+              <p>{sv.pwa.intro}</p>
+              {install?.installed ? <p className="panel-muted">{sv.pwa.installed}</p> : install?.available ? <div><button type="button" className="mini mini-primary" onClick={install.onInstall}>{sv.pwa.install}</button></div> : <p className="panel-muted">{sv.pwa.manual}</p>}
               <div><button type="button" className="mini" onClick={() => { onClose(); window.dispatchEvent(new CustomEvent("pp:help")); }}>{t.openHelp}</button></div>
             </section>)}
           </div>
@@ -216,6 +221,33 @@ function BackupTab({ api, days, onDays }: { api: BackupApi; days: number; onDays
         </select></label>
       <p className="panel-muted">{t.reminderHint}</p>
       {msg && <p role={msg.kind === "error" ? "alert" : "status"} className={msg.kind === "error" ? "people-error" : "panel-muted"}>{msg.text}</p>}
+    </section>
+  );
+}
+
+function RemindersTab({ settings, onChange }: { settings: Settings; onChange: (s: Settings) => void }) {
+  const t = sv.reminders;
+  const r = settings.reminders;
+  const [msg, setMsg] = useState<string | null>(null);
+  const supported = typeof Notification !== "undefined";
+  const set = (patch: Partial<Settings["reminders"]>) => onChange({ ...settings, reminders: { ...r, ...patch } });
+  const toggleOs = async (on: boolean) => {
+    if (!on) { set({ os: false }); setMsg(null); return; }
+    if (!supported) { setMsg(t.unsupported); return; }
+    const p = Notification.permission === "granted" ? "granted" : await Notification.requestPermission();
+    if (p === "granted") { set({ os: true }); setMsg(null); } else setMsg(t.denied);
+  };
+  return (
+    <section>
+      <p className="panel-muted">{t.intro}</p>
+      <label className="settings-check"><input type="checkbox" checked={r.banner} onChange={(e) => set({ banner: e.target.checked })} /><span>{t.banner}<small>{t.bannerHint}</small></span></label>
+      <label className="settings-check"><input type="checkbox" checked={r.os} onChange={(e) => void toggleOs(e.target.checked)} /><span>{t.os}<small>{t.osHint}</small></span></label>
+      <label className="panel-field"><span>{t.scope}</span>
+        <select name="set-remind-scope" value={r.scope} onChange={(e) => set({ scope: e.target.value as "all" | "mine" })}>
+          <option value="all">{t.scopeAll}</option><option value="mine">{t.scopeMine}</option>
+        </select></label>
+      <p className="panel-muted">{t.limit}</p>
+      {msg && <p role="alert" className="people-error">{msg}</p>}
     </section>
   );
 }

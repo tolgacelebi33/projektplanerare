@@ -40,6 +40,7 @@ import { ImportPreview } from "./views/ImportPreview";
 import { BaselineBar } from "./views/BaselineBar";
 import { BackupRestore } from "./views/BackupRestore";
 import { StatusDialog } from "./views/StatusDialog";
+import { dueSummary, type DueSummary } from "./data/reminders";
 import { CommandPalette, type PaletteCommand } from "./views/CommandPalette";
 import { buildBackup, firstSeenAt, lastBackupAt, markBackupSaved, parseBackup, reminderDue, restoreBackup, MAX_BACKUP_BYTES, type BackupSummary } from "./data/backup";
 import { CalendarView } from "./views/CalendarView";
@@ -529,6 +530,40 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
   };
   const [users, setUsers] = useState<User[]>([]);
   const reloadUsers = async () => { setUsers(await store.listUsers()); };
+  // Påminnelser: försenat, idag och imorgon över alla projekt. Läses om vid ändringar (med fördröjning) och var tionde minut, bara medan appen är öppen.
+  const [due, setDue] = useState<DueSummary | null>(null);
+  const [remindDismissed, setRemindDismissed] = useState<string | null>(() => { try { return localStorage.getItem("projektplanerare.remindDismissed"); } catch { return null; } });
+  useEffect(() => {
+    const r = settings.reminders;
+    if (!(r.banner || r.os) || !projects.projects) { setDue(null); return; }
+    let on = true; let timer: ReturnType<typeof setTimeout> | undefined;
+    const run = async () => {
+      try {
+        const data = await Promise.all(projects.projects!.map(async (p) => ({ project: p, items: await store.listItems(p.id) })));
+        if (!on) return;
+        const today = todayISO();
+        const s = dueSummary(data, today, { scope: r.scope, me: settings.me || users[0]?.id || null });
+        setDue(s);
+        if (r.os && s.total > 0 && typeof Notification !== "undefined" && Notification.permission === "granted") {
+          let last: string | null = null; try { last = localStorage.getItem("projektplanerare.remindNotified"); } catch { /* ignoreras */ }
+          if (last !== today) { try { localStorage.setItem("projektplanerare.remindNotified", today); } catch { /* ignoreras */ } new Notification(sv.reminders.osTitle, { body: sv.reminders.bar(s.overdue.length, s.today.length, s.tomorrow.length), tag: "pp-reminder" }); }
+        }
+      } catch { /* påminnelser är en hjälp: ett läsfel ska inte störa */ }
+    };
+    void run();
+    const un = store.subscribe(() => { clearTimeout(timer); timer = setTimeout(() => void run(), 1500); });
+    const iv = setInterval(() => void run(), 10 * 60 * 1000);
+    return () => { on = false; clearTimeout(timer); clearInterval(iv); un(); };
+  }, [store, projects.projects, settings.reminders, settings.me, users]);
+  // Installera som app (Chrome och Edge ger ett installationsförslag som vi sparar tills man trycker på knappen)
+  const [installEvt, setInstallEvt] = useState<(Event & { prompt: () => Promise<void>; userChoice: Promise<unknown> }) | null>(null);
+  const [installed, setInstalled] = useState(() => typeof window !== "undefined" && (window.matchMedia?.("(display-mode: standalone)").matches ?? false));
+  useEffect(() => {
+    const before = (e: Event) => { e.preventDefault(); setInstallEvt(e as never); };
+    const done = () => { setInstalled(true); setInstallEvt(null); };
+    window.addEventListener("beforeinstallprompt", before); window.addEventListener("appinstalled", done);
+    return () => { window.removeEventListener("beforeinstallprompt", before); window.removeEventListener("appinstalled", done); };
+  }, []);
   // Den som gör ändringarna i loggen: vald "Skriv som", annars första personen (som kommentarsrutan)
   useEffect(() => { const u = users.find((x) => x.id === settings.me) ?? users[0]; store.actor = u ? { id: u.id, name: u.name } : { id: null, name: "" }; }, [store, users, settings.me]);
   useEffect(() => { let on = true; void store.listUsers().then((u) => { if (on) setUsers(u); }).catch(() => undefined); return () => { on = false; }; }, [store]);
@@ -774,6 +809,13 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
           onClear={() => { selAnchor.current = null; setSelected(new Set()); }} />
       )}
       {persistent?.loadWarning && <div role="alert" className="notice">{persistent.loadWarning}</div>}
+      {due && settings.reminders.banner && due.total > 0 && remindDismissed !== todayISO() && (
+        <div role="status" className="notice remind-bar" data-part="reminder">
+          {sv.reminders.bar(due.overdue.length, due.today.length, due.tomorrow.length)}
+          <button type="button" className="mini" onClick={() => setView("week")}>{sv.reminders.show}</button>
+          <button type="button" className="mini" onClick={() => { const d = todayISO(); try { localStorage.setItem("projektplanerare.remindDismissed", d); } catch { /* ignoreras */ } setRemindDismissed(d); }}>{sv.reminders.later}</button>
+        </div>
+      )}
       {nag?.due && (
         <div role="status" className="notice backup-nag">
           {nag.never ? sv.backup.nagNever : sv.backup.nag(nag.since)}
@@ -828,7 +870,7 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
       {statusOpen && project && <StatusDialog project={project} updates={statusUpdates} onClose={() => setStatusOpen(false)} onPublish={async (h, t) => { await store.addStatusUpdate({ project_id: project.id, health: h, text: t }); }} />}
       {paletteOpen && <CommandPalette data={paletteData ?? []} loading={paletteData === null} commands={paletteCommands} onClose={() => setPaletteOpen(false)}
         onOpenItem={(pid, iid) => { openInProject(pid, iid); }} onOpenProject={(pid) => { focusMedianOnNextProject(); projects.select(pid); }} />}
-      {settingsOpen && <SettingsDialog fieldDefs={fieldDefs} settings={settings} backup={{ lastSaved: lastBackup, onSave: saveBackupFile, onRestoreFile: pickBackup }} people={{ users, onAdd: async (n) => { await store.addUser(n); await reloadUsers(); }, onRename: async (id, n) => { await store.renameUser(id, n); await reloadUsers(); await refresh(); }, onRemove: async (id) => { const n = await store.removeUser(id); await reloadUsers(); await refresh(); setAttrFilter((f) => ({ ...f, assignees: f.assignees.filter((x) => x !== id) })); return n; } }} onChange={setSettings} onClose={() => setSettingsOpen(false)} />}
+      {settingsOpen && <SettingsDialog fieldDefs={fieldDefs} settings={settings} install={{ available: !!installEvt, installed, onInstall: () => { const e = installEvt; if (!e) return; void e.prompt().then(() => e.userChoice).finally(() => setInstallEvt(null)); } }} backup={{ lastSaved: lastBackup, onSave: saveBackupFile, onRestoreFile: pickBackup }} people={{ users, onAdd: async (n) => { await store.addUser(n); await reloadUsers(); }, onRename: async (id, n) => { await store.renameUser(id, n); await reloadUsers(); await refresh(); }, onRemove: async (id) => { const n = await store.removeUser(id); await reloadUsers(); await refresh(); setAttrFilter((f) => ({ ...f, assignees: f.assignees.filter((x) => x !== id) })); return n; } }} onChange={setSettings} onClose={() => setSettingsOpen(false)} />}
       {backupPreview && <BackupRestore fileName={backupPreview.file} summary={backupPreview.summary} onCancel={() => setBackupPreview(null)} onConfirm={() => void confirmRestore()} />}
       {recurOpen && <RecurringDialog key={recurInit ? "from" : "new"} today={todayISO()} initial={recurInit ?? undefined} onCreate={(a) => void addSeries(a)} onClose={() => setRecurOpen(false)} />}
       {menu && <ContextMenu x={menu.x} y={menu.y} items={menuItems} confirm={confirmRemove} onPick={(id) => void pickMenu(id)} onClose={() => setMenu(null)} />}
