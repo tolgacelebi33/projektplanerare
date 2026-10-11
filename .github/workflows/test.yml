@@ -11,6 +11,11 @@ on:
 permissions:
   contents: read
 
+# Bara den senaste pushen testas: flera körningar samtidigt gör varandra långsamma och ger falska fel.
+concurrency:
+  group: tester-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   test:
     runs-on: ubuntu-latest
