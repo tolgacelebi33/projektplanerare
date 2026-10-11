@@ -70,3 +70,20 @@ test("SR4 boarden visar ett kort för serien, och kalendern visar alla tillfäll
   const cal = page.getByRole("group", { name: "Kalender" });
   for (const i of s) await expect(cal.locator(`.cal-chip[data-id="${i.id}"]`).first()).toBeVisible();
 });
+
+test("SR5 knappen Serier som en rad i listraden slår på och av samma val som inställningen, och är av som standard", async ({ page }) => {
+  const s = (await items(page)).filter((i) => i.series);
+  const btn = page.getByRole("button", { name: "Serier som en rad", exact: true });
+  await expect(btn).toHaveAttribute("aria-pressed", "false");
+  await btn.click();
+  await expect(btn).toHaveAttribute("aria-pressed", "true");
+  await expect.poll(() => modelIds(page).then((ids) => s.filter((i) => ids.includes(i.id)).length)).toBe(1);
+  await expect(page.locator(".series-mark")).toHaveCount(3);
+  await page.getByRole("button", { name: "Inställningar" }).click();
+  const d = page.getByRole("dialog", { name: "Inställningar" });
+  await d.getByRole("tab", { name: "Listvy", exact: true }).click();
+  await expect(d.getByLabel("Visa serier som en rad")).toBeChecked(); // samma val
+  await page.keyboard.press("Escape");
+  await btn.click();
+  await expect.poll(() => modelIds(page).then((ids) => s.filter((i) => ids.includes(i.id)).length)).toBe(4);
+});

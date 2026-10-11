@@ -169,6 +169,7 @@ export const enDict: Dict = {
     button: "+ Recurring milestone...", buttonShort: "+ Recurring...", dialog: "Recurring milestone", name: "Title", defaultTitle: "Maintenance", first: "First date", every: "Repeats", count: "Number of occurrences",
     occurrences: "Occurrences in the series",
     kinds: { weekly: "Every week", biweekly: "Every other week", monthly: "Every month", quarterly: "Every 3 months" },
+    collapseButton: "Series as one row", collapseHint: "Show each recurring series as a single row, with a diamond for every occurrence. Off: every occurrence is its own row that you can move separately.",
     type: "Type", days: "Length (days)", summaryTask: (n: number, first: string, last: string, d: number) => `${n} tasks of ${d} ${d === 1 ? "day" : "days"} each, from ${first} to ${last}. Each occurrence is its own task that you can tick off and move separately.`,
     summary: (n: number, first: string, last: string) => `${n} milestones, from ${first} to ${last}. Each occurrence is its own milestone that you can tick off separately.`,
     max: (n: number) => `At most ${n} occurrences.`, create: "Create", cancel: "Cancel", badDate: "Choose a valid first date.", emptyTitle: "Enter a title.",

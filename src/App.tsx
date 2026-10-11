@@ -816,6 +816,9 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
           <button type="button" className="mini" disabled={!project} onClick={() => setFieldsOpen(true)}>{sv.fields.button}</button>
           <button type="button" className="mini" disabled={!project} onClick={() => setStatusesOpen(true)}>{sv.statuses.button}</button>
           {project && <SavedViews views={savedViews} current={currentView()} onApply={applyView} onSave={saveView} onRemove={removeView} />}
+          {(view === "gantt" || view === "board") && project && state.kind === "ready" && (
+            <button type="button" className="mini" aria-pressed={settings.collapseSeries} title={sv.recur.collapseHint} onClick={() => setSettings({ ...settings, collapseSeries: !settings.collapseSeries })}>{sv.recur.collapseButton}</button>
+          )}
           {view === "gantt" && project && state.kind === "ready" && (
             <button type="button" className="mini" aria-pressed={settings.showCritical} title={sv.critical.hint} onClick={() => setSettings({ ...settings, showCritical: !settings.showCritical })}>{sv.critical.button}</button>
           )}
