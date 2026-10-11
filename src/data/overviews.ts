@@ -1,5 +1,6 @@
 import { addDays, diffDays, weekdayMon0, weekRange } from "./dates";
 import { isOverdue } from "./rules";
+import { peopleOf } from "./actions";
 import type { ISODate, Item, Project, StatusUpdate, User } from "./types";
 
 /** Datumen i en månadsruta: sex veckor (42 dagar) som börjar på måndagen i veckan där månaden börjar, så att höjden aldrig hoppar. `anchor` är en dag i månaden. */
@@ -57,22 +58,36 @@ export function weekSpans(from: ISODate, n: number): WeekSpan[] {
   const s = weekRange(from).start;
   return Array.from({ length: n }, (_, i) => { const a = addDays(s, 7 * i); return { start: a, end: addDays(a, 6) }; });
 }
-export interface WorkloadRow { key: string; name: string; cells: number[]; items: Item[][]; total: number }
+export interface WorkloadRow { key: string; name: string; cells: number[]; items: Item[][]; total: number; /** Timmar per vecka som personen har satt (null: ingen). */ capacity: number | null }
+/** Belastningen räknar uppskattningen i timmar (i stället för antal eller ett eget talfält) när fältet har detta id. */
+export const ESTIMATE_FIELD = "estimate";
 /**
  * Belastning: ansvariga (och "Ingen") mot veckor. Varje post som inte är klar och inte är en grupp räknas i varje vecka den överlappar: som 1, eller, med `fieldId`,
  * som värdet i det egna talfältet (poster utan värde räknas som 0).
  */
 export function workloadTable(items: Item[], users: User[], weeks: WeekSpan[], fieldId?: string): WorkloadRow[] {
   const rows = new Map<string, WorkloadRow>();
-  const row = (key: string, name: string) => { let r = rows.get(key); if (!r) { r = { key, name, cells: weeks.map(() => 0), items: weeks.map(() => []), total: 0 }; rows.set(key, r); } return r; };
-  for (const u of users) row(u.id, u.name);
+  const row = (key: string, name: string, capacity: number | null = null) => { let r = rows.get(key); if (!r) { r = { key, name, cells: weeks.map(() => 0), items: weeks.map(() => []), total: 0, capacity }; rows.set(key, r); } return r; };
+  for (const u of users) row(u.id, u.name, typeof u.capacity === "number" && u.capacity > 0 ? u.capacity : null);
+  const hours = fieldId === ESTIMATE_FIELD;
   for (const i of items) {
     if (i.type === "epic" || i.status === "done") continue;
-    const key = i.assignee_id && users.some((u) => u.id === i.assignee_id) ? i.assignee_id : "";
-    const r = row(key, key ? users.find((u) => u.id === key)!.name : "");
-    const raw = fieldId ? i.fields?.[fieldId] : 1;
-    const v = typeof raw === "number" && Number.isFinite(raw) ? raw : 0;
-    weeks.forEach((w, k) => { if (i.start <= w.end && i.end >= w.start) { r.cells[k] += v; r.items[k].push(i); r.total += v; } });
+    // Alla ansvariga får posten. I timmar delas uppskattningen lika mellan dem och sprids över veckorna i förhållande till hur många dagar posten har i varje vecka
+    const people = peopleOf(i).filter((p) => users.some((u) => u.id === p));
+    const keys = people.length ? people : [""];
+    const days = diffDays(i.start, i.end) + 1;
+    const raw = hours ? i.estimate : fieldId ? i.fields?.[fieldId] : 1;
+    const total = typeof raw === "number" && Number.isFinite(raw) ? raw : 0;
+    for (const key of keys) {
+      const r = row(key, key ? users.find((u) => u.id === key)!.name : "");
+      weeks.forEach((w, k) => {
+        if (!(i.start <= w.end && i.end >= w.start)) return;
+        const overlap = diffDays(i.start > w.start ? i.start : w.start, i.end < w.end ? i.end : w.end) + 1;
+        const v = hours ? (total / keys.length) * (overlap / days) : total;
+        if (hours && v === 0) return;
+        r.cells[k] += v; r.items[k].push(i); r.total += v;
+      });
+    }
   }
   return [...rows.values()].sort((a, b) => (a.key === "" ? 1 : 0) - (b.key === "" ? 1 : 0));
 }

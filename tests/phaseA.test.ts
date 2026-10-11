@@ -87,7 +87,7 @@ describe("boardens kolumner", () => {
 
 describe("inställningar för korten", () => {
   it("standard behåller dagens utseende, och gamla eller trasiga värden ersätts", () => {
-    expect(DEFAULT_SETTINGS.cardFields).toEqual({ date: true, assignee: true, priority: true, description: false, series: true, progress: false, labels: true, checklist: true, links: true, lastUpdate: false, code: false, comments: true });
+    expect(DEFAULT_SETTINGS.cardFields).toEqual({ date: true, assignee: true, priority: true, description: false, series: true, progress: false, labels: true, checklist: true, links: true, lastUpdate: false, code: false, comments: true, estimate: false });
     expect(normalizeSettings({ touch: "on", closeOnEmpty: false })).toMatchObject({ touch: "on", closeOnEmpty: false, quickFilters: true, highlightOverdue: true, boardGroup: "status" });
     expect(normalizeSettings({ cardFields: { description: true, date: "ja" }, boardGroup: "x" })).toMatchObject({ cardFields: { description: true, date: true }, boardGroup: "status" });
     expect(normalizeSettings("skräp")).toEqual(DEFAULT_SETTINGS);

@@ -6,7 +6,10 @@ export type Status = "not_started" | "in_progress" | "done" | "blocked";
 export type Priority = "low" | "normal" | "high" | "urgent";
 
 /** Plats för medlemmar tills fas 4 (auth och roller). Bara id och visningsnamn. */
-export interface User { id: string; name: string }
+export interface User { id: string; name: string; /** Timmar per vecka (för belastningen i timmar). Saknas: ingen kapacitet satt. */ capacity?: number }
+export const MAX_CAPACITY = 168;
+export const ESTIMATE_MAX = 10_000;
+export const MAX_CO_ASSIGNEES = 10;
 
 export interface Workspace { id: string; name: string; created_at: string }
 export interface Membership { workspace_id: string; user_id: string; role: Role }
@@ -124,6 +127,10 @@ export interface Item {
   end: ISODate; // sista dagen (inklusive)
   status: Status;
   assignee_id: string | null;
+  /** Fler ansvariga utöver `assignee_id` (den första). Samma person står aldrig två gånger. */
+  assignees?: string[];
+  /** Uppskattning i timmar (0 till 10 000). Saknas: ingen uppskattning. */
+  estimate?: number | null;
   description: string;
   priority: Priority;
   /** Framsteg i hela procent, 0-100. Fristående från status. */

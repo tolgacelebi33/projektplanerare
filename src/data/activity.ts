@@ -18,6 +18,8 @@ export function describeChange(before: Item | undefined, after: Item | undefined
   if (before.status !== after.status || (before.custom_status ?? null) !== (after.custom_status ?? null)) { const f = statusName(before), t = statusName(after); if (f !== t || before.status !== after.status) out.push({ kind: "changed", field: "status", from: f, to: t }); }
   if (before.priority !== after.priority) out.push({ kind: "changed", field: "priority", from: before.priority, to: after.priority });
   if (before.assignee_id !== after.assignee_id) out.push({ kind: "changed", field: "assignee", from: userName(before.assignee_id), to: userName(after.assignee_id) });
+  if (!same(before.assignees, after.assignees)) out.push({ kind: "changed", field: "assignees", from: (before.assignees ?? []).map((i) => userName(i)).join(", "), to: (after.assignees ?? []).map((i) => userName(i)).join(", ") });
+  if ((before.estimate ?? null) !== (after.estimate ?? null)) out.push({ kind: "changed", field: "estimate", from: before.estimate == null ? "" : String(before.estimate), to: after.estimate == null ? "" : String(after.estimate) });
   if (before.start !== after.start || before.end !== after.end) out.push({ kind: "changed", field: "dates", from: range(before), to: range(after) });
   if (before.progress !== after.progress) out.push({ kind: "changed", field: "progress", from: String(before.progress), to: String(after.progress) });
   if (before.parent_id !== after.parent_id) out.push({ kind: "moved", from: titleOf(before.parent_id), to: titleOf(after.parent_id) });

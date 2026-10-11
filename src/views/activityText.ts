@@ -18,6 +18,8 @@ export function activityText(a: Activity): string {
         case "status": s = t.status(sv.status[(a.from ?? "") as keyof typeof sv.status] ?? a.from ?? "", sv.status[(a.to ?? "") as keyof typeof sv.status] ?? a.to ?? ""); break;
         case "priority": s = t.priority(sv.panel.priorities[(a.from ?? "") as keyof typeof sv.panel.priorities] ?? a.from ?? "", sv.panel.priorities[(a.to ?? "") as keyof typeof sv.panel.priorities] ?? a.to ?? ""); break;
         case "assignee": s = t.assignee(a.from || t.none, a.to || t.none); break;
+        case "assignees": s = t.assignees(a.from || t.none, a.to || t.none); break;
+        case "estimate": s = t.estimate(a.from || t.none, a.to || t.none); break;
         case "dates": s = t.dates(a.from ?? "", a.to ?? ""); break;
         case "progress": s = t.progress(a.from ?? "", a.to ?? ""); break;
         case "description": s = t.description; break;

@@ -170,7 +170,9 @@ export function ItemPanel({ me = "", onMe, baseline, fieldDefs = [], onDuplicate
     setSave({ kind: "saving" });
     try {
       for (const k of ["start", "end"] as const) if (k in changed && !isISODate(String(changed[k]))) throw new RuleError("bad_date", String(changed[k]));
-      validateItemShape({ ...item, ...changed });
+      const cand = { ...item, ...changed } as Item;
+      if (cand.assignees) cand.assignees = cand.assignees.filter((a) => a !== cand.assignee_id); // lagret tar bort den ansvarige ur de andra, så det prövas inte som fel här
+      validateItemShape(cand);
       await store.updateItem(item.id, changed);
       if (currentItem.current === item.id) setFieldError(null);
       await load();
@@ -309,6 +311,20 @@ export function ItemPanel({ me = "", onMe, baseline, fieldDefs = [], onDuplicate
               {users.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
             </select>
           </label>
+          {!epic && (
+            <fieldset className="panel-wide co-assignees" data-section="co-assignees">
+              <legend>{sv.panel.coAssignees}</legend>
+              {users.filter((u) => u.id !== item.assignee_id).length === 0 ? <span className="panel-muted">{sv.panel.noOthers}</span> : users.filter((u) => u.id !== item.assignee_id).map((u) => (
+                <label key={u.id} className="co-option"><input type="checkbox" checked={(item.assignees ?? []).includes(u.id)} onChange={(e) => void commit("assignees", { assignees: e.target.checked ? [...(item.assignees ?? []), u.id] : (item.assignees ?? []).filter((x) => x !== u.id) })} /><span>{u.name}</span></label>
+              ))}
+            </fieldset>
+          )}
+          {!epic && (
+            <label className="panel-field">
+              <span>{sv.panel.estimate}</span>
+              <EstimateInput key={`${item.id}-${item.estimate ?? ""}`} value={item.estimate ?? null} label={sv.panel.estimate} onCommit={(n) => commit("estimate", { estimate: n })} />
+            </label>
+          )}
           {epic ? (
             <p className="panel-muted panel-wide">{sv.panel.epicDates} ({item.start} till {item.end})</p>
           ) : (
@@ -558,4 +574,11 @@ function LagInput({ value, label, onCommit }: { value: number; label: string; on
       <span aria-hidden="true">{sv.panel.depDays}</span>
     </span>
   );
+}
+
+/** Uppskattning i timmar: sparas när fältet lämnas eller vid Enter. Tomt tar bort uppskattningen. */
+function EstimateInput({ value, label, onCommit }: { value: number | null; label: string; onCommit: (n: number | null) => unknown }) {
+  const [v, setV] = useState(value === null ? "" : String(value));
+  const done = () => { const t = v.trim().replace(",", "."); const n = t === "" ? null : Number(t); if (n !== null && !Number.isFinite(n)) { setV(value === null ? "" : String(value)); return; } if (n !== value) void onCommit(n); };
+  return <input type="number" name="estimate" min={0} max={10000} step={0.5} value={v} aria-label={label} onChange={(e) => setV(e.target.value)} onBlur={done} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); (e.target as HTMLInputElement).blur(); } }} />;
 }

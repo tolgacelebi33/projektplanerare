@@ -20,7 +20,8 @@ export const FORMAT = "projektplanerare";
 export const MAX_IMPORT_ITEMS = 5000;
 export const MAX_IMPORT_BYTES = 5_000_000;
 
-export interface ParsedItem extends Omit<Item, "workspace_id" | "project_id" | "assignee_id"> { assignee: string | null }
+/** `assignee` och `assignees` är namn (inte id). */
+export interface ParsedItem extends Omit<Item, "workspace_id" | "project_id" | "assignee_id" | "assignees"> { assignee: string | null; assignees?: string[] }
 /** Vad importen hittade och hur den tolkade det, för förhandsgranskningen innan något läggs in. */
 export interface ImportReport {
   /** Rubrikerna i filen och vad de tolkades som (null för JSON, som inte har kolumner). `as` är en nyckel i ordlistan (ex.colMeaning). */
@@ -91,7 +92,7 @@ export function toParsed(project: Pick<Project, "name" | "dependency_mode"> & Pa
     ...(statusUpdates.length ? { status_updates: statusUpdates.map((u) => ({ at: u.at, actor: u.actor_name || null, health: u.health, text: u.text })) } : {}),
     ...(activity.length ? { activity: activity.filter((a) => ids.has(a.item_id)).map((a) => ({ item: a.item_id, at: a.at, actor: a.actor_name || null, kind: a.kind, ...(a.field ? { field: a.field } : {}), ...(a.from !== undefined ? { from: a.from } : {}), ...(a.to !== undefined ? { to: a.to } : {}), ...(a.other ? { other: a.other } : {}), ...(a.dir ? { dir: a.dir } : {}), ...(a.dep_type ? { dep_type: a.dep_type } : {}), ...(a.lag ? { lag: a.lag } : {}), ...(a.auto ? { auto: true } : {}), ...(a.undo ? { undo: true } : {}) })) } : {}),
     ...(comments.length ? { comments: comments.filter((c) => ids.has(c.item_id)).map((c) => ({ id: c.id, item: c.item_id, ...(c.parent_id ? { parent: c.parent_id } : {}), author: (c.author_id ? name.get(c.author_id) : undefined) ?? (c.author_name || null), text: c.text, at: c.created_at, ...(c.edited_at ? { edited: c.edited_at } : {}) })) } : {}),
-    items: items.map(({ workspace_id: _w, project_id: _p, assignee_id, ...rest }) => ({ ...rest, assignee: assignee_id ? name.get(assignee_id) ?? null : null })),
+    items: items.map(({ workspace_id: _w, project_id: _p, assignee_id, assignees, ...rest }) => ({ ...rest, assignee: assignee_id ? name.get(assignee_id) ?? null : null, ...(assignees?.length ? { assignees: assignees.map((a) => name.get(a)).filter((n): n is string => !!n) } : {}) })),
     deps: deps.filter((d) => ids.has(d.from_item_id) && ids.has(d.to_item_id)).map((d) => ({ from: d.from_item_id, to: d.to_item_id, ...(d.type !== "finish_to_start" ? { type: d.type } : {}), ...(d.lag ? { lag: d.lag } : {}) })),
     warnings: [],
   };
@@ -160,6 +161,8 @@ export function parseJson(text: string): ParsedProject {
       ...(Array.isArray(x.log) ? { log: x.log as Item["log"] } : {}),
       ...(isObj(x.fields) ? { fields: x.fields as Item["fields"] } : {}),
       ...(typeof x.ref === "string" && x.ref ? { ref: x.ref.slice(0, 60) } : typeof x.code === "string" && x.code ? { ref: x.code.slice(0, 60) } : {}),
+      ...(Array.isArray(x.assignees) ? { assignees: (x.assignees as unknown[]).filter((a): a is string => typeof a === "string" && !!a.trim()).slice(0, 10) } : {}),
+      ...(typeof x.estimate === "number" ? { estimate: x.estimate } : {}),
       ...(typeof x.custom_status === "string" && x.custom_status ? { custom_status: x.custom_status.slice(0, 40) } : {}),
       ...(typeof x.series === "string" && x.series ? { series: x.series } : {}),
       ...(typeof x.recur === "string" ? { recur: x.recur as ParsedItem["recur"] } : {}),
@@ -255,7 +258,7 @@ export function toCsv(p: ParsedProject): string {
   for (const d of p.deps) preds.set(d.to, [...(preds.get(d.to) ?? []), predCell(d)]);
   const rows = treeOrder(p.items).map((i) => [
     i.id, sv.panel.type[i.type], i.title, i.parent_id ?? "", i.start, i.type === "milestone" ? i.start : i.end, (i.custom_status ? p.statuses?.find((d) => d.id === i.custom_status)?.name : undefined) ?? sv.status[i.status], i.assignee ?? "",
-    sv.panel.priorities[i.priority], String(i.progress), i.description, (preds.get(i.id) ?? []).join(", "), i.code ?? "",
+    sv.panel.priorities[i.priority], String(i.progress), i.description, (preds.get(i.id) ?? []).join(", "), i.code ?? "", (i.assignees ?? []).join("; "), i.estimate == null ? "" : String(i.estimate),
   ]);
   return "﻿" + [[...sv.ex.header], ...rows].map((r) => r.map(cell).join(";")).join("\r\n") + "\r\n";
 }
@@ -296,6 +299,8 @@ const ALIASES: Record<string, string[]> = {
   end: ["slut", "slutdatum", "end", "enddate", "due", "duedate", "deadline", "förfallodatum", "finish", "till", "to"],
   status: ["status", "state", "tillstånd"],
   assignee: ["ansvarig", "assignee", "assignedto", "owner", "ägare", "responsible"],
+  assignees: ["medansvariga", "övrigaansvariga", "coassignees", "collaborators", "assignees"],
+  estimate: ["uppskattning", "uppskattning(h)", "uppskattningh", "uppskattningtimmar", "estimate", "estimate(h)", "estimatehours"],
   priority: ["prioritet", "priority", "prio"],
   progress: ["framsteg", "progress", "progresspercent", "complete", "percentcomplete", "%complete", "färdig"],
   description: ["beskrivning", "description", "notes", "anteckningar", "details", "kommentar"],
@@ -505,6 +510,8 @@ export function parseRows(rows: string[][], name: string, today: string = todayI
     const it: ParsedItem = {
       id: get(r, "id") || `rad${line}`, parent_id: null, type, title, start, end, status,
       assignee: get(r, "assignee") || null, description, priority, progress, sort_order: idx + 1,
+      ...(get(r, "assignees") ? { assignees: get(r, "assignees").split(/\s*[;|/]\s*/).map((x) => x.trim()).filter(Boolean).slice(0, 10) } : {}),
+      ...(get(r, "estimate") && Number.isFinite(Number(get(r, "estimate").replace(",", "."))) && Number(get(r, "estimate").replace(",", ".")) >= 0 && Number(get(r, "estimate").replace(",", ".")) <= 10000 ? { estimate: Number(get(r, "estimate").replace(",", ".")) } : {}),
       ...(labels.length ? { labels } : {}), ...(links.length ? { links } : {}), ...(checklist.length ? { checklist } : {}),
       ...(Object.keys(cf).length ? { fields: cf } : {}),
       ...(get(r, "code") ? { ref: get(r, "code").slice(0, 60) } : {}),

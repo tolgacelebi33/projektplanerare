@@ -1,5 +1,5 @@
 import { isISODate, dayNumber, addDays, diffDays } from "./dates";
-import { COMMENT_LIMITS, STATUS_LIMITS, type StatusDef, type Baseline, MAX_BASELINE_ITEMS, DEPENDENCY_TYPES, FIELD_LIMITS, FIELD_TYPES, GROUP_COLORS, LIMITS, MAX_LAG, RECURRENCES, type FieldDef, type SavedView, type Dependency, type Item, type Status } from "./types";
+import { ESTIMATE_MAX, MAX_CO_ASSIGNEES, COMMENT_LIMITS, STATUS_LIMITS, type StatusDef, type Baseline, MAX_BASELINE_ITEMS, DEPENDENCY_TYPES, FIELD_LIMITS, FIELD_TYPES, GROUP_COLORS, LIMITS, MAX_LAG, RECURRENCES, type FieldDef, type SavedView, type Dependency, type Item, type Status } from "./types";
 
 export class RuleError extends Error {
   constructor(public code: string, message: string, public data?: Record<string, string>) {
@@ -34,6 +34,8 @@ export function validateItemShape(item: Item): void {
   if (item.board_rank !== undefined && item.board_rank !== null && !Number.isFinite(item.board_rank)) throw new RuleError("bad_rank", `Ogiltig plats i boarden: ${String(item.board_rank)}`);
   for (const k of ["code", "ref"] as const) if (item[k] !== undefined && (typeof item[k] !== "string" || (item[k] as string).length > 60)) throw new RuleError("bad_code", `Ogiltig ${k}`);
   validateExtras(item);
+  if (item.assignees !== undefined && (!Array.isArray(item.assignees) || item.assignees.length > MAX_CO_ASSIGNEES || item.assignees.some((a) => typeof a !== "string" || !a) || new Set(item.assignees).size !== item.assignees.length || (item.assignee_id !== null && item.assignees.includes(item.assignee_id)))) throw new RuleError("bad_assignees", `Högst ${MAX_CO_ASSIGNEES} fler ansvariga, och samma person bara en gång`);
+  if (item.estimate !== undefined && item.estimate !== null && (typeof item.estimate !== "number" || !Number.isFinite(item.estimate) || item.estimate < 0 || item.estimate > ESTIMATE_MAX)) throw new RuleError("bad_estimate", `Uppskattningen ska vara 0 till ${ESTIMATE_MAX} timmar`);
   if (item.custom_status !== undefined && item.custom_status !== null && (typeof item.custom_status !== "string" || !item.custom_status || item.custom_status.length > 40)) throw new RuleError("bad_custom_status", "Ogiltig egen status");
   if (item.undated !== undefined && typeof item.undated !== "boolean") throw new RuleError("bad_undated", "Ogiltigt värde för ej schemalagd");
   if (item.recur !== undefined && item.recur !== null && !RECURRENCES.includes(item.recur)) throw new RuleError("bad_recur", `Ogiltig upprepning: ${String(item.recur)}`);

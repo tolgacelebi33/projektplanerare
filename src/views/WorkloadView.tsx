@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { addDays } from "../data/dates";
-import { weekSpans, workloadTable } from "../data/overviews";
+import { ESTIMATE_FIELD, weekSpans, workloadTable } from "../data/overviews";
 import type { FieldDef, Item, User } from "../data/types";
 import { sv } from "../i18n/sv";
 
@@ -15,12 +15,13 @@ export function WorkloadView({ items, users, fieldDefs, fieldId, cap, today, onO
   const [pick, setPick] = useState<{ row: string; week: number } | null>(null);
   const def = fieldDefs.find((d) => d.id === fieldId && d.type === "number");
   const weeks = useMemo(() => weekSpans(from, WEEKS), [from]);
-  const rows = useMemo(() => workloadTable(items, users, weeks, def?.id), [items, users, weeks, def?.id]);
+  const hours = fieldId === ESTIMATE_FIELD;
+  const rows = useMemo(() => workloadTable(items, users, weeks, hours ? ESTIMATE_FIELD : def?.id), [items, users, weeks, def?.id, hours]);
   const num = (n: number) => String(Math.round(n * 10) / 10);
   const picked = pick ? rows.find((r) => r.key === pick.row) : null;
   return (
     <div className="workload" role="group" aria-label={sv.ov.workload}>
-      <p className="panel-muted">{t.intro} {def ? t.sumOf(def.name) : t.count}. {cap > 0 ? `${t.over}: > ${cap}.` : ""}</p>
+      <p className="panel-muted">{hours ? t.introHours : t.intro} {hours ? t.hours : def ? t.sumOf(def.name) : t.count}. {hours ? t.capacityHint : cap > 0 ? `${t.over}: > ${cap}.` : ""}</p>
       <div className="cal-head">
         <button type="button" className="mini" aria-label={t.back} onClick={() => { setFrom((f) => addDays(f, -28)); setPick(null); }}>{"‹"}</button>
         <button type="button" className="mini" onClick={() => { setFrom(today); setPick(null); }}>{sv.ov.today}</button>
@@ -32,9 +33,10 @@ export function WorkloadView({ items, users, fieldDefs, fieldId, cap, today, onO
           <tbody>
             {rows.map((r) => (
               <tr key={r.key || "__none"}>
-                <th scope="row">{r.name || t.none}</th>
+                <th scope="row">{r.name || t.none}{hours && r.capacity ? <span className="panel-muted wl-cap"> {t.capacityOf(r.capacity)}</span> : null}</th>
                 {r.cells.map((c, k) => {
-                  const high = cap > 0 && c > cap;
+                  const limit = hours ? r.capacity ?? 0 : cap;
+                  const high = limit > 0 && c > limit;
                   return (
                     <td key={weeks[k].start} className={`${c === 0 ? "zero" : ""}${high ? " over" : ""}${pick?.row === r.key && pick.week === k ? " picked" : ""}`}>
                       {c > 0 ? <button type="button" className="wl-cell" aria-label={t.cell(num(c), r.name || t.none, weeks[k].start)} title={high ? t.over : undefined} onClick={() => setPick(pick?.row === r.key && pick.week === k ? null : { row: r.key, week: k })}>{num(c)}{high ? <span className="wl-flag" aria-hidden="true"> {"▲"}</span> : null}</button> : <span aria-hidden="true">{"·"}</span>}

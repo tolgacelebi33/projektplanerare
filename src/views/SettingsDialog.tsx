@@ -11,7 +11,7 @@ const TAB0_KEY = "projektplanerare.settingsTab";
 
 export interface InstallApi { available: boolean; installed: boolean; onInstall: () => void }
 export interface BackupApi { lastSaved: string | null; onSave: () => Promise<string>; onRestoreFile: (file: File) => Promise<void> }
-export interface PeopleApi { users: User[]; onAdd: (name: string) => Promise<void>; onRename: (id: string, name: string) => Promise<void>; onRemove: (id: string) => Promise<number> }
+export interface PeopleApi { users: User[]; onCapacity: (id: string, hours: number | null) => Promise<void>; onAdd: (name: string) => Promise<void>; onRename: (id: string, name: string) => Promise<void>; onRemove: (id: string) => Promise<number> }
 
 export function SettingsDialog({ fieldDefs = [], settings, people, backup, install, onChange, onClose }: { fieldDefs?: FieldDef[]; settings: Settings; people?: PeopleApi; backup?: BackupApi; install?: InstallApi; onChange: (s: Settings) => void; onClose: () => void }) {
   const root = useRef<HTMLDivElement>(null);
@@ -79,6 +79,7 @@ export function SettingsDialog({ fieldDefs = [], settings, people, backup, insta
                 <label className="panel-field"><span>{t.workloadField}</span>
                   <select name="set-wlfield" value={settings.workloadField} onChange={(e) => set("workloadField", e.target.value)}>
                     <option value="">{sv.ov.work.count}</option>
+                    <option value="estimate">{sv.ov.work.hours}</option>
                     {fieldDefs.filter((d) => d.type === "number").map((d) => <option key={d.id} value={d.id}>{sv.ov.work.sumOf(d.name)}</option>)}
                   </select></label>
                 <label className="panel-field"><span>{t.workloadCap}</span>
@@ -183,6 +184,11 @@ function PeopleTab({ api }: { api: PeopleApi }) {
                 <input aria-label={t.nameOf(u.name)} value={draft[u.id] ?? u.name} maxLength={60}
                   onChange={(e) => setDraft((d) => ({ ...d, [u.id]: e.target.value }))} onBlur={() => void commitName(u)}
                   onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); void commitName(u); } else if (e.key === "Escape" && draft[u.id] !== undefined) { e.stopPropagation(); setDraft((d) => { const n = { ...d }; delete n[u.id]; return n; }); } }} />
+                <label className="people-cap"><span className="sr-only">{t.capacityOf(u.name)}</span>
+                  <input type="number" min={0} max={168} step={1} placeholder={t.capacityShort} aria-label={t.capacityOf(u.name)} title={t.capacityHint} defaultValue={u.capacity ?? ""} key={`${u.id}-${u.capacity ?? ""}`}
+                    onBlur={(e) => { const v = e.target.value.trim(); const n = v === "" ? null : Number(v); if ((n ?? null) !== (u.capacity ?? null)) void run(() => api.onCapacity(u.id, n)); }}
+                    onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); (e.target as HTMLInputElement).blur(); } }} />
+                  <span aria-hidden="true">{t.capacityUnit}</span></label>
                 <button type="button" className="mini" aria-label={`${t.remove} ${u.name}`} onClick={() => { setMsg(null); setConfirmId(u.id); }}>{t.remove}</button>
               </>
             )}

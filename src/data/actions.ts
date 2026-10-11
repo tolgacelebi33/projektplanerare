@@ -118,10 +118,10 @@ export function filterView(items: Item[], deps: Dependency[], f: ViewFilter): { 
       if (f.hideDone && i.status === "done") continue;
       if (f.statuses?.length && !f.statuses.includes(i.status)) continue;
       if (f.priorities?.length && !f.priorities.includes(i.priority)) continue;
-      if (f.assignees?.length && !f.assignees.includes(i.assignee_id ?? "")) continue;
+      if (f.assignees?.length && !peopleOf(i).some((p) => f.assignees!.includes(p)) && !(f.assignees.includes("") && peopleOf(i).length === 0)) continue;
       if (f.overdue && (!today || !isOverdue(i, today))) continue;
       if (f.thisWeek && (!week || i.end < week.start || i.start > week.end)) continue;
-      if (f.noAssignee && i.assignee_id !== null) continue;
+      if (f.noAssignee && peopleOf(i).length > 0) continue;
       if (f.undated && !i.undated) continue;
       for (const [fid, vals] of Object.entries(f.fields ?? {})) {
         if (!vals.length) continue;
@@ -369,6 +369,9 @@ export function collapseSeries(view: { items: Item[]; deps: Dependency[] }, toda
   if (!hide.size) return { ...view, marks };
   return { items: view.items.filter((i) => !hide.has(i.id)), deps: view.deps.filter((d) => !hide.has(d.from_item_id) && !hide.has(d.to_item_id)), marks };
 }
+
+/** Alla ansvariga för en post: den första (assignee_id) och de andra (assignees), utan dubbletter. */
+export const peopleOf = (i: Pick<Item, "assignee_id" | "assignees">): string[] => [...new Set([...(i.assignee_id ? [i.assignee_id] : []), ...(i.assignees ?? [])])];
 
 /** Id för nästa tillfälle i varje serie: det första (efter datum) som inte är klart och inte passerat. */
 export function nextOccurrenceIds(items: Item[], today: string): Set<string> {

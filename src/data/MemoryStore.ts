@@ -5,7 +5,7 @@ import { extendSeries } from "./actions";
 import { PLACEHOLDER_RENAMES, placeholderOldName } from "./fixtures";
 import { countersFor, validCounters, type Counters, emptyCounters, itemCode, nextNumber, parseProjectCode, projectCode } from "./codes";
 import { applyPatch, isPatchList, json, makePatch, type Entry, type Patch } from "./patch";
-import { ACTIVITY_LIMITS, COMMENT_LIMITS, PROJECT_HEALTH, STATUS_UPDATE_LIMITS, TEMPLATE_LIMITS, type Template, type TemplateNode, type StatusDef, type Activity, type ProjectHealth, type StatusUpdate } from "./types";
+import { MAX_CAPACITY, ACTIVITY_LIMITS, COMMENT_LIMITS, PROJECT_HEALTH, STATUS_UPDATE_LIMITS, TEMPLATE_LIMITS, type Template, type TemplateNode, type StatusDef, type Activity, type ProjectHealth, type StatusUpdate } from "./types";
 import { depDraft, describeChange } from "./activity";
 import { defOf, statusDefs } from "./statuses";
 import type { Baseline, Comment, Dependency, DependencyMode, FieldDef, Fixture, Item, Project, SavedView, User } from "./types";
@@ -309,7 +309,13 @@ export class MemoryStore implements DataStore {
     this.closeStep();
   }
 
+  /** Fler ansvariga: den som är ansvarig står inte också bland de andra, en tom lista och en tom uppskattning tas bort. */
+  private normalizePeople(item: Item): void {
+    if (item.assignees) { const a = [...new Set(item.assignees)].filter((x) => x !== item.assignee_id); if (a.length) item.assignees = a; else delete item.assignees; }
+    if (item.estimate === null) delete item.estimate;
+  }
   private checkAssignee(item: Item) {
+    for (const a of item.assignees ?? []) if (!this.users.some((u) => u.id === a)) throw new RuleError("bad_assignee", `Ansvarig finns inte: ${a}`);
     if (item.assignee_id !== null && !this.users.some((u) => u.id === item.assignee_id))
       throw new RuleError("bad_assignee", `Ansvarig finns inte: ${item.assignee_id}`);
   }
@@ -376,12 +382,29 @@ export class MemoryStore implements DataStore {
     this.commit();
     return { ...next };
   }
+  /** Timmar per vecka för en person (för belastningen i timmar), eller null för ingen. */
+  async setUserCapacity(id: string, hours: number | null): Promise<User> {
+    await this.tick("setUserCapacity");
+    const cur = this.users.find((u) => u.id === id);
+    if (!cur) throw new RuleError("not_found", "Personen finns inte");
+    if (hours !== null && (!Number.isFinite(hours) || hours < 0 || hours > MAX_CAPACITY)) throw new RuleError("bad_capacity", `Kapaciteten ska vara 0 till ${MAX_CAPACITY} timmar i veckan`);
+    const next: User = { ...cur }; if (hours === null) delete next.capacity; else next.capacity = hours;
+    this.users = this.users.map((u) => (u.id === id ? next : u));
+    this.commit();
+    return { ...next };
+  }
   /** Poster som hade personen blir utan ansvarig i alla projekt. Ångra-historiken töms (ett steg skulle annars kunna ge tillbaka en ansvarig som inte finns). */
   async removeUser(id: string): Promise<number> {
     await this.tick("removeUser");
     if (!this.users.some((u) => u.id === id)) throw new RuleError("not_found", "Personen finns inte");
     let n = 0;
-    for (const i of [...this.items.values()]) if (i.assignee_id === id) { this.items.set(i.id, { ...i, assignee_id: null }); n++; }
+    for (const i of [...this.items.values()]) {
+      if (i.assignee_id === id || i.assignees?.includes(id)) {
+        const next: Item = { ...i, assignee_id: i.assignee_id === id ? null : i.assignee_id }; const rest = (i.assignees ?? []).filter((a) => a !== id);
+        if (rest.length) next.assignees = rest; else delete next.assignees;
+        this.items.set(i.id, next); n++;
+      }
+    }
     this.users = this.users.filter((u) => u.id !== id);
     this.commit(true);
     return n;
@@ -468,8 +491,9 @@ export class MemoryStore implements DataStore {
         created.code = itemCode(created.type, pn, counters[created.type]);
       }
     }
-    this.checkAssignee(created);
+    this.normalizePeople(created);
     validateItemShape(created);
+    this.checkAssignee(created);
     validateParent(created, this.items);
     this.items.set(created.id, created);
     if (counters && proj) this.counters.set(proj.id, counters);
@@ -514,8 +538,9 @@ export class MemoryStore implements DataStore {
     // Epics med innehåll får sina datum ur barnen och kan inte sättas direkt
     if (cur.type === "epic" && (next.start !== cur.start || next.end !== cur.end) && [...this.items.values()].some((i) => i.parent_id === id))
       throw new RuleError("epic_dates_derived", "Datum för en epic med innehåll räknas ur innehållet");
-    this.checkAssignee(next);
+    this.normalizePeople(next);
     validateItemShape(next);
+    this.checkAssignee(next);
     validateParent(next, this.items);
     this.items.set(id, next);
     const datesChanged = next.start !== cur.start || next.end !== cur.end;

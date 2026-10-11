@@ -78,18 +78,21 @@ export async function importParsed(store: MemoryStore, workspaceId: string, pars
     const ordered = [...parsed.items].sort((a, b) => depth(a.id) - depth(b.id) || a.sort_order - b.sort_order);
     const idMap = new Map<string, string>();
     for (const it of ordered) {
-      const { id, assignee, parent_id, code, custom_status, ...rest } = it;
+      const { id, assignee, assignees: coNames, parent_id, code, custom_status, ...rest } = it;
       const mapped = custom_status ? statusMap.get(custom_status) : null;
       if (mapped) (rest as { custom_status?: string }).custom_status = mapped; // koden delas ut av lagret, den gamla blir en hänvisning
       if (code && !rest.ref) rest.ref = code.slice(0, 60);
       if (rest.fields) { const mapped: NonNullable<Item["fields"]> = {}; for (const [k, v] of Object.entries(rest.fields)) { const nk = fieldMap.get(k); if (nk) mapped[nk] = v; } rest.fields = Object.keys(mapped).length ? mapped : undefined; }
       // Flera ansvariga kan stå i samma cell (A; B eller A/B). Första som är en känd användare blir ansvarig, resten (och okända) hamnar i beskrivningen.
       let assignee_id: string | null = null;
-      const left: string[] = [];
-      for (const nm of (assignee ?? "").split(/\s*[;|/]\s*/).map((x) => x.trim()).filter(Boolean)) {
+      const left: string[] = [], co: string[] = [];
+      for (const nm of [...(assignee ?? "").split(/\s*[;|/]\s*/).map((x) => x.trim()).filter(Boolean), ...(coNames ?? [])]) {
         const uid = byName.get(nm.toLowerCase());
-        if (uid && !assignee_id) assignee_id = uid; else { left.push(nm); if (!uid) unknown.add(nm); }
+        if (uid && !assignee_id) assignee_id = uid;
+        else if (uid) { if (uid !== assignee_id && !co.includes(uid)) co.push(uid); } // en känd person till: fler ansvariga
+        else { left.push(nm); unknown.add(nm); }
       }
+      if (co.length) (rest as { assignees?: string[] }).assignees = co.slice(0, 10);
       if (left.length) rest.description = [rest.description.trimEnd(), `${sv.ex.meta.assignees}: ${left.join("; ")}`].filter(Boolean).join("\n\n").slice(0, 5000);
       const made = await store.createItem({ ...rest, sort_order: rest.sort_order + sortBase, workspace_id: workspaceId, project_id: project.id, parent_id: parent_id ? idMap.get(parent_id)! : null, assignee_id });
       idMap.set(id, made.id); createdItems.push(made.id);

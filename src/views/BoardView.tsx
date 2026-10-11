@@ -158,6 +158,8 @@ export function BoardView({ statuses, lastActivity, commentCounts, fields = [], 
                     {cardFields.priority && i.priority !== "normal" && <span>{sv.panel.priorities[i.priority]}</span>}
                     {cardFields.progress && i.progress > 0 && <span>{i.progress} %</span>}
                     {cardFields.assignee && who && <span className="board-who" title={who} aria-label={who}>{initials(who)}</span>}
+                    {cardFields.assignee && (i.assignees ?? []).map((a) => users.find((u) => u.id === a)).filter((u): u is User => !!u).map((u) => <span key={u.id} className="board-who board-who-co" title={u.name} aria-label={u.name}>{initials(u.name)}</span>)}
+                    {cardFields.estimate && i.estimate != null && <span className="board-estimate" title={sv.panel.estimate}>{`${i.estimate} h`}</span>}
                   </div>
                   {cardFields.lastUpdate && lastActivity?.get(i.id) && <div className="board-last">{firstLine(`${logStamp(lastActivity.get(i.id)!.at).slice(5)} ${activityText(lastActivity.get(i.id)!)}`, 90)}</div>}
                   <select className="board-status" aria-label={`${groupLabel} för ${i.title}`} value={mine} onChange={(e) => onMoveTo(i.id, e.target.value)}>
