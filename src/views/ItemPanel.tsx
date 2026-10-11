@@ -288,6 +288,12 @@ export function ItemPanel({ store, projectId, itemId, dataVersion, autoSelectTit
             </>
           )}
         </div>
+        {item.undated && !epic && (
+          <div className="panel-undated" role="note">
+            <span>{sv.undated.panel}</span>
+            <button type="button" className="mini" onClick={() => void depAction("undated", async () => { await store.updateItem(item.id, { undated: false }); })}>{sv.undated.keep}</button>
+          </div>
+        )}
         {err("start")}{err("end")}{err("status")}{err("priority")}{err("assignee")}
         {overdue && <p className="panel-muted">{sv.panel.overdueNote}</p>}
 

@@ -5,6 +5,8 @@ import { duplicateProject, exportProject, importParsed, type ExportFormat, type 
 import { bulkDelete, bulkMove, bulkStatus, canMove, createSeries, deleteSubtree, descendants, epicChoices, filterActive, filterView, moveTargets, newItemDraft, planBoardDrop, planMove, rangeIds, selectionRoots, swapWithSibling, type BulkResult } from "./data/actions";
 import { BulkBar } from "./views/BulkBar";
 import { RecurringDialog } from "./views/RecurringDialog";
+import { SettingsDialog } from "./views/SettingsDialog";
+import { loadSettings, saveSettings, type Settings } from "./settings";
 import { friendlyError } from "./i18n/errors";
 import { ContextMenu, type MenuItem } from "./views/ContextMenu";
 import { QuickAdd } from "./views/QuickAdd";
@@ -54,7 +56,11 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
   useEffect(() => { (window as unknown as { __store: unknown }).__store = store; }, [store]);
   const projects = useProjects(store, workspaceId);
   const { state, reload, refresh } = useProjectData(store, projects.projectId);
-  const [zoom, setZoom] = useState<Zoom>(uiCarry.zoom ?? "week");
+  const [settings, setSettingsState] = useState<Settings>(loadSettings);
+  const setSettings = (s: Settings) => { saveSettings(s); setSettingsState(s); };
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const settingsRef = useRef(settings); settingsRef.current = settings;
+  const [zoom, setZoom] = useState<Zoom>(uiCarry.zoom ?? settings.startZoom);
   const [query, setQuery] = useState("");
   const [hideDone, setHideDone] = useState(false);
   const [attrFilter, setAttrFilter] = useState<AttrFilter>(noAttrFilter);
@@ -65,7 +71,7 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
   );
   const filtering = filterActive({ query, hideDone, ...attrFilter });
   const colors = useMemo(() => (state.kind === "ready" ? effectiveColors(state.items) : new Map<string, never>()), [state]);
-  const [view, setView] = useState<"gantt" | "wheel" | "board">(uiCarry.view ?? VIEW0);
+  const [view, setView] = useState<"gantt" | "wheel" | "board">(uiCarry.view ?? (new URLSearchParams(window.location.search).get("view") ? VIEW0 : settings.startView));
   const [year, setYear] = useState<number | null>(uiCarry.year ?? null);
   uiCarry.zoom = zoom; uiCarry.view = view; uiCarry.year = year;
   const [theme, setTheme] = useState<Theme>(getTheme);
@@ -83,7 +89,21 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
   // när Reacts rotlyssnare körs, så onClick i React nås aldrig. Capture läser klickmålet före bibliotekens egna hanterare.
   useEffect(() => {
     const main = mainRef.current;
-    if (!main || view !== "gantt") return;
+    if (!main) return;
+    // Ett klick på en tom yta (inte en post, knapp, skala eller liknande) stänger panelen och släpper markeringen. Gäller alla vyer.
+    const INTERACTIVE = "button, a, input, select, textarea, label, summary, [role=menu], [role=dialog], .gantt_row[data-task-id], .gantt_task_line, .gantt_link_control, .gantt_task_drag, .gantt_tree_icon, .gantt_scale_line, .gantt_scale_cell, .gantt_grid_head_cell, .gantt_grid_scale, .gantt_task_scale, .gantt_grid_head, .grid-resizer, .quick-add, .wheel-arc, .wheel-ms, .wheel-hit, .wheel-legend, article, .bulk-bar, .datepick, .board-head";
+    let emptyDown: { x: number; y: number } | null = null;
+    const emptyDownH = (e: PointerEvent) => { emptyDown = e.button === 0 && !(e.target as Element).closest(INTERACTIVE) ? { x: e.clientX, y: e.clientY } : null; };
+    const emptyUpH = (e: PointerEvent) => {
+      const d = emptyDown; emptyDown = null;
+      if (!d || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || !settingsRef.current.closeOnEmpty) return;
+      if (Math.hypot(e.clientX - d.x, e.clientY - d.y) > 4) return; // dragning, inget klick
+      if ((e.target as Element).closest(INTERACTIVE)) return;
+      setEditId(null); selAnchor.current = null; setSelected((cur) => (cur.size ? new Set() : cur));
+    };
+    main.addEventListener("pointerdown", emptyDownH, true);
+    main.addEventListener("pointerup", emptyUpH, true);
+    if (view !== "gantt") return () => { main.removeEventListener("pointerdown", emptyDownH, true); main.removeEventListener("pointerup", emptyUpH, true); };
     // Ett klick tolkas från nedtryck och upplyft (inte från click-händelsen): biblioteket kan rita om staplen mellan de två, och då
     // hamnar click på fel element och går förlorat. Målet läses vid nedtrycket, innan något hunnit ritas om.
     const resolve = (t: Element) => {
@@ -101,7 +121,7 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
     };
     main.addEventListener("pointerdown", onDown, true);
     main.addEventListener("pointerup", onUp, true);
-    return () => { main.removeEventListener("pointerdown", onDown, true); main.removeEventListener("pointerup", onUp, true); };
+    return () => { main.removeEventListener("pointerdown", onDown, true); main.removeEventListener("pointerup", onUp, true); main.removeEventListener("pointerdown", emptyDownH, true); main.removeEventListener("pointerup", emptyUpH, true); };
   }, [view]);
   // Drag i Gantt sparas direkt i storen. Vid vybyte hämtas data om så att årshjulet aldrig visar gamla datum.
   useEffect(() => { void refresh(); }, [view, refresh]);
@@ -229,7 +249,7 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
         return;
       }
       if (e.metaKey || e.ctrlKey || typing || state.kind !== "ready" || !projects.projectId) return;
-      if (menu || recurOpen || t?.closest("[role=dialog], [role=menu], aside.panel")) return; // en öppen meny äger tangenterna även innan den hunnit ta fokus
+      if (menu || recurOpen || settingsOpen || t?.closest("[role=dialog], [role=menu], aside.panel")) return; // en öppen meny äger tangenterna även innan den hunnit ta fokus
       if (e.key === "Escape" && selected.size) { e.preventDefault(); selAnchor.current = null; setSelected(new Set()); return; }
       // Alt+pil upp eller ner: flytta den valda raden i sin grupp
       if (e.altKey) {
@@ -392,6 +412,7 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
         <div className="header-controls">
         <div className="header-top">
         <HelpDialog />
+        <button type="button" className="help-btn" onClick={() => setSettingsOpen(true)}>{sv.settings.button}</button>
         <div className="lang-switch" role="group" aria-label={sv.lang.label}>
           {LANGS.map((l) => (
             <button key={l} type="button" aria-pressed={lng === l} aria-label={sv.lang[l === "sv" ? "svName" : "enName"]} title={sv.lang[l === "sv" ? "svName" : "enName"]} onClick={() => { if (l !== lng) { rememberScroll(); onLang(l); } }}>{sv.lang[l]}</button>
@@ -485,7 +506,7 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
       {notice && <div role="alert" className="notice">{notice}{writeError && <button type="button" className="notice-x" aria-label={sv.dismiss} onClick={() => setWriteError(null)}>×</button>}</div>}
       {projects.error && <div role="alert" className="notice">{projects.error}</div>}
       <div className="app-body">
-      <main className="app-main" ref={mainRef}>
+      <main className={`app-main${settings.markUndated ? " mark-undated" : ""}`} ref={mainRef}>
        <Suspense fallback={<p role="status">{sv.loading}</p>}>
         {state.kind === "loading" && <p role="status">{sv.loading}</p>}
         {state.kind === "error" && (
@@ -496,12 +517,12 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
         {projects.projects && projects.projects.length === 0 && (
           <div className="empty-state"><p>{sv.project.none}</p><button type="button" className="btn btn-primary" onClick={() => void projects.create(sv.project.defaultName)}>{sv.project.createFirst}</button></div>
         )}
-        {state.kind === "ready" && projects.projectId && view === "board" && <BoardView items={shown.items} allItems={state.items} users={users} colors={colors} openId={editId} selected={selected} onOpen={setEditId} onSelect={selectRow} onBackground={dropSelection} onDrop={(m, s, b) => void dropCards(m, s, b)} onStatus={(id, s) => void editField(id, "status", s)} onContext={openMenu} />}
+        {state.kind === "ready" && projects.projectId && view === "board" && <BoardView markUndated={settings.markUndated} items={shown.items} allItems={state.items} users={users} colors={colors} openId={editId} selected={selected} onOpen={setEditId} onSelect={selectRow} onBackground={dropSelection} onDrop={(m, s, b) => void dropCards(m, s, b)} onStatus={(id, s) => void editField(id, "status", s)} onContext={openMenu} />}
         {state.kind === "ready" && projects.projectId && view === "wheel" && <YearWheel items={shown.items} year={effectiveYear} colors={colors} selectedId={editId} onOpen={setEditId} onContext={openMenu} />}
         {state.kind === "ready" && projects.projectId && view === "gantt" && (
           <div className="gantt-wrap">
           <div className="gantt-main">
-          <DhtmlxGantt key={theme} selected={selected} onSelect={selectRow} colors={colors} collapse={collapse} gridWidth={gridWidth} columns={columns} users={users} onEditField={editField} revealId={reveal} todayToken={todayToken} onPersisted={() => void refresh()}
+          <DhtmlxGantt key={`${theme}-${settings.touch}`} touchMode={settings.touch} selected={selected} onSelect={selectRow} colors={colors} collapse={collapse} gridWidth={gridWidth} columns={columns} users={users} onEditField={editField} revealId={reveal} todayToken={todayToken} onPersisted={() => void refresh()}
             onNotice={setWriteError}
             onCreateAt={({ rowId, date }) => void addItem("task", { anchorId: rowId, start: date }).catch(() => undefined)}
             onRename={(id) => { setJustCreated(id); setEditId(id); }}
@@ -520,6 +541,7 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
           onClose={() => setEditId(null)} onChanged={() => void refresh()} onOpen={setEditId} />
       )}
       </div>
+      {settingsOpen && <SettingsDialog settings={settings} onChange={setSettings} onClose={() => setSettingsOpen(false)} />}
       {recurOpen && <RecurringDialog today={todayISO()} onCreate={(a) => void addSeries(a)} onClose={() => setRecurOpen(false)} />}
       {menu && <ContextMenu x={menu.x} y={menu.y} items={menuItems} confirm={confirmRemove} onPick={(id) => void pickMenu(id)} onClose={() => setMenu(null)} />}
     </div>

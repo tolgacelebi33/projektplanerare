@@ -457,8 +457,9 @@ body[data-overlay] .gantt_tooltip { display: none !important; }
   .logo-slot { display: none; }
   .app-title { font-size: 16px; }
   .theme-label { display: none; }
-  .header-controls { gap: 2px; }
-  .header-top { gap: 8px; }
+  .app-header { flex-wrap: wrap; row-gap: 2px; }
+  .header-controls { flex-direction: row; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 2px 12px; width: 100%; margin-left: 0; }
+  .header-top { gap: 8px; flex-wrap: wrap; }
   .narrow-only { display: inline-block; }
   .toolbar { padding: 6px 12px; gap: 6px 8px; }
   .project-row { display: none; }
@@ -483,3 +484,16 @@ body[data-overlay] .gantt_tooltip { display: none !important; }
 /* Kompaktare verktygsfält: knapparna "+ Uppgift" och så vidare förklarar sig själva, så etiketten "Lägg till" behövs inte */
 .add-group > .toolbar-label:first-child { display: none; }
 .toolbar { gap: 6px 10px; }
+
+/* Poster utan riktigt datum: streckad stapel, "Ej satt" i listan, och en rad i panelen */
+.mark-undated .gantt_task_line.undated { border-style: dashed; background-image: repeating-linear-gradient(135deg, transparent 0 6px, color-mix(in srgb, var(--surface) 30%, transparent) 6px 12px); }
+.mark-undated .gantt_row.undated-row .grid-undated { font-style: italic; color: var(--text-muted); }
+.board-undated { font-style: italic; border: 1px dashed var(--line); border-radius: var(--radius-pill); padding: 0 8px; }
+.panel-undated { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px 10px; border: 1px dashed var(--line); border-radius: 6px; font-size: 13px; }
+.panel-undated span { flex: 1 1 200px; }
+.settings h3 { margin: 4px 0 6px; font-family: var(--font-title); font-size: 12px; font-weight: 400; letter-spacing: 0.06em; }
+.settings section { display: grid; gap: 8px; }
+.settings-check { display: flex; gap: 10px; align-items: flex-start; font-size: var(--fs-md); cursor: pointer; }
+.settings-check input { width: auto; margin-top: 3px; }
+.settings-check small { display: block; color: var(--text-muted); font-size: 12px; margin-top: 2px; }
+.settings-row { grid-template-columns: 1fr 1fr; }

@@ -30,7 +30,7 @@ import { setDragParent, startRowDragFeedback } from "./rowDrag";
 import { consumeFocusMedian, scrollCarry } from "../scrollCarry";
 /** Rutnätets fasta bredd är GRID_WIDTH (layout.ts). Panelen till höger tar plats från tidslinjen, aldrig från rutnätet. */
 
-interface TaskRow { rec: boolean; color: string; id: string; text: string; start_date: Date; end_date: Date; type: string; kind: Item["type"]; parent: string | number; status: Status; priority: Item["priority"]; assignee: string; progress: number; open: boolean }
+interface TaskRow { und: boolean; rec: boolean; color: string; id: string; text: string; start_date: Date; end_date: Date; type: string; kind: Item["type"]; parent: string | number; status: Status; priority: Item["priority"]; assignee: string; progress: number; open: boolean }
 interface LinkRow { id: string; source: string; target: string; type: string }
 
 /** Förväntad ordning för träd i djupet först, syskon efter sort_order. Används för att avgöra om strukturen ändrats. */
@@ -45,9 +45,11 @@ function treeOrder(items: Item[]): string[] {
 
 export interface ContextArgs { id: string | null; x: number; y: number; date: ISODate | null }
 
-export function DhtmlxGantt({ store, items, deps, zoom, onError, onPersisted, revealId, onNotice, onCreateAt, onRename, onContext, onToggleDone, onMoveRow, onAddInGroup, onEditField, onSelect, selected, gridWidth, columns, users, collapse, colors, todayToken }: {
+export function DhtmlxGantt({ store, items, deps, zoom, onError, onPersisted, revealId, onNotice, onCreateAt, onRename, onContext, onToggleDone, onMoveRow, onAddInGroup, onEditField, onSelect, selected, touchMode, gridWidth, columns, users, collapse, colors, todayToken }: {
   /** Markerade rader (flerval). Klick med Ctrl/Cmd växlar, Shift markerar en följd, ett vanligt klick avmarkerar. */
   selected?: ReadonlySet<string>;
+  /** Pekläge: automatiskt (bara enheter med enbart pekskärm), alltid på, eller av. */
+  touchMode?: "auto" | "on" | "off";
   onSelect?: (a: { id: string; mode: "toggle" | "range" | "clear"; visible: string[] }) => void;
   store: DataStore; items: Item[]; deps: Dependency[]; zoom: Zoom; onError: (e: unknown) => void; onPersisted?: () => void;
   /** Post som ska bläddras fram och markeras (t.ex. en nyskapad). */
@@ -106,7 +108,7 @@ export function DhtmlxGantt({ store, items, deps, zoom, onError, onPersisted, re
       type: TYPE[i.type],
       kind: i.type,
       parent: i.parent_id ?? 0,
-      status: i.status, priority: i.priority, assignee: i.assignee_id ?? "", progress: i.progress, color: colors.get(i.id) ?? "none", rec: !!i.series,
+      status: i.status, priority: i.priority, assignee: i.assignee_id ?? "", progress: i.progress, color: colors.get(i.id) ?? "none", rec: !!i.series, und: !!i.undated,
       open: true,
     }));
     const links: LinkRow[] = deps.map((d) => ({ id: d.id, source: d.from_item_id, target: d.to_item_id, type: "0" }));
@@ -140,8 +142,8 @@ export function DhtmlxGantt({ store, items, deps, zoom, onError, onPersisted, re
     };
     gantt.locale.date.month_full = [...sv.dates.monthsFull] as typeof gantt.locale.date.month_full;
     gantt.locale.date.month_short = [...sv.dates.monthsShort] as typeof gantt.locale.date.month_short;
-    gantt.templates.task_class = (_s, _e, t) => `st-${(t as unknown as { status: Status }).status}${(t as unknown as { kind: string }).kind === "epic" ? " epic" : ""}`;
-    gantt.templates.grid_row_class = (_s, _e, t) => `${(t as unknown as { kind: string }).kind === "epic" ? "epic-row" : ""} grp-${(t as unknown as TaskRow).color}${(t as unknown as TaskRow).rec ? " has-series" : ""}${selectedRef.current.has(String(t.id)) ? " sel-row" : ""}`;
+    gantt.templates.task_class = (_s, _e, t) => `st-${(t as unknown as { status: Status }).status}${(t as unknown as { kind: string }).kind === "epic" ? " epic" : ""}${(t as unknown as TaskRow).und ? " undated" : ""}`;
+    gantt.templates.grid_row_class = (_s, _e, t) => `${(t as unknown as { kind: string }).kind === "epic" ? "epic-row" : ""} grp-${(t as unknown as TaskRow).color}${(t as unknown as TaskRow).rec ? " has-series" : ""}${(t as unknown as TaskRow).und ? " undated-row" : ""}${selectedRef.current.has(String(t.id)) ? " sel-row" : ""}`;
     gantt.templates.task_row_class = (_s, _e, t) => `${(t as unknown as { kind: string }).kind === "epic" ? "epic-row" : ""}${selectedRef.current.has(String(t.id)) ? " sel-row" : ""}`;
     gantt.templates.task_row_class = (_s, _e, t) => ((t as unknown as { kind: string }).kind === "epic" ? "epic-row" : "");
     // Texten i en stapel: ryms titeln flyttas den till höger om staplen (som i andra planeringsverktyg), annars visas den inuti.
@@ -209,7 +211,7 @@ export function DhtmlxGantt({ store, items, deps, zoom, onError, onPersisted, re
       priority: { name: "priority", label: sv.panel.priority, width: COLUMN_WIDTH.priority, template: (t: Task) => select(t, "priority", sv.panel.priority, (t as unknown as TaskRow).priority,
         (["low", "normal", "high", "urgent"] as const).map((p) => [p, sv.panel.priorities[p]] as [string, string]), `prio-${(t as unknown as TaskRow).priority}`) },
       start: { name: "start_date", label: sv.panel.start, width: COLUMN_WIDTH.start, align: "right", template: (t: Task) => `<span class="grid-date">${dayOf(t.start_date as Date)}</span>` },
-      end: { name: "end_date", label: sv.grid.end, width: COLUMN_WIDTH.end, align: "right", template: (t: Task) => `<span class="grid-date">${shortDate(t)}</span>` },
+      end: { name: "end_date", label: sv.grid.end, width: COLUMN_WIDTH.end, align: "right", template: (t: Task) => `<span class="grid-date">${(t as unknown as TaskRow).und ? `<i class="grid-undated">${esc(sv.undated.cell)}</i>` : shortDate(t)}</span>` },
       progress: { name: "progress_pct", label: sv.panel.progress, width: COLUMN_WIDTH.progress, align: "right", template: (t: Task) => `<span class="grid-date">${(t as unknown as TaskRow).progress}%</span>` },
     };
     buildColumnsRef.current = () => [titleColumn, ...(["status", "assignee", "priority", "start", "end", "progress"] as ColumnId[]).filter((c) => columnsRef.current.includes(c)).map((c) => COLS[c])];
@@ -229,7 +231,9 @@ export function DhtmlxGantt({ store, items, deps, zoom, onError, onPersisted, re
     gantt.templates.scale_cell_class = (d) => cellClass(d);
     // Biblioteket slår på pekläget bara på enheter med mobil användaragent. En platta eller dator med enbart pekskärm ska också kunna dras med finger.
     // Pekläget stänger av tooltips vid hovring, så en dator som också har mus eller pekplatta (finns det en "fine" pekare) behåller det vanliga läget.
-    if (window.matchMedia?.("(any-pointer: coarse)").matches && !window.matchMedia("(any-pointer: fine)").matches) gantt.config.touch = "force" as never;
+    const touchOnly = !!window.matchMedia?.("(any-pointer: coarse)").matches && !window.matchMedia("(any-pointer: fine)").matches;
+    if (touchMode === "on" || (touchMode !== "off" && touchOnly)) gantt.config.touch = "force" as never;
+    else if (touchMode === "off") gantt.config.touch = false as never;
     gantt.init(host.current!);
     scrollCarry.read = () => gantt.getScrollState();
     void document.fonts.ready.then(() => gantt.render()); // textmåtten beror på att typsnittet är laddat
@@ -433,9 +437,9 @@ export function DhtmlxGantt({ store, items, deps, zoom, onError, onPersisted, re
           // Bara det som ändrats ritas om. Ritas alla staplar om vid varje sparning byts staplen man är på väg att klicka på ut under klicket.
           for (const t of tasks) {
             const g = gantt.getTask(t.id) as unknown as Record<string, unknown>;
-            const same = g.text === t.text && g.status === t.status && g.priority === t.priority && g.assignee === t.assignee && g.progress === t.progress && g.color === t.color && (g.start_date as Date).getTime() === t.start_date.getTime() && (g.end_date as Date).getTime() === t.end_date.getTime();
+            const same = g.text === t.text && g.status === t.status && g.priority === t.priority && g.assignee === t.assignee && g.progress === t.progress && g.color === t.color && g.und === t.und && (g.start_date as Date).getTime() === t.start_date.getTime() && (g.end_date as Date).getTime() === t.end_date.getTime();
             if (same) continue;
-            g.text = t.text; g.start_date = t.start_date; g.end_date = t.end_date; g.status = t.status; g.priority = t.priority; g.assignee = t.assignee; g.progress = t.progress; g.color = t.color;
+            g.text = t.text; g.start_date = t.start_date; g.end_date = t.end_date; g.status = t.status; g.priority = t.priority; g.assignee = t.assignee; g.progress = t.progress; g.color = t.color; g.und = t.und;
             gantt.updateTask(t.id);
           }
         });

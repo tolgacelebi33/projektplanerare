@@ -273,6 +273,7 @@ export class MemoryStore implements DataStore {
     const cur = this.items.get(id);
     if (!cur) throw new RuleError("not_found", `Item ${id} finns inte`);
     const next: Item = { ...cur, ...patch };
+    if (cur.undated && (next.start !== cur.start || next.end !== cur.end) && patch.undated === undefined) delete next.undated; // nya datum: posten är schemalagd
     // I läget "shift" får en uppgift inte flyttas till att börja före att dess föregångare är klar (som Asana och monday i strikt läge).
     if (next.start !== cur.start && next.start < cur.start && cur.type !== "epic" && this.modeOf(cur.project_id) === "shift") {
       const ends = [...this.deps.values()].filter((d) => d.to_item_id === id).map((d) => this.items.get(d.from_item_id)).filter((p): p is Item => !!p && p.type !== "epic").map((p) => p.end);

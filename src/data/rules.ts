@@ -32,6 +32,7 @@ export function validateItemShape(item: Item): void {
     throw new RuleError("bad_progress", `Framsteg måste vara ett heltal 0-100: ${item.progress}`);
   if (item.color !== undefined && item.color !== null && item.color !== "none" && !GROUP_COLORS.includes(item.color)) throw new RuleError("bad_color", `Ogiltig färg: ${String(item.color)}`);
   if (item.board_rank !== undefined && item.board_rank !== null && !Number.isFinite(item.board_rank)) throw new RuleError("bad_rank", `Ogiltig plats i boarden: ${String(item.board_rank)}`);
+  if (item.undated !== undefined && typeof item.undated !== "boolean") throw new RuleError("bad_undated", "Ogiltigt värde för ej schemalagd");
   if (item.recur !== undefined && item.recur !== null && !RECURRENCES.includes(item.recur)) throw new RuleError("bad_recur", `Ogiltig upprepning: ${String(item.recur)}`);
   if (item.series !== undefined && item.series !== null && (typeof item.series !== "string" || !item.series)) throw new RuleError("bad_series", "Ogiltigt serie-id");
   if (item.description.length > MAX_DESCRIPTION) throw new RuleError("description_too_long", `Beskrivningen är längre än ${MAX_DESCRIPTION} tecken`);

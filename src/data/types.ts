@@ -37,6 +37,8 @@ export interface Item {
   color?: GroupColor | "none" | null;
   /** Plats i kolumnen i boardvyn (lägre först). Saknas: efter de med plats, i listans ordning. */
   board_rank?: number | null;
+  /** Datumen är platshållare från en import (posten saknade datum). Tas bort när datumen ändras eller användaren väljer att behålla dem. */
+  undated?: boolean;
   /** Gemensamt id för posterna i en återkommande serie (en milstolpe som upprepas). Varje tillfälle är en egen post som kan göras klar för sig. */
   series?: string | null;
   /** Hur ofta serien upprepas. Samma på alla poster i serien. */

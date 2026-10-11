@@ -102,6 +102,7 @@ export function parseJson(text: string): ParsedProject {
       progress: typeof x.progress === "number" ? x.progress : 0, sort_order: typeof x.sort_order === "number" ? x.sort_order : n,
       ...(x.color !== undefined ? { color: x.color as ParsedItem["color"] } : {}),
       ...(typeof x.board_rank === "number" ? { board_rank: x.board_rank } : {}),
+      ...(x.undated === true ? { undated: true } : {}),
       ...(typeof x.series === "string" && x.series ? { series: x.series } : {}),
       ...(typeof x.recur === "string" ? { recur: x.recur as ParsedItem["recur"] } : {}),
     };
@@ -430,6 +431,8 @@ export function parseRows(rows: string[][], name: string, today: string = todayI
   for (const i of items) if (hasKids.has(i.id) && i.type !== "epic") { i.type = "epic"; promoted++; }
 
   // Epics med innehåll får sina datum ur innehållet och räknas därför inte som saknade
+  const undSet = new Set(undatedIds);
+  for (const i of items) if (undSet.has(i.id.split("~")[0]) && !hasKids.has(i.id)) i.undated = true; // platshållardatum märks, så att de går att skilja från riktiga
   const undated = undatedIds.filter((id) => !hasKids.has(id)).length;
   if (undated) warnings.push(sv.ex.undated(undated, today, addDays(today, PLACEHOLDER_DAYS - 1)));
   if (promoted) warnings.push(sv.ex.promoted(promoted));
