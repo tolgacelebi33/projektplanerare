@@ -276,7 +276,7 @@ export function ItemPanel({ critical, me = "", onMe, baseline, fieldDefs = [], o
 
   return (
     <aside className="panel" aria-label={sv.panel.label} data-item-id={item.id}>
-      <PanelHead onClose={onClose} kind={sv.panel.type[item.type]} code={item.code} refCode={item.ref} crumbs={chain} saveState={save} />
+      <PanelHead onClose={onClose} kind={sv.panel.type[item.type]} code={item.code} refCode={item.ref} crumbs={chain} saveState={save} occ={seriesNav(all, item)} onOpen={onOpen} />
       <div className="panel-body">
         <label className="panel-field panel-title">
           <span className="sr-only">{sv.panel.name}</span>
@@ -559,11 +559,27 @@ export function ItemPanel({ critical, me = "", onMe, baseline, fieldDefs = [], o
   );
 }
 
-function PanelHead({ onClose, kind, code, refCode, crumbs = [], saveState }: { onClose: () => void; kind: string; code?: string; refCode?: string; crumbs?: string[]; saveState?: SaveState }) {
+/** Föregående och nästa tillfälle i en serie (efter datum), eller null i ändarna. Bara poster som ingår i en serie har pilar. */
+function seriesNav(all: Item[], item: Item): { prev: Item | null; next: Item | null; pos: number; total: number } | null {
+  if (!item.series) return null;
+  const mem = [...seriesMembers(all, item)].sort((a, b) => (a.start < b.start ? -1 : a.start > b.start ? 1 : a.id < b.id ? -1 : 1));
+  const at = mem.findIndex((m) => m.id === item.id);
+  if (at < 0 || mem.length < 2) return null;
+  return { prev: mem[at - 1] ?? null, next: mem[at + 1] ?? null, pos: at + 1, total: mem.length };
+}
+
+function PanelHead({ onClose, kind, code, refCode, crumbs = [], saveState, occ, onOpen }: { onClose: () => void; kind: string; code?: string; refCode?: string; crumbs?: string[]; saveState?: SaveState; occ?: ReturnType<typeof seriesNav>; onOpen?: (id: string) => void }) {
   return (
     <header className="panel-head">
       <div className="panel-head-text">
         <div className="panel-kind-row"><span className="panel-kind">{kind}</span>{code && <span className="code-tag" title={sv.panel.codeHint} data-code={code}>{code}</span>}</div>
+        {occ && onOpen && (
+          <div className="occ-nav" role="group" aria-label={sv.recur.occurrences}>
+            <button type="button" className="mini" disabled={!occ.prev} aria-label={sv.recur.prevOcc} title={occ.prev ? `${sv.recur.prevOcc}: ${occ.prev.start}` : undefined} onClick={() => occ.prev && onOpen(occ.prev.id)}>{"\u2039"}</button>
+            <span className="occ-pos">{sv.recur.occPos(occ.pos, occ.total)}</span>
+            <button type="button" className="mini" disabled={!occ.next} aria-label={sv.recur.nextOcc} title={occ.next ? `${sv.recur.nextOcc}: ${occ.next.start}` : undefined} onClick={() => occ.next && onOpen(occ.next.id)}>{"\u203a"}</button>
+          </div>
+        )}
         {refCode && <span className="panel-crumbs">{sv.panel.refLabel}: {refCode}</span>}
         {crumbs.length > 0 && <span className="panel-crumbs">{sv.panel.inEpic}: {crumbs.join(" / ")}</span>}
       </div>

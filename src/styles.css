@@ -734,3 +734,7 @@ span.health-chip { cursor: default; }
 .port-bar { display: inline-block; width: 70px; height: 8px; border: var(--line-width) solid var(--line); border-radius: var(--radius-pill); vertical-align: middle; overflow: hidden; }
 .port-bar > span { display: block; height: 100%; background: var(--status-done-bg); }
 @media (max-width: 700px) { .cal-day { min-height: 64px; } .cal-chip { font-size: 11px; } .calendar, .myweek, .workload, .portfolio { padding: 8px 10px; } }
+
+.occ-nav { display: flex; align-items: center; gap: 6px; margin-top: 4px; }
+.occ-nav .mini { min-width: 32px; }
+.occ-pos { font-size: var(--fs-sm); }

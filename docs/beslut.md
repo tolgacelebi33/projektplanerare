@@ -467,3 +467,7 @@ Fel: med serier som en rad räknades tidsskalans slut bara på de synliga radern
 ## 2026-10-11: Markeringen följer en klickad romb
 
 Fel: ett klick på en romb öppnade rätt tillfälle i panelen, men markeringen (radens markering och handtagen) låg kvar på radens egen post, så det såg ut som att markeringen inte flyttades. Nu markeras den klickade romben (ram och lite större), radens markering släpps, och nästa klick flyttar markeringen. Esc släpper den. Test SD3 (Chromium och WebKit).
+
+## 2026-10-11: Pilar mellan tillfällen i en serie
+
+Panelhuvudet har föregående och nästa tillfälle (‹ 2 av 4 ›) för poster som ingår i en serie, släckta i ändarna. Valet flyttar också markeringen i Gantt. Test SD4.

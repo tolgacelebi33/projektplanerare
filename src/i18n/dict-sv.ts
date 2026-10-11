@@ -173,6 +173,7 @@ export const svDict = {
   recur: {
     button: "+ Återkommande milstolpe...", buttonShort: "+ Återkommande...", dialog: "Återkommande milstolpe", name: "Titel", defaultTitle: "Underhåll", first: "Första datum", every: "Återkommer", count: "Antal tillfällen",
     occurrences: "Tillfällen i serien",
+    prevOcc: "Föregående tillfälle", nextOcc: "Nästa tillfälle", occPos: (n: number, t: number) => `${n} av ${t}`,
     kinds: { weekly: "Varje vecka", biweekly: "Varannan vecka", monthly: "Varje månad", quarterly: "Var 3:e månad" },
     collapseButton: "Serier som en rad", collapseHint: "Visa varje återkommande serie som en enda rad, med en romb för varje tillfälle. Av: varje tillfälle är en egen rad som du kan flytta för sig.",
     type: "Typ", days: "Längd (dagar)", summaryTask: (n: number, first: string, last: string, d: number) => `${n} uppgifter på ${d} ${d === 1 ? "dag" : "dagar"} vardera, från ${first} till ${last}. Varje tillfälle är en egen uppgift som du kan bocka av och flytta för sig.`,

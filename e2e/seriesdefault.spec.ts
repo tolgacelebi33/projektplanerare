@@ -72,3 +72,32 @@ test("SD3 markeringen följer klicket: efter ett klick på en romb är det den s
   await page.keyboard.press("Escape");
   await expect(page.locator(".series-mark.sel")).toHaveCount(0);
 });
+
+test("SD4 pilarna i panelen går till föregående och nästa tillfälle, är släckta i ändarna, och markeringen följer med", async ({ page }) => {
+  await page.setViewportSize({ width: 1472, height: 900 });
+  await page.clock.setFixedTime(new Date("2026-10-11T10:00:00"));
+  await openApp(page, "dhtmlx", { seriesRow: true });
+  await page.getByRole("button", { name: "+ Återkommande milstolpe..." }).click();
+  const d = page.getByRole("dialog", { name: "Återkommande milstolpe" });
+  await d.getByLabel("Titel").fill("M3 Styrgrupp"); const f = d.locator('input[name="first"]'); await f.fill("2026-10-12"); await f.blur();
+  await d.getByLabel("Återkommer").selectOption("weekly"); await d.getByLabel("Antal tillfällen").fill("4");
+  await d.getByRole("button", { name: "Skapa" }).click();
+  await page.getByRole("button", { name: "Dölj klara" }).click();
+  await page.locator(".gantt_grid_data").evaluate((e) => e.scrollTo(0, 99999));
+  await page.locator(".gantt_row", { hasText: "M3 Styrgrupp" }).locator(".grid-title").click();
+  const nav = page.getByRole("group", { name: "Tillfällen i serien" }).first();
+  const next = nav.getByRole("button", { name: "Nästa tillfälle" }), prev = nav.getByRole("button", { name: "Föregående tillfälle" });
+  const date = () => page.locator("aside.panel").getByLabel("Datum", { exact: true }).inputValue();
+  await expect(prev).toBeDisabled();
+  await expect(nav).toContainText("1 av 4");
+  const seen: string[] = [await date()];
+  for (let i = 0; i < 3; i++) { await next.click(); await expect(nav).toContainText(`${i + 2} av 4`); seen.push(await date()); }
+  await expect(next).toBeDisabled();
+  expect(seen).toEqual(["2026-10-12", "2026-10-19", "2026-10-26", "2026-11-02"]);
+  await expect(page.locator(".series-mark.sel")).toHaveCount(1); // markeringen följer med
+  await prev.click();
+  expect(await date()).toBe("2026-10-26");
+  // vanliga poster har inga pilar
+  await page.locator(".gantt_row", { hasText: "Driftsättning" }).locator(".grid-title").click();
+  await expect(page.getByRole("group", { name: "Tillfällen i serien" })).toHaveCount(0);
+});

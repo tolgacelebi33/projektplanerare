@@ -893,7 +893,7 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
       </main>
       {editId && (
         <ItemPanel key="panel" critical={critical} me={settings.me} onMe={(id) => setSettings({ ...settingsRef.current, me: id })} baseline={project?.baseline ?? null} fieldDefs={fieldDefs} onDuplicate={(id) => void doDuplicateItem(id)} onNewSeries={(it, n) => { if (it.recur) { setRecurInit({ title: it.title, kind: it.recur, count: n }); setRecurOpen(true); } }} nextDate={state.kind === "ready" ? (() => { const cur = state.items.find((i) => i.id === editId); if (!cur?.series) return null; const nx = nextOccurrenceIds(state.items, todayISO()); return state.items.find((i) => i.series === cur.series && nx.has(i.id))?.start ?? null; })() : null} features={settings.features} checklistProgress={settings.checklistProgress} store={store} projectId={projects.projectId!} itemId={editId} dataVersion={state.kind === "ready" ? state.items : undefined} autoSelectTitle={editId === justCreated} focusField={panelFocus} onFocusDone={() => setPanelFocus(null)}
-          onClose={() => setEditId(null)} onChanged={() => void refresh()} onOpen={setEditId} />
+          onClose={() => setEditId(null)} onChanged={() => void refresh()} onOpen={(id) => { if (state.kind === "ready" && state.items.find((i) => i.id === id)?.series) { selAnchor.current = id; setSelected(new Set([id])); } setEditId(id); }} />
       )}
       </div>
       {fieldsOpen && project && <FieldsDialog fields={fieldDefs} onSave={(f) => projects.setFields(project.id, f)} onRemove={async (id) => { await removeFieldDef(store, project, id); await projects.reload(project.id); await refresh(); }} onClose={() => setFieldsOpen(false)} />}
