@@ -138,3 +138,30 @@ describe("filter på status, prioritet och ansvarig", () => {
     for (const d of r.deps) { expect(shown.has(d.from_item_id)).toBe(true); expect(shown.has(d.to_item_id)).toBe(true); }
   });
 });
+
+describe("batch: en handling med flera skrivningar är ett ångra-steg, hur långt det än går mellan dem", () => {
+  it("skrivningar med paus längre än 250 ms mellan sig blir ändå ett steg", async () => {
+    const s = new MemoryStore(smallFixture());
+    await s.batch(async () => {
+      await s.updateItem("i6", { title: "A" });
+      await new Promise((r) => setTimeout(r, 300));
+      await s.updateItem("i7", { title: "B" });
+    });
+    const t = async (id: string) => (await s.listItems("proj_1")).find((i) => i.id === id)!.title;
+    expect(await s.undo()).toBe(true);
+    expect([await t("i6"), await t("i7")]).not.toContain("A");
+    expect(await t("i7")).not.toBe("B");
+  });
+  it("en vanlig skrivning före och efter är egna steg", async () => {
+    const s = new MemoryStore(smallFixture());
+    await s.updateItem("i6", { title: "Före" });
+    await new Promise((r) => setTimeout(r, 300));
+    await s.batch(async () => { await s.updateItem("i7", { title: "I1" }); await s.updateItem("i8", { title: "I2" }); });
+    await new Promise((r) => setTimeout(r, 300));
+    await s.updateItem("i9", { title: "Efter" });
+    const titles = async () => Object.fromEntries((await s.listItems("proj_1")).map((i) => [i.id, i.title]));
+    await s.undo(); expect((await titles()).i9).not.toBe("Efter");
+    await s.undo(); const a = await titles(); expect([a.i7, a.i8]).not.toContain("I1"); expect(a.i6).toBe("Före");
+    await s.undo(); expect((await titles()).i6).not.toBe("Före");
+  });
+});

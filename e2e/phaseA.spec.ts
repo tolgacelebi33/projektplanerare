@@ -1,7 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import { openApp } from "./helpers";
 
-type Row = { id: string; title: string; assignee_id: string | null; priority: string; parent_id: string | null; status: string; description: string };
+type Row = { id: string; type: string; title: string; assignee_id: string | null; priority: string; parent_id: string | null; status: string; description: string };
 const items = (page: Page) => page.evaluate(() => (window as any).__store.listItems("proj_1")) as Promise<Row[]>;
 const settingsBtn = (page: Page) => page.getByRole("button", { name: "Inställningar" });
 const dlg = (page: Page) => page.getByRole("dialog", { name: "Inställningar" });

@@ -90,6 +90,7 @@ export class MemoryStore implements DataStore {
   private stepOpen = false;
   private stepPushed = false;
   private touched = false;
+  private holding = 0; // pågående batch: alla skrivningar i den är ett ångra-steg, hur lång tid de än tar
   static readonly GROUP_MS = 250;
   static readonly MAX_STEPS = 100;
 
@@ -99,7 +100,7 @@ export class MemoryStore implements DataStore {
     if (this.suppress) return;
     if (!this.touched) { // första ändringen sedan senaste skrivningen: hör den till samma steg eller börjar ett nytt?
       this.touched = true;
-      const continuing = this.stepOpen && this.stepPushed && this.undoStack.length > 0 && performance.now() - this.lastCommitAt <= MemoryStore.GROUP_MS;
+      const continuing = this.stepOpen && this.stepPushed && this.undoStack.length > 0 && (this.holding > 0 || performance.now() - this.lastCommitAt <= MemoryStore.GROUP_MS);
       if (!continuing) {
         this.stepOld = { projects: new Map(), items: new Map(), deps: new Map() };
         this.stepKeys = { projects: [...this.projects.keys()], items: [...this.items.keys()], deps: [...this.deps.keys()] };
@@ -148,6 +149,12 @@ export class MemoryStore implements DataStore {
     this.lastCommitAt = now;
     this.afterWrite();
     this.listeners.forEach((l) => l());
+  }
+  /** Alla skrivningar i `fn` blir ett enda ångra-steg (en handling i UI som skriver flera poster), oavsett hur långt det går mellan dem. */
+  async batch<T>(fn: () => Promise<T>): Promise<T> {
+    this.closeStep(); // börjar ett nytt steg
+    this.holding++;
+    try { return await fn(); } finally { this.holding--; this.lastCommitAt = performance.now(); }
   }
   /** Nollställer historiken (efter en import, som annars skulle ångras post för post). */
   clearHistory(): void { this.undoStack = []; this.redoStack = []; this.closeStep(); this.afterWrite(); this.listeners.forEach((l) => l()); }

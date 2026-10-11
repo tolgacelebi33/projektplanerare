@@ -2,7 +2,7 @@ import { Suspense, lazy, useEffect, useMemo, useRef, useState } from "react";
 import { downloadText } from "./download";
 import { MAX_IMPORT_BYTES, ImportError, parseUpload } from "./data/exchange";
 import { duplicateProject, exportProject, importParsed, type ExportFormat, type ImportResult } from "./data/importExport";
-import { bulkDelete, bulkMove, bulkStatus, canMove, createSeries, deleteSubtree, descendants, epicChoices, filterActive, filterView, moveTargets, newItemDraft, planMove, rangeIds, selectionRoots, swapWithSibling, type BulkResult } from "./data/actions";
+import { bulkDelete, bulkMove, bulkStatus, canMove, createSeries, inOneStep, deleteSubtree, descendants, epicChoices, filterActive, filterView, moveTargets, newItemDraft, planMove, rangeIds, selectionRoots, swapWithSibling, type BulkResult } from "./data/actions";
 import { BulkBar } from "./views/BulkBar";
 import { boardColumns, planColumnDrop, planColumnMoves } from "./data/boardColumns";
 import { RecurringDialog } from "./views/RecurringDialog";
@@ -158,9 +158,11 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
       const pid = projects.projectId;
       const col = boardColumns(settings.boardGroup, await store.listItems(pid), users).find((c) => c.key === colKey);
       if (!col) return;
-      // Kolumner som är grupper: korten flyttas först till gruppen (ett i taget, eftersom varje flytt ändrar syskonens ordning)
-      if (col.parent !== undefined) for (const id of moved) for (const u of planColumnMoves(await store.listItems(pid), id, col)) await store.updateItem(u.id, u.patch);
-      for (const u of planColumnDrop(await store.listItems(pid), moved, col, before)) await store.updateItem(u.id, u.patch);
+      await inOneStep(store, async () => {
+        // Kolumner som är grupper: korten flyttas först till gruppen (ett i taget, eftersom varje flytt ändrar syskonens ordning)
+        if (col.parent !== undefined) for (const id of moved) for (const u of planColumnMoves(await store.listItems(pid), id, col)) await store.updateItem(u.id, u.patch);
+        for (const u of planColumnDrop(await store.listItems(pid), moved, col, before)) await store.updateItem(u.id, u.patch);
+      });
       await refresh();
     } catch (e) { setWriteError(friendlyError(e)); reload(); }
   };
@@ -169,7 +171,8 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
   const runBulk = async (fn: (projectId: string) => Promise<BulkResult>) => {
     if (!projects.projectId) return;
     try {
-      const r = await fn(projects.projectId);
+      const pid = projects.projectId;
+      const r = await inOneStep(store, () => fn(pid));
       await refresh();
       if (editId && !(await store.listItems(projects.projectId)).some((i) => i.id === editId)) setEditId(null);
       if (r.failed) setWriteError(sv.bulk.partial(r.done, r.failed, friendlyError(r.firstError)));
@@ -202,7 +205,7 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
       const anchor = editId ?? activeGroup;
       const selected = anchor ? state.items.find((i) => i.id === anchor) ?? null : null;
       const draft = newItemDraft("milestone", state.items, selected, { projectId: projects.projectId, workspaceId }, todayISO(), a.first);
-      const made = await createSeries(store, draft, a.kind, a.count, a.title);
+      const made = await inOneStep(store, () => createSeries(store, draft, a.kind, a.count, a.title));
       await refresh();
       if (made[0]) setReveal(made[0].id);
       setWriteError(sv.recur.done(made.length));
@@ -317,7 +320,7 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
     if (!projects.projectId) return;
     try {
       const plan = planMove(await store.listItems(projects.projectId), id, parentId, visibleOrder);
-      for (const u of plan) await store.updateItem(u.id, u.patch);
+      await inOneStep(store, async () => { for (const u of plan) await store.updateItem(u.id, u.patch); });
       await refresh(); // även utan ändring: biblioteket kan ha visat raden på en plats som inte gäller
     } catch (e) { setWriteError(friendlyError(e)); reload(); }
   };

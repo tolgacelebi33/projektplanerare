@@ -324,3 +324,6 @@ export async function changeRecurrence(store: DataStore, items: Item[], member: 
   for (const i of all) if (i.start < member.start && i.recur !== kind) await store.updateItem(i.id, { recur: kind });
   return moved;
 }
+
+/** Kör `fn` som ett enda ångra-steg om lagret stöder det. */
+export const inOneStep = <T,>(store: DataStore, fn: () => Promise<T>): Promise<T> => (store.batch ? store.batch(fn) : fn());

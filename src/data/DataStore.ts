@@ -2,6 +2,8 @@ import type { DependencyMode, Dependency, Item, Project, User } from "./types";
 
 /** UI pratar bara med detta gränssnitt. Alla anrop är asynkrona. */
 export interface DataStore {
+  /** Skrivningarna i `fn` blir ett enda ångra-steg. Lagringar utan ångra kan utelämna den (då körs `fn` som den är). */
+  batch?<T>(fn: () => Promise<T>): Promise<T>;
   listProjects(): Promise<Project[]>;
   /** Medlemmar som kan vara ansvariga. Platshållare tills fas 4. */
   listUsers(): Promise<User[]>;
