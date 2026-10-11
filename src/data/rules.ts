@@ -1,5 +1,5 @@
 import { isISODate, dayNumber, addDays, diffDays } from "./dates";
-import { COMMENT_LIMITS, type Baseline, MAX_BASELINE_ITEMS, DEPENDENCY_TYPES, FIELD_LIMITS, FIELD_TYPES, GROUP_COLORS, LIMITS, MAX_LAG, RECURRENCES, type FieldDef, type SavedView, type Dependency, type Item, type Status } from "./types";
+import { COMMENT_LIMITS, STATUS_LIMITS, type StatusDef, type Baseline, MAX_BASELINE_ITEMS, DEPENDENCY_TYPES, FIELD_LIMITS, FIELD_TYPES, GROUP_COLORS, LIMITS, MAX_LAG, RECURRENCES, type FieldDef, type SavedView, type Dependency, type Item, type Status } from "./types";
 
 export class RuleError extends Error {
   constructor(public code: string, message: string, public data?: Record<string, string>) {
@@ -34,6 +34,7 @@ export function validateItemShape(item: Item): void {
   if (item.board_rank !== undefined && item.board_rank !== null && !Number.isFinite(item.board_rank)) throw new RuleError("bad_rank", `Ogiltig plats i boarden: ${String(item.board_rank)}`);
   for (const k of ["code", "ref"] as const) if (item[k] !== undefined && (typeof item[k] !== "string" || (item[k] as string).length > 60)) throw new RuleError("bad_code", `Ogiltig ${k}`);
   validateExtras(item);
+  if (item.custom_status !== undefined && item.custom_status !== null && (typeof item.custom_status !== "string" || !item.custom_status || item.custom_status.length > 40)) throw new RuleError("bad_custom_status", "Ogiltig egen status");
   if (item.undated !== undefined && typeof item.undated !== "boolean") throw new RuleError("bad_undated", "Ogiltigt värde för ej schemalagd");
   if (item.recur !== undefined && item.recur !== null && !RECURRENCES.includes(item.recur)) throw new RuleError("bad_recur", `Ogiltig upprepning: ${String(item.recur)}`);
   if (item.series !== undefined && item.series !== null && (typeof item.series !== "string" || !item.series)) throw new RuleError("bad_series", "Ogiltigt serie-id");
@@ -271,4 +272,23 @@ export function validateCommentText(text: string): string {
   if (!t) throw new RuleError("empty_comment", "Skriv en kommentar");
   if (t.length > COMMENT_LIMITS.text) throw new RuleError("comment_too_long", `Kommentaren är längre än ${COMMENT_LIMITS.text} tecken`);
   return t;
+}
+
+/** Projektets egna statusar: unika id och namn, minst en i varje kategori, och en grundstatus (id lika med kategori) måste ha just den kategorin. */
+export function validateStatusDefs(defs: StatusDef[]): void {
+  const bad = (msg: string) => { throw new RuleError("bad_statuses", msg); };
+  if (!Array.isArray(defs) || defs.length === 0 || defs.length > STATUS_LIMITS.count) bad(`Mellan 1 och ${STATUS_LIMITS.count} statusar`);
+  const ids = new Set<string>(), names = new Set<string>(), cats = new Set<string>();
+  for (const d of defs) {
+    if (!d || typeof d.id !== "string" || !/^[a-z0-9_]{1,40}$/.test(d.id) || ids.has(d.id)) bad("Ogiltigt eller dubbelt id för en status");
+    ids.add(d.id);
+    if (!STATUSES.includes(d.category)) bad("Ogiltig kategori för en status");
+    if (STATUSES.includes(d.id as Status) && d.id !== d.category) bad("En grundstatus måste ligga i sin egen kategori");
+    const n = typeof d.name === "string" ? d.name.trim() : "";
+    if (!n || n.length > STATUS_LIMITS.name) bad(`Namnet på en status ska vara 1 till ${STATUS_LIMITS.name} tecken`);
+    if (names.has(n.toLowerCase())) bad(`Två statusar heter "${n}"`);
+    names.add(n.toLowerCase());
+    cats.add(d.category);
+  }
+  for (const c of STATUSES) if (!cats.has(c)) bad("Varje kategori (Ej påbörjad, Pågår, Klar och Blockerad) behöver minst en status");
 }

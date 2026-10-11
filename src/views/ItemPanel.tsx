@@ -5,7 +5,7 @@ import { DEPENDENCY_TYPES, GROUP_COLORS, RECURRENCES, type GroupColor, type Recu
 import type { DataStore } from "../data/DataStore";
 import { diffDays, isISODate, todayISO } from "../data/dates";
 import { MAX_DESCRIPTION, MAX_TITLE, RuleError, isOverdue, validateItemShape } from "../data/rules";
-import type { Activity, Baseline, Comment, Dependency, FieldDef, Item, Priority, Status, User } from "../data/types";
+import type { StatusDef, Activity, Baseline, Comment, Dependency, FieldDef, Item, Priority, Status, User } from "../data/types";
 import { friendlyError } from "../i18n/errors";
 import { sv } from "../i18n/sv";
 import { STATUS_GLYPH } from "../proto/statusUi";
@@ -13,6 +13,7 @@ import { DatePicker } from "./DatePicker";
 import { PanelExtras } from "./PanelExtras";
 import { CommentsTab } from "./CommentsTab";
 import { LogTab } from "./LogTab";
+import { defOf, statusDefs, statusPatch } from "../data/statuses";
 import { PanelFields } from "./PanelFields";
 import { checklistPercent } from "../data/extras";
 import { DEFAULT_FEATURES, type Features } from "../settings";
@@ -20,7 +21,7 @@ import { DEFAULT_FEATURES, type Features } from "../settings";
 const STATUSES: Status[] = ["not_started", "in_progress", "done", "blocked"];
 const PRIORITIES: Priority[] = ["low", "normal", "high", "urgent"];
 
-interface Loaded { item: Item; all: Item[]; deps: Dependency[]; users: User[] }
+interface Loaded { item: Item; all: Item[]; deps: Dependency[]; users: User[]; statuses: StatusDef[] }
 type SaveState = { kind: "idle" } | { kind: "saving" } | { kind: "saved" } | { kind: "error"; message: string };
 
 /**
@@ -112,13 +113,13 @@ export function ItemPanel({ me = "", onMe, baseline, fieldDefs = [], onDuplicate
 
   const load = useCallback(async () => {
     try {
-      const [all, deps, users] = await Promise.all([store.listItems(projectId), store.listDependencies(projectId), store.listUsers()]);
+      const [all, deps, users, projects] = await Promise.all([store.listItems(projectId), store.listDependencies(projectId), store.listUsers(), store.listProjects()]);
       if (currentItem.current !== itemId) return; // man har redan bytt post
       const item = all.find((i) => i.id === itemId);
       if (!item) { setLoadError(sv.panel.errors.not_found); return; }
       setLoadError(null);
       const switched = dataRef.current?.item.id !== itemId; // en annan post än den panelen visade senast
-      const loaded = { item, all, deps, users };
+      const loaded = { item, all, deps, users, statuses: statusDefs(projects.find((x) => x.id === projectId)) };
       dataRef.current = loaded;
       setData(loaded);
       // Fältet man skriver i skrivs aldrig över av en omladdning av samma post. Vid byte av post ska fälten alltid byta text, annars kan texten från
@@ -207,7 +208,7 @@ export function ItemPanel({ me = "", onMe, baseline, fieldDefs = [], onDuplicate
     </aside>
   );
 
-  const { item, all, deps, users } = data;
+  const { item, all, deps, users, statuses } = data;
   const byId = new Map(all.map((i) => [i.id, i]));
   const milestone = item.type === "milestone";
   const epic = item.type === "epic";
@@ -288,8 +289,8 @@ export function ItemPanel({ me = "", onMe, baseline, fieldDefs = [], onDuplicate
         <div className="panel-grid">
           <label className="panel-field">
             <span>{sv.panel.status}</span>
-            <select name="status" value={item.status} onChange={(e) => void commit("status", { status: e.target.value as Status })}>
-              {STATUSES.map((s) => <option key={s} value={s}>{STATUS_GLYPH[s]} {sv.status[s]}</option>)}
+            <select name="status" value={defOf(item, statuses).id} onChange={(e) => { const d = statuses.find((x) => x.id === e.target.value); if (d) void commit("status", statusPatch(d, item)); }}>
+              {statuses.map((d) => <option key={d.id} value={d.id}>{STATUS_GLYPH[d.category]} {d.name}</option>)}
             </select>
           </label>
           <label className="panel-field">

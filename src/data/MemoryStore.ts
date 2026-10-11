@@ -1,12 +1,13 @@
 import type { DataStore } from "./DataStore";
-import { RuleError, earliestStart, rederiveEpics, shiftSuccessors, validateBaseline, validateCommentText, validateDependency, validateFieldDefs, validateItemShape, validateParent, validateSavedViews } from "./rules";
+import { RuleError, earliestStart, rederiveEpics, shiftSuccessors, validateBaseline, validateCommentText, validateStatusDefs, validateDependency, validateFieldDefs, validateItemShape, validateParent, validateSavedViews } from "./rules";
 import { addDays } from "./dates";
 import { extendSeries } from "./actions";
 import { PLACEHOLDER_RENAMES, placeholderOldName } from "./fixtures";
 import { countersFor, validCounters, type Counters, emptyCounters, itemCode, nextNumber, parseProjectCode, projectCode } from "./codes";
 import { applyPatch, isPatchList, json, makePatch, type Entry, type Patch } from "./patch";
-import { ACTIVITY_LIMITS, COMMENT_LIMITS, PROJECT_HEALTH, STATUS_UPDATE_LIMITS, type Activity, type ProjectHealth, type StatusUpdate } from "./types";
+import { ACTIVITY_LIMITS, COMMENT_LIMITS, PROJECT_HEALTH, STATUS_UPDATE_LIMITS, type StatusDef, type Activity, type ProjectHealth, type StatusUpdate } from "./types";
 import { depDraft, describeChange } from "./activity";
+import { defOf, statusDefs } from "./statuses";
 import type { Baseline, Comment, Dependency, DependencyMode, FieldDef, Fixture, Item, Project, SavedView, User } from "./types";
 
 /** Allt lagret håller, för att kunna sparas och återställas. */
@@ -167,6 +168,8 @@ export class MemoryStore implements DataStore {
   }
 
   private userNameOf = (id: string | null): string => (id ? this.users.find((u) => u.id === id)?.name ?? "" : "");
+  /** Postens status som i loggen: den egna statusens namn, annars kategorins nyckel (som visas på det valda språket). */
+  private statusNameOf = (i: Item): string => { const defs = statusDefs(this.projects.get(i.project_id)); const d = defOf(i, defs); return d.id === d.category && !this.projects.get(i.project_id)?.statuses ? i.status : d.name; };
   private titleOf = (id: string | null): string => (id ? this.items.get(id)?.title ?? "" : "");
 
   /** Lägger till en rad i loggen (och håller gränserna: högst 300 per post, 100 000 totalt, äldst först bort). */
@@ -188,7 +191,7 @@ export class MemoryStore implements DataStore {
     if (!this.logging) return;
     for (const [id, before] of base) {
       const after = this.items.get(id);
-      for (const d of describeChange(before, after, this.userNameOf, this.titleOf)) this.log(after, d, { auto: !direct.has(id) });
+      for (const d of describeChange(before, after, this.userNameOf, this.titleOf, this.statusNameOf)) this.log(after, d, { auto: !direct.has(id) });
     }
   }
 
@@ -249,7 +252,7 @@ export class MemoryStore implements DataStore {
     for (const [id, after] of this.items) { // vad Ångra eller Gör om ändrade, i loggen
       const before = was.get(id);
       if (before === after) continue;
-      for (const d of describeChange(before, after, this.userNameOf, this.titleOf)) this.log(after, d, { undo: true });
+      for (const d of describeChange(before, after, this.userNameOf, this.titleOf, this.statusNameOf)) this.log(after, d, { undo: true });
     }
     this.projectSeq = Math.max(projectSeq, this.projectSeq); // projektnummer och räkneverk går aldrig tillbaka, inte heller vid ångra
     for (const [pid, c] of counters) {
@@ -399,7 +402,7 @@ export class MemoryStore implements DataStore {
     this.commit(true);
     return proj;
   }
-  async updateProject(id: string, patch: { name?: string; dependency_mode?: DependencyMode; fields?: FieldDef[]; views?: SavedView[]; baseline?: Baseline | null }) {
+  async updateProject(id: string, patch: { name?: string; dependency_mode?: DependencyMode; fields?: FieldDef[]; views?: SavedView[]; baseline?: Baseline | null; statuses?: StatusDef[] | null }) {
     await this.tick("updateProject");
     const cur = this.projects.get(id);
     if (!cur) throw new RuleError("not_found", `Projekt ${id} finns inte`);
@@ -410,8 +413,14 @@ export class MemoryStore implements DataStore {
     if (patch.fields !== undefined) validateFieldDefs(patch.fields);
     if (patch.views !== undefined) validateSavedViews(patch.views);
     if (patch.baseline) validateBaseline(patch.baseline);
+    if (patch.statuses) validateStatusDefs(patch.statuses);
     const next: Project = { ...cur, name, dependency_mode: patch.dependency_mode ?? cur.dependency_mode ?? "shift", ...(patch.fields !== undefined ? { fields: patch.fields } : {}), ...(patch.views !== undefined ? { views: patch.views } : {}) };
     if (patch.baseline === null) delete next.baseline; else if (patch.baseline) next.baseline = patch.baseline;
+    if (patch.statuses === null) delete next.statuses; else if (patch.statuses) next.statuses = patch.statuses.map((d) => ({ id: d.id, name: d.name.trim(), category: d.category }));
+    if (patch.statuses !== undefined) { // poster vars egna status inte finns längre (eller har fel kategori) går tillbaka till grundstatusen
+      const defs = statusDefs(next);
+      for (const i of [...this.items.values()]) if (i.project_id === id && i.custom_status && !defs.some((d) => d.id === i.custom_status && d.category === i.status)) { const { custom_status: _c, ...rest } = i; void _c; this.items.set(i.id, rest); }
+    }
     this.projects.set(id, next);
     this.writes.push({ method: "updateProject", args: [id, patch] });
     this.commit();
@@ -439,6 +448,7 @@ export class MemoryStore implements DataStore {
     await this.tick("createItem");
     const created: Item = { ...item, id: this.nextId("i") };
     this.direct.add(created.id);
+    if (created.custom_status) { const d = statusDefs(this.projects.get(created.project_id)).find((x) => x.id === created.custom_status); if (d) created.status = d.category; else delete created.custom_status; }
     delete created.code; // koden delas alltid ut här, aldrig av den som skapar
     const proj = this.projects.get(created.project_id);
     let counters: Counters | null = null;
@@ -468,8 +478,16 @@ export class MemoryStore implements DataStore {
     if (patch.code !== undefined && patch.code !== cur.code) throw new RuleError("code_fixed", "Koden kan inte ändras");
     this.direct.add(id);
     const next: Item = { ...cur, ...patch };
+    // Egen status: den väljer kategori (status), och en ändrad kategori utan egen status eller med en annan kategori tar bort den egna statusen
+    const defs = statusDefs(this.projects.get(cur.project_id));
+    if (patch.custom_status === null) delete next.custom_status;
+    else if (patch.custom_status) {
+      const d = defs.find((x) => x.id === patch.custom_status);
+      if (!d) throw new RuleError("bad_custom_status", "Statusen finns inte i projektet");
+      next.status = d.category;
+    } else if (next.custom_status && !defs.some((x) => x.id === next.custom_status && x.category === next.status)) delete next.custom_status;
     // Regel: när status blir Klar sätts framsteget till 100 (om framsteg inte ändras i samma skrivning)
-    if (this.rules.doneSetsProgress && patch.status === "done" && cur.status !== "done" && patch.progress === undefined && cur.type !== "epic") next.progress = 100;
+    if (this.rules.doneSetsProgress && next.status === "done" && cur.status !== "done" && patch.progress === undefined && cur.type !== "epic") next.progress = 100;
     if (cur.undated && (next.start !== cur.start || next.end !== cur.end) && patch.undated === undefined) delete next.undated; // nya datum: posten är schemalagd
     // I läget "shift" får en uppgift inte flyttas så att ett beroende bryts (som Asana och monday i strikt läge): slut-start och start-start gäller starten,
     // slut-slut och start-slut gäller slutet, och fördröjningen räknas med. Det är bara en kant som flyttas tidigare som kontrolleras.

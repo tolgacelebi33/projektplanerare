@@ -4,7 +4,7 @@ import { boardColumns, columnCards, type BoardGroup } from "../data/boardColumns
 import { isOverdue } from "../data/rules";
 import { checklistCount, labelColor, logStamp } from "../data/extras";
 import { activityText } from "./activityText";
-import type { Activity, FieldDef, GroupColor, Item, User } from "../data/types";
+import type { StatusDef, Activity, FieldDef, GroupColor, Item, User } from "../data/types";
 import { cardFieldValues } from "../data/fields";
 import type { CardFields } from "../settings";
 import { sv } from "../i18n/sv";
@@ -17,7 +17,7 @@ const firstLine = (t: string, n = 110) => { const l = t.split("\n").find((x) => 
  * värdet och ordningen, eller använd valet på kortet. Ctrl/Cmd-klick markerar flera kort och Shift-klick en följd, och ett klick på tom yta släpper både markering
  * och öppnad post. Grupper är inga kort: de syns som sökväg och som en smal färgkant på korten. Vad som visas på korten styrs av `cardFields`.
  */
-export function BoardView({ lastActivity, commentCounts, fields = [], nextIds, groupBy = "status", cardFields, highlightOverdue = true, markUndated = true, items, allItems, users, colors, openId, selected, onOpen, onSelect, onBackground, onDrop, onMoveTo, onContext }: {
+export function BoardView({ statuses, lastActivity, commentCounts, fields = [], nextIds, groupBy = "status", cardFields, highlightOverdue = true, markUndated = true, items, allItems, users, colors, openId, selected, onOpen, onSelect, onBackground, onDrop, onMoveTo, onContext }: {
   /** Id för nästa tillfälle i varje serie (märks med "Nästa"). */
   nextIds?: ReadonlySet<string>;
   /** Projektets egna fält (för kolumner per fält och fält som visas på korten). */
@@ -25,6 +25,8 @@ export function BoardView({ lastActivity, commentCounts, fields = [], nextIds, g
   groupBy?: BoardGroup; cardFields: CardFields; highlightOverdue?: boolean; markUndated?: boolean;
   /** Antal kommentarer per post (id), för räknaren på korten. */
   commentCounts?: ReadonlyMap<string, number>;
+  /** Projektets egna statusar: kolumnerna när de är grupperade på status. Saknas de är det de fyra grundstatusarna. */
+  statuses?: StatusDef[];
   /** Senaste loggraden per post (id), för "Senaste uppdatering" på korten. */
   lastActivity?: ReadonlyMap<string, Activity>;
   items: Item[]; allItems: Item[]; users: User[]; colors: ReadonlyMap<string, GroupColor | "none">;
@@ -43,7 +45,7 @@ export function BoardView({ lastActivity, commentCounts, fields = [], nextIds, g
   const byId = new Map(allItems.map((i) => [i.id, i]));
   const path = (i: Item): string => { const out: string[] = []; for (let c = i.parent_id ? byId.get(i.parent_id) : undefined; c; c = c.parent_id ? byId.get(c.parent_id) : undefined) out.unshift(c.title); return out.join(" / "); };
   const today = todayISO();
-  const cols = boardColumns(groupBy, allItems, users, fields);
+  const cols = boardColumns(groupBy, allItems, users, fields, statuses);
   const groupLabel = groupBy.startsWith("field:") ? fields.find((f) => f.id === groupBy.slice(6))?.name ?? sv.board.groups.status : sv.board.groups[groupBy as "status"];
   const columns = cols.map((col) => ({ col, list: columnCards(items, col) }));
   const visible = columns.flatMap((c) => c.list.map((i) => i.id));

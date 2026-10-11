@@ -40,6 +40,8 @@ import { ImportPreview } from "./views/ImportPreview";
 import { BaselineBar } from "./views/BaselineBar";
 import { BackupRestore } from "./views/BackupRestore";
 import { StatusDialog } from "./views/StatusDialog";
+import { StatusesDialog } from "./views/StatusesDialog";
+import { defOf, statusDefs, statusPatch } from "./data/statuses";
 import { dueSummary, type DueSummary } from "./data/reminders";
 import { CommandPalette, type PaletteCommand } from "./views/CommandPalette";
 import { buildBackup, firstSeenAt, lastBackupAt, markBackupSaved, parseBackup, reminderDue, restoreBackup, MAX_BACKUP_BYTES, type BackupSummary } from "./data/backup";
@@ -78,6 +80,7 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [statusOpen, setStatusOpen] = useState(false);
+  const [statusesOpen, setStatusesOpen] = useState(false);
   const [statusUpdates, setStatusUpdates] = useState<import("./data/types").StatusUpdate[]>([]);
   const [paletteData, setPaletteData] = useState<{ project: Project; items: Item[] }[] | null>(null);
   const settingsRef = useRef(settings); settingsRef.current = settings;
@@ -221,7 +224,7 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
     if (!projects.projectId) return;
     try {
       const pid = projects.projectId;
-      const col = boardColumns(boardGroup, await store.listItems(pid), users, fieldDefs).find((c) => c.key === colKey);
+      const col = boardColumns(boardGroup, await store.listItems(pid), users, fieldDefs, project?.statuses).find((c) => c.key === colKey);
       if (!col) return;
       await inOneStep(store, async () => {
         // Kolumner som är grupper: korten flyttas först till gruppen (ett i taget, eftersom varje flytt ändrar syskonens ordning)
@@ -262,6 +265,10 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
   };
   const project = projects.projects?.find((p) => p.id === projects.projectId) ?? null;
   const fieldDefs = project?.fields ?? [];
+  // Samma lista (samma objekt) så länge statusarna inte ändrats: annars ritas rutnätet om varje gång projektet läses om
+  const statusKey = JSON.stringify(project?.statuses ?? null);
+  const statusList = useMemo(() => statusDefs(project), [statusKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  const statusCounts = useMemo(() => { const m = new Map<string, number>(); if (state.kind === "ready") for (const i of state.items) if (i.type !== "epic") { const id = defOf(i, statusList).id; m.set(id, (m.get(id) ?? 0) + 1); } return m; }, [state, statusList]);
   const [fieldsOpen, setFieldsOpen] = useState(false);
   const savedViews = project?.views ?? [];
   // En gruppering på ett fält som inte finns (i det här projektet) blir status
@@ -570,7 +577,9 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
   /** Status, prioritet eller ansvarig ändrad direkt i en rad. */
   const editField = async (id: string, field: "status" | "priority" | "assignee", value: string) => {
     try {
-      await store.updateItem(id, field === "assignee" ? { assignee_id: value || null } : field === "status" ? { status: value as Status } : { priority: value as Priority });
+      const d = field === "status" ? statusList.find((x) => x.id === value) : undefined;
+      const cur = state.kind === "ready" ? state.items.find((i) => i.id === id) : undefined;
+      await store.updateItem(id, field === "assignee" ? { assignee_id: value || null } : field === "status" ? (d ? statusPatch(d, cur) : { status: value as Status }) : { priority: value as Priority });
       await refresh();
     } catch (e) { setWriteError(friendlyError(e)); }
   };
@@ -790,6 +799,7 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
           <span className="toolbar-label">{sv.filter.listLabel}</span>
           <ColumnPicker columns={columns} fieldDefs={fieldDefs} onToggle={toggleColumn} />
           <button type="button" className="mini" disabled={!project} onClick={() => setFieldsOpen(true)}>{sv.fields.button}</button>
+          <button type="button" className="mini" disabled={!project} onClick={() => setStatusesOpen(true)}>{sv.statuses.button}</button>
           {project && <SavedViews views={savedViews} current={currentView()} onApply={applyView} onSave={saveView} onRemove={removeView} />}
           {view === "gantt" && project && state.kind === "ready" && (
             <BaselineBar baseline={project.baseline} count={state.items.length} onSave={saveBaseline} onRemove={async () => { await projects.setBaseline(project.id, null); }} />
@@ -801,9 +811,9 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
         </div>
       </div>
       {(view === "gantt" || view === "board") && selected.size > 0 && state.kind === "ready" && (
-        <BulkBar count={selected.size} inside={selectionRoots(state.items, selected).reduce((n, id) => n + descendants(state.items, id).length, 0)}
+        <BulkBar statuses={statusList} count={selected.size} inside={selectionRoots(state.items, selected).reduce((n, id) => n + descendants(state.items, id).length, 0)}
           targets={(() => { const ok = new Set(moveTargets(state.items, selected).map((i) => i.id)); return epicChoices(state.items, "").filter((c) => ok.has(c.id)); })()}
-          onStatus={(s) => void runBulk((pid) => bulkStatus(store, [...selected], s))}
+          onStatus={(d) => void runBulk((pid) => bulkStatus(store, [...selected], statusPatch(d)))}
           onMove={(g) => void runBulk((pid) => bulkMove(store, pid, [...selected], g))}
           onDelete={() => void runBulk((pid) => bulkDelete(store, pid, [...selected]))}
           onClear={() => { selAnchor.current = null; setSelected(new Set()); }} />
@@ -837,7 +847,7 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
         {projects.projects && projects.projects.length === 0 && (
           <div className="empty-state"><p>{sv.project.none}</p><button type="button" className="btn btn-primary" onClick={() => void projects.create(sv.project.defaultName)}>{sv.project.createFirst}</button></div>
         )}
-        {state.kind === "ready" && projects.projectId && view === "board" && <BoardView lastActivity={lastActivity} commentCounts={commentCounts} fields={fieldDefs} nextIds={nextIds} groupBy={boardGroup} cardFields={settings.cardFields} highlightOverdue={settings.highlightOverdue} markUndated={settings.markUndated} items={listItems} allItems={state.items} users={users} colors={colors} openId={editId} selected={selected} onOpen={setEditId} onSelect={selectRow} onBackground={dropSelection} onDrop={(m, k, b) => void dropCards(m, k, b)} onMoveTo={moveCardTo} onContext={openMenu} />}
+        {state.kind === "ready" && projects.projectId && view === "board" && <BoardView statuses={project?.statuses} lastActivity={lastActivity} commentCounts={commentCounts} fields={fieldDefs} nextIds={nextIds} groupBy={boardGroup} cardFields={settings.cardFields} highlightOverdue={settings.highlightOverdue} markUndated={settings.markUndated} items={listItems} allItems={state.items} users={users} colors={colors} openId={editId} selected={selected} onOpen={setEditId} onSelect={selectRow} onBackground={dropSelection} onDrop={(m, k, b) => void dropCards(m, k, b)} onMoveTo={moveCardTo} onContext={openMenu} />}
         {state.kind === "ready" && projects.projectId && view === "calendar" && <CalendarView items={shown.items} today={todayISO()} markUndated={settings.markUndated} colors={colors} openId={editId} onOpen={setEditId} onShift={(id, d) => void shiftItem(id, d)} />}
         {state.kind === "ready" && projects.projectId && view === "workload" && <WorkloadView items={shown.items} users={users} fieldDefs={fieldDefs} fieldId={settings.workloadField} cap={settings.workloadCap} today={todayISO()} onOpen={setEditId} />}
         {view === "week" && projects.projects && projects.projects.length > 0 && <MyWeekView groups={myWeekGroups(allData, todayISO())} users={users} multi={projects.projects.length > 1} onOpen={openInProject} />}
@@ -846,7 +856,7 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
         {state.kind === "ready" && projects.projectId && view === "gantt" && (
           <div className="gantt-wrap">
           <div className="gantt-main">
-          <DhtmlxGantt fieldDefs={fieldDefs} key={`${theme}-${settings.touch}`} touchMode={settings.touch} selected={selected} onSelect={selectRow} colors={colors} collapse={collapse} gridWidth={gridWidth} columns={columns} columnWidths={colWidths} onResizeColumn={resizeColumn} users={users} onEditField={editField} revealId={reveal} todayToken={todayToken} onPersisted={() => void refresh()}
+          <DhtmlxGantt statuses={statusList} fieldDefs={fieldDefs} key={`${theme}-${settings.touch}`} touchMode={settings.touch} selected={selected} onSelect={selectRow} colors={colors} collapse={collapse} gridWidth={gridWidth} columns={columns} columnWidths={colWidths} onResizeColumn={resizeColumn} users={users} onEditField={editField} revealId={reveal} todayToken={todayToken} onPersisted={() => void refresh()}
             onNotice={setWriteError}
             onCreateAt={({ rowId, date }) => void addItem("task", { anchorId: rowId, start: date }).catch(() => undefined)}
             onRename={(id) => { setJustCreated(id); setEditId(id); }}
@@ -867,6 +877,7 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
       </div>
       {fieldsOpen && project && <FieldsDialog fields={fieldDefs} onSave={(f) => projects.setFields(project.id, f)} onRemove={async (id) => { await removeFieldDef(store, project, id); await projects.reload(project.id); await refresh(); }} onClose={() => setFieldsOpen(false)} />}
       {preview && <ImportPreview fileName={preview.file} parsed={preview.parsed} destination={{ into: preview.into ? project?.name ?? "" : null, name: preview.parsed.name }} onCancel={() => setPreview(null)} onConfirm={() => { const p = preview; setPreview(null); void commitImport(p.parsed, p.into).catch((e) => setWriteError(friendlyError(e))); }} />}
+      {statusesOpen && project && <StatusesDialog statuses={statusList} custom={!!project.statuses} counts={statusCounts} onClose={() => setStatusesOpen(false)} onSave={async (defs) => { await projects.setStatuses(project.id, defs); await refresh(); }} />}
       {statusOpen && project && <StatusDialog project={project} updates={statusUpdates} onClose={() => setStatusOpen(false)} onPublish={async (h, t) => { await store.addStatusUpdate({ project_id: project.id, health: h, text: t }); }} />}
       {paletteOpen && <CommandPalette data={paletteData ?? []} loading={paletteData === null} commands={paletteCommands} onClose={() => setPaletteOpen(false)}
         onOpenItem={(pid, iid) => { openInProject(pid, iid); }} onOpenProject={(pid) => { focusMedianOnNextProject(); projects.select(pid); }} />}

@@ -202,8 +202,9 @@ async function eachId(ids: string[], fn: (id: string) => Promise<unknown>): Prom
 }
 
 /** Ändrar status på alla markerade poster. En post som lagret avvisar hoppas över och räknas som misslyckad, resten ändras ändå. */
-export function bulkStatus(store: DataStore, ids: string[], status: Status): Promise<BulkResult> {
-  return eachId(ids, (id) => store.updateItem(id, { status }));
+export function bulkStatus(store: DataStore, ids: string[], status: Status | { status: Status; custom_status?: string | null }): Promise<BulkResult> {
+  const patch = typeof status === "string" ? { status } : status;
+  return eachId(ids, (id) => store.updateItem(id, patch));
 }
 
 /** Flyttar markerade poster (utan markerad förfader) sist i en grupp (`null` = översta nivån), i den ordning de visas nu. */

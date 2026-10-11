@@ -10,12 +10,12 @@ const same = (a: unknown, b: unknown) => JSON.stringify(a ?? null) === JSON.stri
  * Vad som ändrats mellan två lägen av en post, som poster i loggen. Start och slut som ändras tillsammans blir en rad (datum). Beskrivning, etiketter,
  * checklista, länkar, egna fält och färg loggas utan värden (det som ändrats, inte hur). Bara det användaren kan ändra loggas: ordning, kod och liknande hoppas över.
  */
-export function describeChange(before: Item | undefined, after: Item | undefined, userName: (id: string | null) => string, titleOf: (id: string | null) => string): Draft[] {
+export function describeChange(before: Item | undefined, after: Item | undefined, userName: (id: string | null) => string, titleOf: (id: string | null) => string, statusName: (i: Item) => string = (i) => i.status): Draft[] {
   if (!after) return [];
   if (!before) return [{ kind: "created" }];
   const out: Draft[] = [];
   if (before.title !== after.title) out.push({ kind: "changed", field: "title", from: cut(before.title), to: cut(after.title) });
-  if (before.status !== after.status) out.push({ kind: "changed", field: "status", from: before.status, to: after.status });
+  if (before.status !== after.status || (before.custom_status ?? null) !== (after.custom_status ?? null)) { const f = statusName(before), t = statusName(after); if (f !== t || before.status !== after.status) out.push({ kind: "changed", field: "status", from: f, to: t }); }
   if (before.priority !== after.priority) out.push({ kind: "changed", field: "priority", from: before.priority, to: after.priority });
   if (before.assignee_id !== after.assignee_id) out.push({ kind: "changed", field: "assignee", from: userName(before.assignee_id), to: userName(after.assignee_id) });
   if (before.start !== after.start || before.end !== after.end) out.push({ kind: "changed", field: "dates", from: range(before), to: range(after) });

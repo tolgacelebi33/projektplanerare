@@ -1,5 +1,5 @@
 import { addDays, isISODate, recurringDates, todayISO } from "./dates";
-import { RuleError, validateBaseline, validateCommentText, validateFieldDefs, validateItemShape, validateSavedViews } from "./rules";
+import { RuleError, validateStatusDefs, validateBaseline, validateCommentText, validateFieldDefs, validateItemShape, validateSavedViews } from "./rules";
 import { newChecklistId, normalizeLink } from "./extras";
 import { importFieldValue, inferFieldDef, newFieldId } from "./fields";
 import { FIELD_LIMITS, LIMITS, type FieldValue } from "./types";
@@ -7,7 +7,7 @@ import { sv } from "../i18n/sv";
 import { enDict, svDict } from "../i18n/sv";
 import { friendlyError } from "../i18n/errors";
 import { DEPENDENCY_TYPES, MAX_LAG, type DependencyType } from "./types";
-import { PROJECT_HEALTH, STATUS_UPDATE_LIMITS, type ProjectHealth, type StatusUpdate } from "./types";
+import { PROJECT_HEALTH, STATUS_UPDATE_LIMITS, type ProjectHealth, type StatusDef, type StatusUpdate } from "./types";
 import type { Activity, ActivityKind, Baseline, Comment, Dependency, DependencyMode, FieldDef, ISODate, Item, ItemType, Priority, Project, Recurrence, SavedView, Status, User } from "./types";
 
 /**
@@ -46,6 +46,8 @@ export interface ParsedProject {
   /** Kommentarer (JSON): `item` och `id`/`parent` är filens id, författaren ett namn. */
   /** Loggen (JSON): `item` är filens id, `actor` ett namn. */
   activity?: { item: string; at: string; actor: string | null; kind: ActivityKind; field?: string; from?: string; to?: string; other?: string; dir?: "pred" | "succ"; dep_type?: DependencyType; lag?: number; auto?: boolean; undo?: boolean }[];
+  /** Projektets egna statusar (JSON). */
+  statuses?: StatusDef[];
   /** Projektets statusuppdateringar (JSON): hälsa, text, tid och namn. */
   status_updates?: { at: string; actor: string | null; health: ProjectHealth; text: string }[];
   comments?: { id: string; item: string; parent?: string; author: string | null; text: string; at: string; edited?: string }[];
@@ -77,12 +79,13 @@ const TYPES: ItemType[] = ["epic", "milestone", "task"];
 export class ImportError extends Error {}
 
 /** Lagrets poster som en neutral beskrivning (ansvarig som namn, inga projekt- eller workspace-id). */
-export function toParsed(project: Pick<Project, "name" | "dependency_mode"> & Partial<Pick<Project, "fields" | "views" | "baseline">>, items: Item[], deps: Dependency[], users: User[], comments: Comment[] = [], activity: Activity[] = [], statusUpdates: StatusUpdate[] = []): ParsedProject {
+export function toParsed(project: Pick<Project, "name" | "dependency_mode"> & Partial<Pick<Project, "fields" | "views" | "baseline" | "statuses">>, items: Item[], deps: Dependency[], users: User[], comments: Comment[] = [], activity: Activity[] = [], statusUpdates: StatusUpdate[] = []): ParsedProject {
   const name = new Map(users.map((u) => [u.id, u.name]));
   const ids = new Set(items.map((i) => i.id));
   return {
     name: project.name,
     dependency_mode: project.dependency_mode ?? "shift",
+    ...(project.statuses?.length ? { statuses: project.statuses } : {}),
     ...(project.fields?.length ? { fields: project.fields } : {}), ...(project.views?.length ? { views: project.views } : {}),
     ...(project.baseline && Object.keys(project.baseline.items).length ? { baseline: { saved_at: project.baseline.saved_at, items: Object.fromEntries(Object.entries(project.baseline.items).filter(([k]) => ids.has(k))) } } : {}),
     ...(statusUpdates.length ? { status_updates: statusUpdates.map((u) => ({ at: u.at, actor: u.actor_name || null, health: u.health, text: u.text })) } : {}),
@@ -97,7 +100,7 @@ export function toParsed(project: Pick<Project, "name" | "dependency_mode"> & Pa
 // ---------- JSON ----------
 
 export function toJson(p: ParsedProject, exportedAt: string): string {
-  return JSON.stringify({ format: FORMAT, version: 1, exported_at: exportedAt, project: { name: p.name, dependency_mode: p.dependency_mode, ...(p.fields?.length ? { fields: p.fields } : {}), ...(p.views?.length ? { views: p.views } : {}), ...(p.baseline ? { baseline: p.baseline } : {}), ...(p.status_updates?.length ? { status_updates: p.status_updates } : {}) }, items: p.items, dependencies: p.deps, ...(p.comments?.length ? { comments: p.comments } : {}), ...(p.activity?.length ? { activity: p.activity } : {}) }, null, 2);
+  return JSON.stringify({ format: FORMAT, version: 1, exported_at: exportedAt, project: { name: p.name, dependency_mode: p.dependency_mode, ...(p.fields?.length ? { fields: p.fields } : {}), ...(p.statuses?.length ? { statuses: p.statuses } : {}), ...(p.views?.length ? { views: p.views } : {}), ...(p.baseline ? { baseline: p.baseline } : {}), ...(p.status_updates?.length ? { status_updates: p.status_updates } : {}) }, items: p.items, dependencies: p.deps, ...(p.comments?.length ? { comments: p.comments } : {}), ...(p.activity?.length ? { activity: p.activity } : {}) }, null, 2);
 }
 
 function shapeCheck(it: ParsedItem, n: number) {
@@ -157,6 +160,7 @@ export function parseJson(text: string): ParsedProject {
       ...(Array.isArray(x.log) ? { log: x.log as Item["log"] } : {}),
       ...(isObj(x.fields) ? { fields: x.fields as Item["fields"] } : {}),
       ...(typeof x.ref === "string" && x.ref ? { ref: x.ref.slice(0, 60) } : typeof x.code === "string" && x.code ? { ref: x.code.slice(0, 60) } : {}),
+      ...(typeof x.custom_status === "string" && x.custom_status ? { custom_status: x.custom_status.slice(0, 40) } : {}),
       ...(typeof x.series === "string" && x.series ? { series: x.series } : {}),
       ...(typeof x.recur === "string" ? { recur: x.recur as ParsedItem["recur"] } : {}),
     };
@@ -203,6 +207,9 @@ export function parseJson(text: string): ParsedProject {
     });
   }
   if (isObj(proj.baseline)) { try { validateBaseline(proj.baseline as unknown as Baseline); } catch (er) { throw new ImportError(friendlyError(er)); } out.baseline = proj.baseline as unknown as Baseline; }
+  if (Array.isArray(proj.statuses)) { try { validateStatusDefs(proj.statuses as StatusDef[]); } catch (er) { throw new ImportError(friendlyError(er)); } out.statuses = proj.statuses as StatusDef[]; }
+  // En egen status på en post som inte finns bland filens statusar tas bort (posten behåller kategorin)
+  for (const it of out.items) if (it.custom_status && !out.statuses?.some((d) => d.id === it.custom_status && d.category === it.status)) delete it.custom_status;
   if (Array.isArray(proj.views)) { try { validateSavedViews(proj.views as SavedView[]); } catch (er) { throw new ImportError(friendlyError(er)); } out.views = proj.views as SavedView[]; }
   structureCheck(out);
   out.report = buildReport(out, null);
@@ -247,7 +254,7 @@ export function toCsv(p: ParsedProject): string {
   const preds = new Map<string, string[]>();
   for (const d of p.deps) preds.set(d.to, [...(preds.get(d.to) ?? []), predCell(d)]);
   const rows = treeOrder(p.items).map((i) => [
-    i.id, sv.panel.type[i.type], i.title, i.parent_id ?? "", i.start, i.type === "milestone" ? i.start : i.end, sv.status[i.status], i.assignee ?? "",
+    i.id, sv.panel.type[i.type], i.title, i.parent_id ?? "", i.start, i.type === "milestone" ? i.start : i.end, (i.custom_status ? p.statuses?.find((d) => d.id === i.custom_status)?.name : undefined) ?? sv.status[i.status], i.assignee ?? "",
     sv.panel.priorities[i.priority], String(i.progress), i.description, (preds.get(i.id) ?? []).join(", "), i.code ?? "",
   ]);
   return "﻿" + [[...sv.ex.header], ...rows].map((r) => r.map(cell).join(";")).join("\r\n") + "\r\n";

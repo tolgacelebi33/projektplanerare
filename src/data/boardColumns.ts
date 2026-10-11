@@ -1,6 +1,7 @@
 import { sv } from "../i18n/sv";
 import { boardRankOrder, planMove, treeOrderIds } from "./actions";
-import type { FieldDef, Item, Priority, Status, User } from "./types";
+import { defOf, statusPatch } from "./statuses";
+import type { FieldDef, Item, Priority, Status, StatusDef, User } from "./types";
 
 /** Vad boardens kolumner är. `field:<id>` är ett eget rullistefält. */
 export type BoardGroup = "status" | "assignee" | "priority" | "group" | `field:${string}`;
@@ -31,7 +32,7 @@ export function topGroupId(byId: Map<string, Item>, i: Item): string | null {
   return top;
 }
 
-export function boardColumns(groupBy: BoardGroup, items: Item[], users: User[], fields: FieldDef[] = []): BoardColumn[] {
+export function boardColumns(groupBy: BoardGroup, items: Item[], users: User[], fields: FieldDef[] = [], statuses?: StatusDef[]): BoardColumn[] {
   const fdef = groupBy.startsWith("field:") ? fields.find((f) => f.id === groupBy.slice(6) && f.type === "select") : undefined;
   if (fdef) {
     const val = (i: Item) => { const v = i.fields?.[fdef.id]; return typeof v === "string" ? (fdef.options ?? []).find((o) => o.toLowerCase() === v.toLowerCase()) ?? null : null; };
@@ -50,6 +51,8 @@ export function boardColumns(groupBy: BoardGroup, items: Item[], users: User[], 
     return [...tops.map((g) => ({ key: g.id, label: g.title, belongs: (i: Item) => topGroupId(byId, i) === g.id, patch: {}, parent: g.id })),
       { key: "", label: sv.board.noGroup, belongs: (i: Item) => topGroupId(byId, i) === null, patch: {}, parent: null }];
   }
+  // Status: projektets egna statusar i den ordning de har (en kolumn var), annars de fyra grundstatusarna
+  if (statuses?.length) return statuses.map((d) => ({ key: d.id, label: d.name, glyph: GLYPH[d.category], status: d.category, belongs: (i: Item) => defOf(i, statuses).id === d.id, patch: statusPatch(d) as Partial<Item> }));
   return STATUSES.map((s) => ({ key: s, label: sv.status[s], glyph: GLYPH[s], status: s, belongs: (i: Item) => i.status === s, patch: { status: s } }));
 }
 

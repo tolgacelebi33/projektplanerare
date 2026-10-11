@@ -46,6 +46,12 @@ export async function importParsed(store: MemoryStore, workspaceId: string, pars
   try {
     if (existing && originalMode !== "none") await store.updateProject(project.id, { dependency_mode: "none" });
     // Egna fält: ett nytt projekt får filens fält och vyer som de är. I ett befintligt projekt förs fälten samman på namn (samma typ återanvänds, rullistans val läggs ihop), och posternas värden flyttas till rätt fält.
+    // Egna statusar: ett nytt projekt får filens. I ett befintligt projekt används en status med samma namn och kategori, annars går posten tillbaka till grundstatusen.
+    const statusMap = new Map<string, string | null>();
+    if (parsed.statuses?.length) {
+      if (!existing) { for (const d of parsed.statuses) statusMap.set(d.id, d.id); await store.updateProject(project.id, { statuses: parsed.statuses }); }
+      else for (const d of parsed.statuses) { const same = (existing.statuses ?? []).find((h) => h.name.trim().toLowerCase() === d.name.trim().toLowerCase() && h.category === d.category); statusMap.set(d.id, same ? same.id : null); }
+    }
     const fieldMap = new Map<string, string>();
     if (parsed.fields?.length) {
       if (!existing) { for (const d of parsed.fields) fieldMap.set(d.id, d.id); await store.updateProject(project.id, { fields: parsed.fields, ...(parsed.views?.length ? { views: parsed.views } : {}) }); }
@@ -72,7 +78,9 @@ export async function importParsed(store: MemoryStore, workspaceId: string, pars
     const ordered = [...parsed.items].sort((a, b) => depth(a.id) - depth(b.id) || a.sort_order - b.sort_order);
     const idMap = new Map<string, string>();
     for (const it of ordered) {
-      const { id, assignee, parent_id, code, ...rest } = it; // koden delas ut av lagret, den gamla blir en hänvisning
+      const { id, assignee, parent_id, code, custom_status, ...rest } = it;
+      const mapped = custom_status ? statusMap.get(custom_status) : null;
+      if (mapped) (rest as { custom_status?: string }).custom_status = mapped; // koden delas ut av lagret, den gamla blir en hänvisning
       if (code && !rest.ref) rest.ref = code.slice(0, 60);
       if (rest.fields) { const mapped: NonNullable<Item["fields"]> = {}; for (const [k, v] of Object.entries(rest.fields)) { const nk = fieldMap.get(k); if (nk) mapped[nk] = v; } rest.fields = Object.keys(mapped).length ? mapped : undefined; }
       // Flera ansvariga kan stå i samma cell (A; B eller A/B). Första som är en känd användare blir ansvarig, resten (och okända) hamnar i beskrivningen.

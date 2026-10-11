@@ -239,6 +239,12 @@ export const enDict: Dict = {
     title: "Install as an app", intro: "The app can be installed on the phone and the computer and then starts in its own window, even without a network (the data is in the browser on that device).", install: "Install the app", installed: "The app is installed on this device.",
     manual: "Install from the browser menu (Chrome and Edge: Install app). On iPhone: Share and then Add to Home Screen.",
   },
+  statuses: {
+    title: "Statuses", button: "Statuses...", intro: "Custom statuses for the project, for example Waiting for supplier. Each status belongs to one of four categories that control overdue, done, workload, color and symbol. At least one in each category. An item without a custom status shows the first status of its category. The columns of the board follow the order here.",
+    nameOf: (n: string) => `Name: ${n}`, up: (n: string) => `Move up ${n}`, down: (n: string) => `Move down ${n}`, remove: (n: string) => `Remove ${n}`, removeBtn: "Remove", lastInCategory: "There must be at least one status in each category",
+    countHint: "Number of items with the status. If the status is removed they get the first status of the category.", newName: "Name of new status", newCategory: "Category of new status", add: "Add", save: "Save", cancel: "Cancel", close: "Close",
+    reset: "Back to the default statuses", confirmReset: "Back to the four default statuses? Items with a custom status get the default status of the category.", resetYes: "Reset",
+  },
   settings: {
     button: "Settings", title: "Settings",
     tabs: { label: "Settings, sections", list: "List view", board: "Board view", views: "More views", item: "Item", rules: "Rules", people: "People", reminders: "Reminders", backup: "Backup", start: "Start", touch: "Touch screen", info: "Information and help" },

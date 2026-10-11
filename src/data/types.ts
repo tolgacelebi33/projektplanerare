@@ -18,6 +18,8 @@ export interface Project {
   fields?: FieldDef[];
   /** Sparade vyer (vy, filter, kolumner, gruppering under ett namn). */
   views?: SavedView[];
+  /** Projektets egna statusar (i visad ordning). Saknas de gäller de fyra grundstatusarna. */
+  statuses?: StatusDef[];
   /** Baslinje: planens datum vid en tidpunkt, för att se glidning. Posterna är nycklar (id). */
   baseline?: Baseline;
   /** Läsbar kod (PRJ0001). Delas ut av lagret, aldrig av användaren, och återanvänds aldrig. */
@@ -68,6 +70,13 @@ export const COMMENT_LIMITS = { text: 2000, perItem: 500, total: 50_000 } as con
 
 export interface Baseline { saved_at: string; items: Record<string, { start: string; end: string }> }
 export const MAX_BASELINE_ITEMS = 50_000;
+
+/**
+ * Egen status: ett namn som hör till en av de fyra grundkategorierna (Ej påbörjad, Pågår, Klar, Blockerad). Kategorin styr allt som beror på status
+ * (försenat, klart, belastning, färg och symbol), namnet är det man ser och väljer. Id lika med kategorins nyckel är grundstatusen.
+ */
+export interface StatusDef { id: string; name: string; category: Status }
+export const STATUS_LIMITS = { count: 30, name: 40 } as const;
 
 export type FieldType = "text" | "number" | "date" | "select";
 /** Ett eget fält. `options` är rullistans val (bara för `select`), `card` att värdet visas på korten. */
@@ -122,6 +131,8 @@ export interface Item {
   log?: LogEntry[];
   /** Datumen är platshållare från en import (posten saknade datum). Tas bort när datumen ändras eller användaren väljer att behålla dem. */
   undated?: boolean;
+  /** Id för en egen status i projektet (se `Project.statuses`). `status` är dess kategori. Saknas: grundstatusen. */
+  custom_status?: string | null;
   /** Gemensamt id för posterna i en återkommande serie (en milstolpe som upprepas). Varje tillfälle är en egen post som kan göras klar för sig. */
   series?: string | null;
   /** Hur ofta serien upprepas. Samma på alla poster i serien. */

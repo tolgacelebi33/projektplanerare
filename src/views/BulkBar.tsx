@@ -1,16 +1,16 @@
 import { useState } from "react";
-import type { Status } from "../data/types";
+import type { StatusDef } from "../data/types";
 import { sv } from "../i18n/sv";
 
-const STATUSES: Status[] = ["not_started", "in_progress", "done", "blocked"];
-
 /** Åtgärder för markerade poster: ändra status, flytta till en grupp, ta bort, avmarkera. */
-export function BulkBar({ count, inside, targets, onStatus, onMove, onDelete, onClear }: {
+export function BulkBar({ statuses, count, inside, targets, onStatus, onMove, onDelete, onClear }: {
+  /** Projektets statusar (egna eller grundstatusarna). */
+  statuses: StatusDef[];
   count: number;
   /** Antal poster som ligger under de markerade (de tas bort tillsammans med dem). */
   inside: number;
   targets: { id: string; label: string }[];
-  onStatus: (s: Status) => void;
+  onStatus: (s: StatusDef) => void;
   /** `null` = översta nivån. */
   onMove: (groupId: string | null) => void;
   onDelete: () => void;
@@ -29,9 +29,9 @@ export function BulkBar({ count, inside, targets, onStatus, onMove, onDelete, on
   return (
     <div className="bulk-bar" role="region" aria-label={sv.bulk.label}>
       <span className="bulk-count" role="status">{sv.bulk.count(count)}</span>
-      <select aria-label={sv.bulk.status} value="" onChange={(e) => { if (e.target.value) onStatus(e.target.value as Status); }}>
+      <select aria-label={sv.bulk.status} value="" onChange={(e) => { const d = statuses.find((x) => x.id === e.target.value); if (d) onStatus(d); }}>
         <option value="">{sv.bulk.status}</option>
-        {STATUSES.map((s) => <option key={s} value={s}>{sv.status[s]}</option>)}
+        {statuses.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
       </select>
       <select aria-label={sv.bulk.move} value="" onChange={(e) => { if (e.target.value !== "") onMove(e.target.value === "__top" ? null : e.target.value); }}>
         <option value="">{sv.bulk.move}</option>

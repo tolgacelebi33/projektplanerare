@@ -104,6 +104,7 @@ test("S7 filter ändrar bara vyn: lagrade data är orörda, och årshjulet filtr
 });
 
 test("S8 Fäll ihop alla döljer innehållet i grupperna, och Öppna alla visar allt igen", async ({ page }) => {
+  await page.setViewportSize({ width: 1500, height: 1100 }); // raderna ritas bara när de ryms (listan är virtualiserad)
   await openApp(page, "dhtmlx");
   const all = await allItems(page);
   const top = all.filter((i) => i.parent_id === null).length;

@@ -244,6 +244,12 @@ export const svDict = {
     title: "Installera som app", intro: "Appen går att installera på telefonen och datorn och startar då i eget fönster, även utan nät (datan finns i webbläsaren på den enheten).", install: "Installera appen", installed: "Appen är installerad på den här enheten.",
     manual: "Installera från webbläsarens meny (Chrome och Edge: Installera app). På iPhone: Dela och sedan Lägg till på hemskärmen.",
   },
+  statuses: {
+    title: "Statusar", button: "Statusar...", intro: "Egna statusar för projektet, till exempel Väntar på leverantör. Varje status hör till en av fyra kategorier som styr försenat, klart, belastning, färg och symbol. Minst en i varje kategori. En post utan egen status visar kategorins första status. Kolumnerna i boarden följer ordningen här.",
+    nameOf: (n: string) => `Namn: ${n}`, up: (n: string) => `Flytta upp ${n}`, down: (n: string) => `Flytta ner ${n}`, remove: (n: string) => `Ta bort ${n}`, removeBtn: "Ta bort", lastInCategory: "Det måste finnas minst en status i varje kategori",
+    countHint: "Antal poster med statusen. Tas statusen bort får de kategorins första status.", newName: "Namn på ny status", newCategory: "Kategori för ny status", add: "Lägg till", save: "Spara", cancel: "Avbryt", close: "Stäng",
+    reset: "Tillbaka till grundstatusarna", confirmReset: "Tillbaka till de fyra grundstatusarna? Poster som har en egen status får kategorins grundstatus.", resetYes: "Återställ",
+  },
   settings: {
     button: "Inställningar", title: "Inställningar",
     tabs: { label: "Inställningar, avsnitt", list: "Listvy", board: "Boardvy", views: "Fler vyer", item: "Posten", rules: "Regler", people: "Personer", reminders: "Påminnelser", backup: "Säkerhetskopia", start: "Start", touch: "Pekskärm", info: "Information och hjälp" },

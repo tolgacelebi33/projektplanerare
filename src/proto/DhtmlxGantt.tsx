@@ -6,7 +6,8 @@ import { addDays, diffDays, fromLocalDate, toLocalDate, todayISO } from "../data
 import { friendlyError } from "../i18n/errors";
 import type { ISODate } from "../data/types";
 import { isOverdue } from "../data/rules";
-import type { Baseline, Dependency, Item, Status, User } from "../data/types";
+import type { Baseline, Dependency, Item, Status, StatusDef, User } from "../data/types";
+import { defOf, defaultStatusDefs } from "../data/statuses";
 import { sv } from "../i18n/sv";
 import { datePatch, persistPatch } from "./persist";
 import { STATUS_GLYPH } from "./statusUi";
@@ -33,7 +34,7 @@ import { consumeFocusMedian, scrollCarry } from "../scrollCarry";
 
 const LINK_TYPE: Record<string, string> = { finish_to_start: "0", start_to_start: "1", finish_to_finish: "2", start_to_finish: "3" };
 const DEP_TYPE: Record<string, "finish_to_start" | "start_to_start" | "finish_to_finish" | "start_to_finish"> = { "0": "finish_to_start", "1": "start_to_start", "2": "finish_to_finish", "3": "start_to_finish" };
-interface TaskRow { sm: string; code: string; cf: Record<string, string | number | null>; od: boolean; und: boolean; rec: boolean; color: string; id: string; text: string; start_date: Date; end_date: Date; type: string; kind: Item["type"]; parent: string | number; status: Status; priority: Item["priority"]; assignee: string; progress: number; open: boolean }
+interface TaskRow { sid: string; sname: string; ss: string; sm: string; code: string; cf: Record<string, string | number | null>; od: boolean; und: boolean; rec: boolean; color: string; id: string; text: string; start_date: Date; end_date: Date; type: string; kind: Item["type"]; parent: string | number; status: Status; priority: Item["priority"]; assignee: string; progress: number; open: boolean }
 interface LinkRow { id: string; source: string; target: string; type: string }
 
 /** Förväntad ordning för träd i djupet först, syskon efter sort_order. Används för att avgöra om strukturen ändrats. */
@@ -48,7 +49,9 @@ function treeOrder(items: Item[]): string[] {
 
 export interface ContextArgs { id: string | null; x: number; y: number; date: ISODate | null }
 
-export function DhtmlxGantt({ store, items, deps, zoom, onError, onPersisted, revealId, onNotice, onCreateAt, onRename, onContext, onToggleDone, onMoveRow, onAddInGroup, onEditField, onSelect, selected, touchMode, fieldDefs, gridWidth, columns, users, collapse, colors, todayToken, seriesMarks, onOpenItem, baseline, columnWidths, onResizeColumn }: {
+export function DhtmlxGantt({ store, items, deps, zoom, onError, onPersisted, revealId, onNotice, onCreateAt, onRename, onContext, onToggleDone, onMoveRow, onAddInGroup, onEditField, onSelect, selected, touchMode, fieldDefs, gridWidth, columns, users, collapse, colors, todayToken, seriesMarks, onOpenItem, baseline, columnWidths, onResizeColumn, statuses }: {
+  /** Projektets statusar (egna eller grundstatusarna), för statuskolumnen och verktygstipsen. */
+  statuses?: StatusDef[];
   /** Egna kolumnbredder, och hur de ändras (id "title" = rutnätets bredd; null = tillbaka till standard). */
   columnWidths?: ColumnWidths;
   onResizeColumn?: (id: ColumnId | "title", width: number | null, final: boolean) => void;
@@ -115,6 +118,8 @@ export function DhtmlxGantt({ store, items, deps, zoom, onError, onPersisted, re
   selectedRef.current = selected ?? selectedRef.current;
   const gridWidthRef = useRef(gridWidth);
   const columnsRef = useRef(columns);
+  const statusesRef = useRef<StatusDef[]>(statuses ?? defaultStatusDefs());
+  statusesRef.current = statuses ?? defaultStatusDefs();
   const widthsRef = useRef<ColumnWidths>(columnWidths ?? {});
   widthsRef.current = columnWidths ?? {};
   const resizeRef = useRef(onResizeColumn);
@@ -132,6 +137,7 @@ export function DhtmlxGantt({ store, items, deps, zoom, onError, onPersisted, re
   const mapped = useMemo(() => {
     known.current = new Map(items.map((i) => [i.id, i]));
     const marks = marksRef.current;
+    const sdefs = statusesRef.current, ssig = JSON.stringify(sdefs);
     const tasks: TaskRow[] = [...items].sort((a, b) => a.sort_order - b.sort_order).map((i) => ({
       id: i.id,
       text: i.title,
@@ -140,12 +146,12 @@ export function DhtmlxGantt({ store, items, deps, zoom, onError, onPersisted, re
       type: TYPE[i.type],
       kind: i.type,
       parent: i.parent_id ?? 0,
-      sm: (marks.get(i.id) ?? []).map((m) => `${m.id}|${m.start}|${m.status}|${m.title}`).join(";"), code: i.code ?? "", status: i.status, priority: i.priority, assignee: i.assignee_id ?? "", progress: i.progress, color: colors.get(i.id) ?? "none", rec: !!i.series, und: !!i.undated, od: isOverdue(i, todayISO()), cf: i.fields ?? {},
+      sid: defOf(i, sdefs).id, sname: defOf(i, sdefs).name, ss: ssig, sm: (marks.get(i.id) ?? []).map((m) => `${m.id}|${m.start}|${m.status}|${m.title}`).join(";"), code: i.code ?? "", status: i.status, priority: i.priority, assignee: i.assignee_id ?? "", progress: i.progress, color: colors.get(i.id) ?? "none", rec: !!i.series, und: !!i.undated, od: isOverdue(i, todayISO()), cf: i.fields ?? {},
       open: true,
     }));
     const links: LinkRow[] = deps.map((d) => ({ id: d.id, source: d.from_item_id, target: d.to_item_id, type: LINK_TYPE[d.type] ?? "0" }));
     return { tasks, links, order: treeOrder(items) };
-  }, [items, deps, colors, seriesMarks]);
+  }, [items, deps, colors, seriesMarks, statuses]);
 
   // Engångsinställning och initiering
   useEffect(() => {
@@ -197,7 +203,7 @@ export function DhtmlxGantt({ store, items, deps, zoom, onError, onPersisted, re
     gantt.templates.task_text = (_s, _e, t) => {
       const status = (t as unknown as { status: Status }).status;
       const { glyph, title } = label(t as never);
-      const sr = `<span class="sr-only">${sv.status[status]}. </span>`;
+      const sr = `<span class="sr-only">${esc((t as unknown as TaskRow).sname)}. </span>`;
       if (!fits(t)) return sr; // titeln visas till höger, se rightside_text
       return `<span class="bar-glyph" aria-hidden="true">${glyph}</span>${sr}${title}`;
     };
@@ -303,7 +309,7 @@ export function DhtmlxGantt({ store, items, deps, zoom, onError, onPersisted, re
     gantt.templates.tooltip_text = (start, end, t) => {
       const status = (t as unknown as { status: Status }).status;
       const last = addDays(fromLocalDate(end), -1);
-      return `<b>${t.text}</b><br/>${sv.dates.range(fromLocalDate(start), last)}<br/>${STATUS_GLYPH[status]} ${sv.status[status]}`;
+      return `<b>${t.text}</b><br/>${sv.dates.range(fromLocalDate(start), last)}<br/>${STATUS_GLYPH[status]} ${String((t as unknown as TaskRow).sname).replace(/&/g, "&amp;").replace(/</g, "&lt;")}`;
     };
     // Slutdatumet i en dämpad kolumn: titel, datum och status ska inte ha samma tyngd (som listorna i Asana och monday)
     // Slutdagen: biblioteket räknar slutet exklusivt, och en milstolpe har sitt datum i startdatumet
@@ -331,8 +337,8 @@ export function DhtmlxGantt({ store, items, deps, zoom, onError, onPersisted, re
     const cw = (c: ColumnId) => columnWidth(c, widthsRef.current);
     const COLS: Record<StaticColumnId, unknown> = {
       code: { name: "code", label: sv.cols.code, width: cw("code"), template: (t: Task) => `<span class="grid-code">${esc((t as unknown as TaskRow).code)}</span>` },
-      status: { name: "status", label: sv.panel.status, width: cw("status"), template: (t: Task) => select(t, "status", sv.panel.status, (t as unknown as TaskRow).status,
-        (["not_started", "in_progress", "done", "blocked"] as Status[]).map((s) => [s, `${STATUS_GLYPH[s]} ${sv.status[s]}`] as [string, string]), `chip st-${(t as unknown as TaskRow).status}`) },
+      status: { name: "status", label: sv.panel.status, width: cw("status"), template: (t: Task) => select(t, "status", sv.panel.status, (t as unknown as TaskRow).sid,
+        statusesRef.current.map((d) => [d.id, `${STATUS_GLYPH[d.category]} ${d.name}`] as [string, string]), `chip st-${(t as unknown as TaskRow).status}`) },
       assignee: { name: "assignee", label: sv.panel.assignee, width: cw("assignee"), template: (t: Task) => select(t, "assignee", sv.panel.assignee, (t as unknown as TaskRow).assignee,
         [["", sv.cols.none], ...latest.current.users.map((u) => [u.id, u.name] as [string, string])]) },
       priority: { name: "priority", label: sv.panel.priority, width: cw("priority"), template: (t: Task) => select(t, "priority", sv.panel.priority, (t as unknown as TaskRow).priority,
@@ -570,9 +576,9 @@ export function DhtmlxGantt({ store, items, deps, zoom, onError, onPersisted, re
           // Bara det som ändrats ritas om. Ritas alla staplar om vid varje sparning byts staplen man är på väg att klicka på ut under klicket.
           for (const t of tasks) {
             const g = gantt.getTask(t.id) as unknown as Record<string, unknown>;
-            const same = g.text === t.text && g.code === t.code && g.sm === t.sm && g.status === t.status && g.priority === t.priority && g.assignee === t.assignee && g.progress === t.progress && g.color === t.color && g.und === t.und && g.od === t.od && JSON.stringify(g.cf) === JSON.stringify(t.cf) && (g.start_date as Date).getTime() === t.start_date.getTime() && (g.end_date as Date).getTime() === t.end_date.getTime();
+            const same = g.text === t.text && g.code === t.code && g.sm === t.sm && g.sid === t.sid && g.sname === t.sname && g.ss === t.ss && g.status === t.status && g.priority === t.priority && g.assignee === t.assignee && g.progress === t.progress && g.color === t.color && g.und === t.und && g.od === t.od && JSON.stringify(g.cf) === JSON.stringify(t.cf) && (g.start_date as Date).getTime() === t.start_date.getTime() && (g.end_date as Date).getTime() === t.end_date.getTime();
             if (same) continue;
-            g.text = t.text; g.code = t.code; g.sm = t.sm; g.start_date = t.start_date; g.end_date = t.end_date; g.status = t.status; g.priority = t.priority; g.assignee = t.assignee; g.progress = t.progress; g.color = t.color; g.und = t.und; g.od = t.od; g.cf = t.cf;
+            g.text = t.text; g.code = t.code; g.sm = t.sm; g.sid = t.sid; g.sname = t.sname; g.ss = t.ss; g.start_date = t.start_date; g.end_date = t.end_date; g.status = t.status; g.priority = t.priority; g.assignee = t.assignee; g.progress = t.progress; g.color = t.color; g.und = t.und; g.od = t.od; g.cf = t.cf;
             gantt.updateTask(t.id);
           }
         });

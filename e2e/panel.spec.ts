@@ -122,6 +122,7 @@ for (const lib of LIBS) {
     });
 
     test("P6 beroenden: lägg till och ta bort föregångare och efterföljare, cykel avvisas", async ({ page }) => {
+      await page.setViewportSize({ width: 1800, height: 1200 }); // pilarna ritas bara för rader som ryms (listan är virtualiserad)
       await openApp(page, lib);
       await page.locator(SEL[lib].bar("i6")).click(); // Moodboard: i3 -> i6 -> i9
       const preds = panel(page).locator('[data-section="predecessors"]');

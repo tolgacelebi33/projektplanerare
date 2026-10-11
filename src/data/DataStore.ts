@@ -1,4 +1,4 @@
-import type { Activity, Baseline, ProjectHealth, StatusUpdate, Comment, DependencyMode, Dependency, FieldDef, Item, Project, SavedView, User } from "./types";
+import type { StatusDef, Activity, Baseline, ProjectHealth, StatusUpdate, Comment, DependencyMode, Dependency, FieldDef, Item, Project, SavedView, User } from "./types";
 
 /** UI pratar bara med detta gränssnitt. Alla anrop är asynkrona. */
 export interface DataStore {
@@ -8,7 +8,7 @@ export interface DataStore {
   /** Medlemmar som kan vara ansvariga. Platshållare tills fas 4. */
   listUsers(): Promise<User[]>;
   createProject(p: Omit<Project, "id" | "created_at">): Promise<Project>;
-  updateProject(id: string, patch: { name?: string; dependency_mode?: DependencyMode; fields?: FieldDef[]; views?: SavedView[]; baseline?: Baseline | null }): Promise<Project>;
+  updateProject(id: string, patch: { name?: string; dependency_mode?: DependencyMode; fields?: FieldDef[]; views?: SavedView[]; baseline?: Baseline | null; statuses?: StatusDef[] | null }): Promise<Project>;
   /** Tar bort projektet med alla poster och beroenden. */
   deleteProject(id: string): Promise<void>;
   listItems(projectId: string): Promise<Item[]>;
