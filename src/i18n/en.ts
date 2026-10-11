@@ -219,6 +219,11 @@ export const enDict: Dict = {
     auto: "(automatic)", undo: "(undo)", unknownActor: "Unknown", note: "Note", empty: "Nothing has happened to the item yet.",
     intro: "Everything that has happened to the item, with who and when. The log is written automatically and cannot be changed.",
   },
+  palette: {
+    title: "Search and commands", placeholder: "Search items, projects or type a command...", results: "Results", items: "Items", projects: "Projects", commands: "Commands", none: "No results.", loading: "Loading...",
+    hint: "Arrow up and down selects, Enter opens, Esc closes.", button: "Search", buttonHint: "Search everywhere and run commands (Cmd/Ctrl + K)",
+    cmd: { newTask: "New task", newMilestone: "New milestone", newGroup: "New group", newSeries: "New recurring milestone", viewGantt: "Show Gantt", viewWheel: "Show Year wheel", viewBoard: "Show Board", today: "Go to today", undo: "Undo", redo: "Redo", settings: "Open settings", help: "Open help", backup: "Save backup", export: "Export the project (JSON)" },
+  },
   settings: {
     button: "Settings", title: "Settings",
     tabs: { label: "Settings, sections", list: "List view", board: "Board view", views: "More views", item: "Item", rules: "Rules", people: "People", backup: "Backup", start: "Start", touch: "Touch screen", info: "Information and help" },
@@ -228,7 +233,7 @@ export const enDict: Dict = {
     infoStorage: "Everything is saved in this browser, on this device. Nothing is sent to a server. Export now and then (JSON) as a backup, and import to move data to another browser.",
     infoCodes: "Every project and every item has a code that is assigned automatically and cannot be changed: PRJ0001 for a project, GRP0001-003 for a group, MIL0001-0041 for a milestone and TSK0001-0123 for a task. The number after PRJ is the project number, and the one after the hyphen counts the items of the same type in the project. A code is never used twice. Show it in the list (Columns, ID) or on the cards, and search for it in the search box.",
     shortcutsTitle: "Keyboard shortcuts", shortcutsHint: "Apply when you are not typing in a field.",
-    shortcuts: ["New task", "New milestone", "New group", "Go to the search box", "Go to today (Gantt)", "Zoom day, week, month (Gantt)", "Open or close help", "Undo", "Redo", "Move the open item within its group", "Clear the selection, or close the dialog"],
+    shortcuts: ["New task", "New milestone", "New group", "Go to the search box", "Search everywhere and run commands", "Go to today (Gantt)", "Zoom day, week, month (Gantt)", "Open or close help", "Undo", "Redo", "Move the open item within its group", "Clear the selection, or close the dialog"],
     openHelp: "Open help",
     close: "Close", reset: "Reset to defaults",
     cardFields: { date: "Date", assignee: "Assignee (initials)", priority: "Priority", description: "First line of the description", series: "Repetition for series", progress: "Progress", labels: "Labels", checklist: "Checklist (counter)", links: "Links (count)", lastUpdate: "Latest update", comments: "Comments (count)", code: "Code (for example MIL0001-0041)" },

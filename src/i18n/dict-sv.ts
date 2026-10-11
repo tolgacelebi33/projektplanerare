@@ -224,6 +224,11 @@ export const svDict = {
     auto: "(automatiskt)", undo: "(ångra)", unknownActor: "Okänd", note: "Anteckning", empty: "Inget har hänt med posten än.",
     intro: "Allt som hänt med posten, med vem och när. Loggen skrivs automatiskt och kan inte ändras.",
   },
+  palette: {
+    title: "Sök och kommandon", placeholder: "Sök poster, projekt eller skriv ett kommando...", results: "Träffar", items: "Poster", projects: "Projekt", commands: "Kommandon", none: "Inga träffar.", loading: "Läser in...",
+    hint: "Pil upp och ner väljer, Enter öppnar, Esc stänger.", button: "Sök", buttonHint: "Sök överallt och kör kommandon (Cmd/Ctrl + K)",
+    cmd: { newTask: "Ny uppgift", newMilestone: "Ny milstolpe", newGroup: "Ny grupp", newSeries: "Ny återkommande milstolpe", viewGantt: "Visa Gantt", viewWheel: "Visa Årshjul", viewBoard: "Visa Board", today: "Gå till idag", undo: "Ångra", redo: "Gör om", settings: "Öppna inställningar", help: "Öppna hjälpen", backup: "Spara säkerhetskopia", export: "Exportera projektet (JSON)" },
+  },
   settings: {
     button: "Inställningar", title: "Inställningar",
     tabs: { label: "Inställningar, avsnitt", list: "Listvy", board: "Boardvy", views: "Fler vyer", item: "Posten", rules: "Regler", people: "Personer", backup: "Säkerhetskopia", start: "Start", touch: "Pekskärm", info: "Information och hjälp" },
@@ -233,7 +238,7 @@ export const svDict = {
     infoStorage: "Allt sparas i den här webbläsaren, på den här enheten. Inget skickas till någon server. Exportera då och då (JSON) som säkerhetskopia, och importera för att flytta data till en annan webbläsare.",
     infoCodes: "Varje projekt och varje post har en kod som delas ut automatiskt och inte kan ändras: PRJ0001 för projekt, GRP0001-003 för grupp, MIL0001-0041 för milstolpe och TSK0001-0123 för uppgift. Siffran efter PRJ är projektets nummer, och den efter bindestrecket räknar posterna av samma typ i projektet. En kod används aldrig två gånger. Visa den i listan (Kolumner, ID) eller på korten, och sök på den i sökrutan.",
     shortcutsTitle: "Kortkommandon", shortcutsHint: "Gäller när du inte skriver i ett fält.",
-    shortcuts: ["Ny uppgift", "Ny milstolpe", "Ny grupp", "Gå till sökrutan", "Gå till idag (Gantt)", "Zoom dag, vecka, månad (Gantt)", "Öppna eller stäng hjälpen", "Ångra", "Gör om", "Flytta den öppna posten i sin grupp", "Släpp markeringen, eller stäng dialogen"],
+    shortcuts: ["Ny uppgift", "Ny milstolpe", "Ny grupp", "Gå till sökrutan", "Sök överallt och kör kommandon", "Gå till idag (Gantt)", "Zoom dag, vecka, månad (Gantt)", "Öppna eller stäng hjälpen", "Ångra", "Gör om", "Flytta den öppna posten i sin grupp", "Släpp markeringen, eller stäng dialogen"],
     openHelp: "Öppna hjälpen",
     close: "Stäng", reset: "Återställ standard",
     cardFields: { date: "Datum", assignee: "Ansvarig (initialer)", priority: "Prioritet", description: "Första raden av beskrivningen", series: "Upprepning för serier", progress: "Framsteg", labels: "Etiketter", checklist: "Checklista (räknare)", links: "Länkar (antal)", lastUpdate: "Senaste uppdatering", comments: "Kommentarer (antal)", code: "Kod (till exempel MIL0001-0041)" },

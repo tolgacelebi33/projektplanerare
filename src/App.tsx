@@ -39,6 +39,7 @@ import { BoardView } from "./views/BoardView";
 import { ImportPreview } from "./views/ImportPreview";
 import { BaselineBar } from "./views/BaselineBar";
 import { BackupRestore } from "./views/BackupRestore";
+import { CommandPalette, type PaletteCommand } from "./views/CommandPalette";
 import { buildBackup, firstSeenAt, lastBackupAt, markBackupSaved, parseBackup, reminderDue, restoreBackup, MAX_BACKUP_BYTES, type BackupSummary } from "./data/backup";
 import { CalendarView } from "./views/CalendarView";
 import { MyWeekView } from "./views/MyWeekView";
@@ -73,6 +74,8 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
   const [settings, setSettingsState] = useState<Settings>(loadSettings);
   const setSettings = (s: Settings) => { saveSettings(s); setSettingsState(s); };
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  const [paletteData, setPaletteData] = useState<{ project: Project; items: Item[] }[] | null>(null);
   const settingsRef = useRef(settings); settingsRef.current = settings;
   useEffect(() => { store.rules = settings.rules; }, [store, settings.rules]);
   const [zoom, setZoom] = useState<Zoom>(uiCarry.zoom ?? settings.startZoom);
@@ -157,7 +160,7 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
   useEffect(() => { if (editId !== justCreated) setJustCreated(null); }, [editId, justCreated]);
   // Byte av projekt: stäng panelen, den hör till ett annat projekt
   const pendingOpen = useRef<string | null>(null);
-  useEffect(() => { setEditId(pendingOpen.current); pendingOpen.current = null; setSelected(new Set()); }, [projects.projectId]);
+  useEffect(() => { const p = pendingOpen.current; setEditId(p); if (p) setReveal(p); pendingOpen.current = null; setSelected(new Set()); }, [projects.projectId]);
   // Min vecka och Portfölj läser alla projekt. Läses om när det aktuella projektets data ändras.
   const [allData, setAllData] = useState<{ project: Project; items: Item[] }[]>([]);
   useEffect(() => {
@@ -166,8 +169,16 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
     void Promise.all(projects.projects.map(async (p) => ({ project: p, items: await store.listItems(p.id) }))).then((r) => { if (on) setAllData(r); }).catch(() => undefined);
     return () => { on = false; };
   }, [view, projects.projects, state, store]);
+  // Sök överallt läser alla projekt när den öppnas
+  useEffect(() => {
+    if (!paletteOpen || !projects.projects) return;
+    let on = true;
+    setPaletteData(null);
+    void Promise.all(projects.projects.map(async (p) => ({ project: p, items: await store.listItems(p.id) }))).then((r) => { if (on) setPaletteData(r); }).catch(() => { if (on) setPaletteData([]); });
+    return () => { on = false; };
+  }, [paletteOpen, projects.projects, store]);
   const openInProject = (pid: string, iid: string) => {
-    if (pid === projects.projectId) { setEditId(iid); return; }
+    if (pid === projects.projectId) { setEditId(iid); setReveal(iid); return; }
     pendingOpen.current = iid; projects.select(pid);
   };
   const shiftItem = async (id: string, delta: number) => {
@@ -346,6 +357,7 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
     const onKey = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement | null;
       const typing = !!t && !!t.closest("input, textarea, select, [contenteditable=true]"); // fält har sina egna tangenter (och sin egen ångra)
+      if ((e.metaKey || e.ctrlKey) && !e.altKey && !e.shiftKey && e.key.toLowerCase() === "k") { e.preventDefault(); e.stopPropagation(); setPaletteOpen((o) => !o); return; } // sök överallt, även när man skriver
       if ((e.metaKey || e.ctrlKey) && !e.altKey) {
         if (typing) return;
         const k = e.key.toLowerCase();
@@ -354,7 +366,7 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
         return;
       }
       if (e.metaKey || e.ctrlKey || typing || state.kind !== "ready" || !projects.projectId) return;
-      if (menu || recurOpen || settingsOpen || fieldsOpen || t?.closest("[role=dialog], [role=menu], aside.panel")) return; // en öppen meny äger tangenterna även innan den hunnit ta fokus
+      if (menu || recurOpen || settingsOpen || fieldsOpen || paletteOpen || t?.closest("[role=dialog], [role=menu], aside.panel")) return; // en öppen meny äger tangenterna även innan den hunnit ta fokus
       if (e.key === "Escape" && selected.size) { e.preventDefault(); selAnchor.current = null; setSelected(new Set()); return; }
       // Alt+pil upp eller ner: flytta den valda raden i sin grupp
       if (e.altKey) {
@@ -584,6 +596,22 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
 
   const clearAllFilters = () => { setQuery(""); setHideDone(false); setAttrFilter(noAttrFilter); setQuick({ overdue: false, thisWeek: false, noAssignee: false, undated: false }); };
   // Aktiva filter som chips som går att ta bort ett och ett (söktext, dölj klara och urvalen i Filtrera). Snabbfiltren är knappar som syns som nedtryckta.
+  const paletteCommands: PaletteCommand[] = [
+    { id: "task", label: sv.palette.cmd.newTask, run: () => void addItem("task").catch(() => undefined) },
+    { id: "milestone", label: sv.palette.cmd.newMilestone, run: () => void addItem("milestone").catch(() => undefined) },
+    { id: "group", label: sv.palette.cmd.newGroup, run: () => void addItem("epic", { anchorId: null }).catch(() => undefined) },
+    { id: "series", label: sv.palette.cmd.newSeries, run: () => { setRecurInit(null); setRecurOpen(true); } },
+    { id: "gantt", label: sv.palette.cmd.viewGantt, run: () => setView("gantt") },
+    { id: "wheel", label: sv.palette.cmd.viewWheel, run: () => setView("wheel") },
+    { id: "board", label: sv.palette.cmd.viewBoard, run: () => setView("board") },
+    { id: "today", label: sv.palette.cmd.today, run: () => { setView("gantt"); setTodayToken((n) => n + 1); } },
+    { id: "undo", label: sv.palette.cmd.undo, run: () => void travel("undo") },
+    { id: "redo", label: sv.palette.cmd.redo, run: () => void travel("redo") },
+    { id: "settings", label: sv.palette.cmd.settings, run: () => setSettingsOpen(true) },
+    { id: "help", label: sv.palette.cmd.help, run: () => window.dispatchEvent(new CustomEvent("pp:help")) },
+    { id: "backup", label: sv.palette.cmd.backup, run: () => void saveBackupFile().then((m) => setWriteError(m)).catch((e) => setWriteError(friendlyError(e))) },
+    { id: "export", label: sv.palette.cmd.export, run: () => void doExport("json").catch((e) => setWriteError(friendlyError(e))) },
+  ];
   const filterChips: { key: string; label: string; remove: () => void }[] = [];
   if (query.trim()) filterChips.push({ key: "q", label: sv.filter.chipQuery(query.trim()), remove: () => setQuery("") });
   for (const s of attrFilter.statuses) filterChips.push({ key: `s-${s}`, label: `${sv.panel.status}: ${sv.status[s]}`, remove: () => setAttrFilter((f) => ({ ...f, statuses: f.statuses.filter((x) => x !== s) })) });
@@ -601,6 +629,7 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
         <div className="header-controls">
         <div className="header-top">
         <HelpDialog />
+        <button type="button" className="help-btn" title={sv.palette.buttonHint} onClick={() => setPaletteOpen(true)}>{sv.palette.button}</button>
         <button type="button" className="help-btn" onClick={() => setSettingsOpen(true)}>{sv.settings.button}</button>
         <div className="lang-switch" role="group" aria-label={sv.lang.label}>
           {LANGS.map((l) => (
@@ -785,6 +814,8 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
       </div>
       {fieldsOpen && project && <FieldsDialog fields={fieldDefs} onSave={(f) => projects.setFields(project.id, f)} onRemove={async (id) => { await removeFieldDef(store, project, id); await projects.reload(project.id); await refresh(); }} onClose={() => setFieldsOpen(false)} />}
       {preview && <ImportPreview fileName={preview.file} parsed={preview.parsed} destination={{ into: preview.into ? project?.name ?? "" : null, name: preview.parsed.name }} onCancel={() => setPreview(null)} onConfirm={() => { const p = preview; setPreview(null); void commitImport(p.parsed, p.into).catch((e) => setWriteError(friendlyError(e))); }} />}
+      {paletteOpen && <CommandPalette data={paletteData ?? []} loading={paletteData === null} commands={paletteCommands} onClose={() => setPaletteOpen(false)}
+        onOpenItem={(pid, iid) => { openInProject(pid, iid); }} onOpenProject={(pid) => { focusMedianOnNextProject(); projects.select(pid); }} />}
       {settingsOpen && <SettingsDialog fieldDefs={fieldDefs} settings={settings} backup={{ lastSaved: lastBackup, onSave: saveBackupFile, onRestoreFile: pickBackup }} people={{ users, onAdd: async (n) => { await store.addUser(n); await reloadUsers(); }, onRename: async (id, n) => { await store.renameUser(id, n); await reloadUsers(); await refresh(); }, onRemove: async (id) => { const n = await store.removeUser(id); await reloadUsers(); await refresh(); setAttrFilter((f) => ({ ...f, assignees: f.assignees.filter((x) => x !== id) })); return n; } }} onChange={setSettings} onClose={() => setSettingsOpen(false)} />}
       {backupPreview && <BackupRestore fileName={backupPreview.file} summary={backupPreview.summary} onCancel={() => setBackupPreview(null)} onConfirm={() => void confirmRestore()} />}
       {recurOpen && <RecurringDialog key={recurInit ? "from" : "new"} today={todayISO()} initial={recurInit ?? undefined} onCreate={(a) => void addSeries(a)} onClose={() => setRecurOpen(false)} />}
