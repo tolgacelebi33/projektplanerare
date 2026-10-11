@@ -230,9 +230,10 @@ describe("flytt från den första versionens lagring (localStorage)", () => {
 
 describe("hierarki och projekt", () => {
   const mk = () => new MemoryStore(smallFixture());
-  it("bara en epic kan vara förälder", async () => {
-    await expect(mk().updateItem("i2", { parent_id: "i3" })).rejects.toMatchObject({ code: "parent_not_epic" });
-    await expect(mk().createItem(base({ parent_id: "i6" }))).rejects.toMatchObject({ code: "parent_not_epic" });
+  it("en milstolpe kan inte vara förälder (en uppgift kan, som underuppgifter)", async () => {
+    await expect(mk().updateItem("i2", { parent_id: "i11" })).rejects.toMatchObject({ code: "parent_not_container" });
+    await expect(mk().createItem(base({ parent_id: "i17" }))).rejects.toMatchObject({ code: "parent_not_container" });
+    await expect(mk().updateItem("i2", { parent_id: "i3" })).resolves.toBeTruthy();
   });
   it("flytta en post till en annan epic räknar om båda", async () => {
     const s = mk();

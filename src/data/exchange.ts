@@ -117,7 +117,7 @@ function structureCheck(p: ParsedProject) {
     if (i.parent_id === null) continue;
     const par = byId.get(i.parent_id);
     if (!par) throw new ImportError(sv.ex.parentMissing(i.title, i.parent_id));
-    if (par.type !== "epic") throw new ImportError(sv.ex.parentNotEpic(i.title, par.title));
+    if (par.type === "milestone") throw new ImportError(sv.ex.parentNotEpic(i.title, par.title));
     const seen = new Set([i.id]);
     for (let c: ParsedItem | undefined = par; c; c = c.parent_id ? byId.get(c.parent_id) : undefined) {
       if (seen.has(c.id)) throw new ImportError(sv.ex.cycle(i.title));

@@ -50,14 +50,30 @@ export function validateParent(item: Item, all: Map<string, Item>): void {
   if (!parent) throw new RuleError("parent_missing", "Förälder finns inte");
   if (parent.workspace_id !== item.workspace_id) throw new RuleError("cross_workspace", "Förälder i annan workspace");
   if (parent.project_id !== item.project_id) throw new RuleError("cross_project", "Förälder i annat projekt");
-  if (parent.type !== "epic") throw new RuleError("parent_not_epic", "Bara en epic kan innehålla andra poster");
+  if (parent.type === "milestone") throw new RuleError("parent_not_container", "En milstolpe kan inte innehålla andra poster");
+  if (parent.type === "task" && item.type === "epic") throw new RuleError("epic_in_task", "En grupp kan inte ligga i en uppgift");
   const seen = new Set<string>([item.id]);
   let cur: Item | undefined = parent;
+  let taskAbove = 0; // uppgifter ovanför posten (en uppgift kan innehålla underuppgifter, en grupp kan innehålla vad som helst)
   while (cur) {
     if (seen.has(cur.id)) throw new RuleError("parent_cycle", "Hierarkin får inte vara cirkulär");
     seen.add(cur.id);
+    if (cur.type === "task") taskAbove += 1;
     cur = cur.parent_id ? all.get(cur.parent_id) : undefined;
   }
+  // Underuppgifter: högst MAX_TASK_DEPTH uppgiftsnivåer i en kedja, räknat med posten och det som ligger under den. Kontrolleras bara när något ligger under en uppgift.
+  if (taskAbove > 0 && taskAbove + taskDepthBelow(item, all) > MAX_TASK_DEPTH) throw new RuleError("too_deep", `Underuppgifter kan ligga högst ${MAX_TASK_DEPTH} nivåer djupt`, { max: String(MAX_TASK_DEPTH) });
+}
+
+/** Högst så många uppgiftsnivåer i en kedja (en uppgift, dess underuppgift, och så vidare). Grupper räknas inte. */
+export const MAX_TASK_DEPTH = 5;
+
+/** Antal uppgiftsnivåer från posten och nedåt (posten själv räknas om den är en uppgift). */
+export function taskDepthBelow(item: Item, all: Map<string, Item>): number {
+  const kids = new Map<string, Item[]>();
+  for (const i of all.values()) if (i.parent_id) kids.set(i.parent_id, [...(kids.get(i.parent_id) ?? []), i]);
+  const walk = (i: Item, guard: number): number => (guard > 200 ? 0 : (i.type === "task" ? 1 : 0) + Math.max(0, ...(kids.get(i.id) ?? []).map((k) => walk(k, guard + 1))));
+  return walk(item, 0);
 }
 
 export function validateDependency(dep: Dependency, all: Map<string, Item>, existing: Dependency[]): void {

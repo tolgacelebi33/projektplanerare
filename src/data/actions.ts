@@ -1,7 +1,7 @@
 import type { DataStore } from "./DataStore";
 import { sv } from "../i18n/sv";
 import { addDays, diffDays, recurringDates, weekRange } from "./dates";
-import { isOverdue } from "./rules";
+import { isOverdue, MAX_TASK_DEPTH, taskDepthBelow } from "./rules";
 import type { Dependency, Item, ItemType, Priority, Recurrence, Status } from "./types";
 
 /** Alla poster under `id` (barn, barnbarn, ...), inte posten själv. */
@@ -47,6 +47,25 @@ export function newItemDraft(kind: ItemType, items: Item[], selected: Item | nul
 }
 
 export interface EpicChoice { id: string; label: string }
+
+/** Närmaste grupp (epic) ovanför posten, eller null. En underuppgift tillhör gruppen över sin överordnade uppgift. */
+export function groupOf(items: Item[], item: Pick<Item, "parent_id">): string | null {
+  const byId = new Map(items.map((i) => [i.id, i]));
+  for (let p = item.parent_id ? byId.get(item.parent_id) : undefined, n = 0; p && n < 200; p = p.parent_id ? byId.get(p.parent_id) : undefined, n++) if (p.type === "epic") return p.id;
+  return null;
+}
+
+/** Uppgifter som en post kan bli underuppgift till: inte posten själv eller det som ligger under den, inte en milstolpe, och inte om kedjan skulle bli för djup. */
+export function subtaskChoices(items: Item[], itemId: string): EpicChoice[] {
+  const byId = new Map(items.map((i) => [i.id, i]));
+  const me = byId.get(itemId);
+  if (!me) return [];
+  const blocked = new Set([itemId, ...descendants(items, itemId).map((i) => i.id)]);
+  const path = (i: Item): string => (i.parent_id && byId.get(i.parent_id) ? `${path(byId.get(i.parent_id)!)} / ${i.title}` : i.title);
+  const below = taskDepthBelow(me, byId);
+  const tasksAbove = (i: Item): number => { let n = 0; for (let p: Item | undefined = i, g = 0; p && g < 200; p = p.parent_id ? byId.get(p.parent_id) : undefined, g++) if (p.type === "task") n++; return n; };
+  return items.filter((i) => i.type === "task" && !blocked.has(i.id) && i.project_id === me.project_id && tasksAbove(i) + below <= MAX_TASK_DEPTH).sort((a, b) => a.sort_order - b.sort_order).map((i) => ({ id: i.id, label: path(i) }));
+}
 
 /** Epics som en post kan flyttas till: alla utom posten själv och det som ligger under den (annars blir hierarkin cirkulär). */
 export function epicChoices(items: Item[], itemId: string): EpicChoice[] {

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { canMove, changeRecurrence, deleteSeries, deleteSubtree, descendants, epicChoices, extendSeries, MAX_SERIES, renameSeries, seriesMembers, swapWithSibling } from "../data/actions";
+import { canMove, changeRecurrence, deleteSeries, deleteSubtree, descendants, epicChoices, extendSeries, groupOf, MAX_SERIES, renameSeries, seriesMembers, subtaskChoices, swapWithSibling } from "../data/actions";
 import { effectiveColors } from "../data/colors";
 import { DEPENDENCY_TYPES, GROUP_COLORS, RECURRENCES, type GroupColor, type Recurrence } from "../data/types";
 import type { DataStore } from "../data/DataStore";
@@ -28,7 +28,7 @@ type SaveState = { kind: "idle" } | { kind: "saving" } | { kind: "saved" } | { k
  * Detaljpanel för en post, fast bredd, dockad till höger. Ändringar sparas per fält direkt (inget spara-steg), så att man
  * kan hoppa mellan poster utan att tappa något. Läser alltid färska data från DataStore (drag i vyerna sparas direkt i storen).
  */
-export function ItemPanel({ critical, me = "", onMe, baseline, fieldDefs = [], onDuplicate, onNewSeries, nextDate, features = DEFAULT_FEATURES, checklistProgress = false, store, projectId, itemId, dataVersion, autoSelectTitle = false, focusField = null, onFocusDone, onClose, onChanged, onOpen }: {
+export function ItemPanel({ onAddChild, critical, me = "", onMe, baseline, fieldDefs = [], onDuplicate, onNewSeries, nextDate, features = DEFAULT_FEATURES, checklistProgress = false, store, projectId, itemId, dataVersion, autoSelectTitle = false, focusField = null, onFocusDone, onClose, onChanged, onOpen }: {
   features?: Features; checklistProgress?: boolean;
   /** Projektets egna fält. */
   fieldDefs?: FieldDef[];
@@ -46,7 +46,7 @@ export function ItemPanel({ critical, me = "", onMe, baseline, fieldDefs = [], o
   focusField?: "placement" | "pred" | "succ" | null; onFocusDone?: () => void;
   /** Ändras när data ändrats utanför panelen (t.ex. ett drag i vyn), så att panelen visar det som är sparat. */
   dataVersion?: unknown;
-  onClose: () => void; onChanged: () => void; onOpen: (id: string) => void;
+  onClose: () => void; onChanged: () => void; onOpen: (id: string) => void; onAddChild?: (parentId: string) => void;
 }) {
   const [data, setData] = useState<Loaded | null>(null);
   const [tab, setTab] = useState<"details" | "comments" | "log">("details");
@@ -227,6 +227,9 @@ export function ItemPanel({ critical, me = "", onMe, baseline, fieldDefs = [], o
   const children = all.filter((i) => i.parent_id === item.id).sort((a, b) => a.sort_order - b.sort_order);
   const overdue = isOverdue(item, todayISO());
   const choices = epicChoices(all, item.id);
+  const parentItem = item.parent_id ? byId.get(item.parent_id) ?? null : null;
+  const underTask = parentItem?.type === "task";
+  const subChoices = item.type === "epic" ? [] : subtaskChoices(all, item.id);
   const view = (tab === "comments" && !features.comments) || (tab === "log" && !features.log) ? "details" : tab;
   const subtreeCount = descendants(all, item.id).length;
   const doDelete = async () => {
@@ -418,12 +421,21 @@ export function ItemPanel({ critical, me = "", onMe, baseline, fieldDefs = [], o
           <h3>{sv.panel.placement}</h3>
           <label className="panel-field">
             <span>{sv.panel.moveTo}</span>
-            <select name="parent" value={item.parent_id ?? ""} onChange={(e) => void commit("parent", { parent_id: e.target.value || null })}>
+            <select name="parent" value={groupOf(all, item) ?? ""} onChange={(e) => void commit("parent", { parent_id: e.target.value || null })}>
               <option value="">{sv.panel.topLevel}</option>
               {choices.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
             </select>
           </label>
           {err("parent")}
+          {item.type !== "epic" && (subChoices.length > 0 || underTask) && (
+            <label className="panel-field">
+              <span>{sv.panel.subtaskOf}</span>
+              <select name="subtask-of" value={underTask ? item.parent_id ?? "" : ""} onChange={(e) => void commit("parent", { parent_id: e.target.value || groupOf(all, item) })}>
+                <option value="">{sv.panel.noSubtaskOf}</option>
+                {subChoices.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
+              </select>
+            </label>
+          )}
           <div className="panel-row" role="group" aria-label={sv.panel.order}>
             <button type="button" className="mini" disabled={!canMove(all, item.id, "up")}
               onClick={() => void depAction("order", async () => { for (const u of swapWithSibling(all, item.id, "up") ?? []) await store.updateItem(u.id, { sort_order: u.sort_order }); })}>↑ {sv.panel.moveUp}</button>
@@ -448,6 +460,19 @@ export function ItemPanel({ critical, me = "", onMe, baseline, fieldDefs = [], o
         {!epic && depList("pred")}
         {!epic && depList("succ")}
 
+        {item.type === "task" && onAddChild && (
+          <section className="panel-section" data-section="subtasks">
+            <h3>{sv.panel.subtasks}</h3>
+            {children.length === 0 ? <p className="panel-muted">{sv.panel.subtaskHint}</p> : (
+              <ul className="panel-list">
+                {children.map((c) => (
+                  <li key={c.id}><button type="button" className="panel-link" onClick={() => onOpen(c.id)}>{STATUS_GLYPH[c.status]} {c.title}</button></li>
+                ))}
+              </ul>
+            )}
+            <button type="button" className="mini" onClick={() => onAddChild(item.id)}>{sv.panel.addSubtask}</button>
+          </section>
+        )}
         {epic && (
           <section className="panel-section" data-section="contents">
             <h3>{sv.panel.contents}</h3>

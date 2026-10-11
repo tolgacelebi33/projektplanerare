@@ -120,7 +120,7 @@ describe("regler i DataStore", () => {
     await fail(new MemoryStore(f).updateItem("i2", { parent_id: "x2" }), "cross_workspace");
   });
   it("avvisar cirkulär hierarki (en epic in i sitt eget innehåll)", async () => fail(mk().updateItem("i4", { parent_id: "i5" }), "parent_cycle"));
-  it("avvisar en förälder som inte är en epic", async () => fail(mk().updateItem("i1", { parent_id: "i2" }), "parent_not_epic"));
+  it("avvisar en milstolpe som förälder", async () => fail(mk().updateItem("i2", { parent_id: "i11" }), "parent_not_container"));
   it("avvisar beroende över projekt", async () => {
     const f = smallFixture();
     f.items.push({ ...f.items[0], id: "x3", project_id: "proj_2", parent_id: null });

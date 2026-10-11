@@ -493,3 +493,13 @@ Ny vy "Rapport" under Fler vyer (kan stängas av i Inställningar, Fler vyer): n
 - Allt en regel ändrar loggas som automatiskt (kommentarer som skrivs av en regel har författaren "Regel: namn").
 - Regler körs inte vid import eller återställning (loggningen är då av), och inte för grupper (deras värden räknas ur innehållet). Återställ standard rör inte egna regler.
 Testat: tests/customrules.test.ts (8), e2e/rulebuilder.spec.ts (4).
+
+## 2026-10-12: Underuppgifter, djupare nivåer (nummer 10)
+
+Regeländring: tidigare kunde bara en grupp (epic) innehålla andra poster. Nu kan även en uppgift ha underuppgifter (och milstolpar under sig). Fortfarande gäller: en milstolpe kan inte innehålla något, och en grupp kan inte ligga i en uppgift. Beslut:
+- Högst 5 uppgiftsnivåer i en kedja (uppgift, underuppgift, ...), räknat med det som ligger under en flyttad post. Grupper nästlas som förut utan gräns. Felkoder `parent_not_container`, `epic_in_task`, `too_deep` (`parent_not_epic` finns inte längre).
+- Datum är fristående: en uppgift med underuppgifter behåller sina egna datum, och gruppens datum räknas som förut ur sina direkta barn. En underuppgift behöver inte ligga inom uppgiftens datum. Framsteg och status rullar inte upp. Overifierat om du vill ha uppräkning som i en grupp.
+- Skapa: högerklick på en uppgift, Ny underuppgift, eller + Underuppgift i panelen. Flytta: panelen har "Underuppgift till" (uppgifter som går att välja) vid sidan av "Tillhör grupp" (visar gruppen ovanför, och ett byte flyttar posten ut ur uppgiften). Att dra rader till en uppgift tolkas fortfarande som "efter uppgiften" (samma som förut).
+- Sparad data och gamla filer påverkas inte: regeln blev bara mer tillåtande och ingen befintlig post har en uppgift som förälder. Smart import av CSV/Excel gör fortfarande om en post med innehåll till en grupp (oförändrat), JSON-import tar emot uppgifter som föräldrar.
+- Belastning och rapport räknar både uppgiften och underuppgifterna som poster (som Asana), så timmar kan räknas dubbelt om båda har uppskattning.
+Testat: tests/subtasks.test.ts (7), uppdaterade data.test och persist.test, e2e/subtasks.spec.ts (4).
