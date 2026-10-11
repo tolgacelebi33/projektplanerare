@@ -48,15 +48,15 @@ export interface Settings {
   /** Belastning: en vecka över detta värde markeras (0 = ingen gräns). */
   workloadCap: number;
 }
-export type ViewId = "gantt" | "wheel" | "board" | "calendar" | "week" | "workload" | "portfolio";
-export const MORE_VIEWS = ["calendar", "week", "workload", "portfolio"] as const;
+export type ViewId = "gantt" | "wheel" | "board" | "calendar" | "week" | "workload" | "portfolio" | "report";
+export const MORE_VIEWS = ["calendar", "week", "workload", "portfolio", "report"] as const;
 export type MoreView = (typeof MORE_VIEWS)[number];
 export interface Features { labels: boolean; checklist: boolean; links: boolean; log: boolean; comments: boolean }
 export const DEFAULT_FEATURES: Features = { labels: true, checklist: true, links: true, log: true, comments: true };
 export interface CardFields { date: boolean; assignee: boolean; priority: boolean; description: boolean; series: boolean; progress: boolean; labels: boolean; checklist: boolean; links: boolean; lastUpdate: boolean; code: boolean; comments: boolean; estimate: boolean }
 export type BoardGroup = "status" | "assignee" | "priority" | "group" | `field:${string}`;
 export const DEFAULT_CARD_FIELDS: CardFields = { date: true, assignee: true, priority: true, description: false, series: true, progress: false, labels: true, checklist: true, links: true, lastUpdate: false, code: false, comments: true, estimate: false };
-export const DEFAULT_SETTINGS: Settings = { touch: "auto", closeOnEmpty: true, markUndated: true, startView: "gantt", startZoom: "week", cardFields: { ...DEFAULT_CARD_FIELDS }, highlightOverdue: true, quickFilters: true, boardGroup: "status", features: { ...DEFAULT_FEATURES }, checklistProgress: false, hidePastSeries: false, collapseSeries: true, seriesRowV2: true, importPreview: true, showCritical: false, reminders: { banner: true, os: false, scope: "all" }, me: "", backupReminderDays: 30, showBaseline: true, rules: { doneSetsProgress: false, seriesNext: false }, importExtraAsFields: true, moreViews: { calendar: true, week: true, workload: true, portfolio: true }, workloadField: "", workloadCap: 5 };
+export const DEFAULT_SETTINGS: Settings = { touch: "auto", closeOnEmpty: true, markUndated: true, startView: "gantt", startZoom: "week", cardFields: { ...DEFAULT_CARD_FIELDS }, highlightOverdue: true, quickFilters: true, boardGroup: "status", features: { ...DEFAULT_FEATURES }, checklistProgress: false, hidePastSeries: false, collapseSeries: true, seriesRowV2: true, importPreview: true, showCritical: false, reminders: { banner: true, os: false, scope: "all" }, me: "", backupReminderDays: 30, showBaseline: true, rules: { doneSetsProgress: false, seriesNext: false }, importExtraAsFields: true, moreViews: { calendar: true, week: true, workload: true, portfolio: true, report: true }, workloadField: "", workloadCap: 5 };
 const KEY = "projektplanerare.settings";
 const bool = (v: unknown, d: boolean) => (typeof v === "boolean" ? v : d);
 const pick = <T extends string>(v: unknown, ok: readonly T[], d: T): T => (ok.includes(v as T) ? (v as T) : d);
@@ -87,7 +87,7 @@ export function normalizeSettings(raw: unknown): Settings {
     showBaseline: bool(o.showBaseline, DEFAULT_SETTINGS.showBaseline),
     rules: ((r) => ({ doneSetsProgress: bool(r.doneSetsProgress, false), seriesNext: bool(r.seriesNext, false) }))((o.rules && typeof o.rules === "object" ? o.rules : {}) as Record<string, unknown>),
     importExtraAsFields: bool(o.importExtraAsFields, DEFAULT_SETTINGS.importExtraAsFields),
-    moreViews: ((m) => ({ calendar: bool(m.calendar, true), week: bool(m.week, true), workload: bool(m.workload, true), portfolio: bool(m.portfolio, true) }))((o.moreViews && typeof o.moreViews === "object" ? o.moreViews : {}) as Record<string, unknown>),
+    moreViews: ((m) => ({ calendar: bool(m.calendar, true), week: bool(m.week, true), workload: bool(m.workload, true), portfolio: bool(m.portfolio, true), report: bool(m.report, true) }))((o.moreViews && typeof o.moreViews === "object" ? o.moreViews : {}) as Record<string, unknown>),
     workloadField: typeof o.workloadField === "string" && o.workloadField.length <= 60 ? o.workloadField : "",
     workloadCap: typeof o.workloadCap === "number" && Number.isInteger(o.workloadCap) && o.workloadCap >= 0 && o.workloadCap <= 999 ? o.workloadCap : DEFAULT_SETTINGS.workloadCap,
   };

@@ -479,3 +479,7 @@ Mätning (produktionsbygge, 6000 poster): start 8,0 s, växande kvadratiskt (100
 ## 2026-10-11: En testkörning i taget på GitHub
 
 Flera pushar i följd gav flera samtidiga testkörningar på samma maskinkapacitet (upp till 21 minuter, falska tidsfel i D5 och skalatestet). `test.yml` avbryter nu en pågående körning när en ny push kommer (`concurrency`). Overifierat: om D5 (Gör om efter dragning) bara är tidskänsligt; det gick igenom lokalt och i föregående körning.
+
+## 2026-10-12: Rapport (nummer 9)
+
+Ny vy "Rapport" under Fler vyer (kan stängas av i Inställningar, Fler vyer): nyckeltal (andel klara, försenade, dagar kvar och hur stor del av tiden som gått, projektstatus), statusfördelning som ett staplat band med förklaring (följer projektets egna statusar), försenat, kommande milstolpar, poster som slutar inom 14 dagar, tabell per ansvarig (medansvariga räknas hos alla) och per grupp med framsteg. Knappen "Skriv ut / spara som PDF" anropar webbläsarens utskrift; utskriftsformatet (`@media print`, styrt av `data-view` på `<html>`) visar bara rapporten på vit bakgrund. Rapporten räknar hela projektet, inte det filtrerade (en sökning ska inte ge en annan rapport). Poster utan datum räknas som poster men aldrig som försenade. Grupper räknas inte som poster. Overifierat: hur utskriften ser ut i en riktig webbläsardialog (testat med emulerat utskriftsläge, inte med PDF-utskrift), och rapport över flera projekt (portföljvyn finns sedan tidigare). Testat: tests/report.test.ts (5), e2e/report.spec.ts (5).

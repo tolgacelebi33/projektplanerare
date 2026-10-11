@@ -51,6 +51,7 @@ import { CalendarView } from "./views/CalendarView";
 import { MyWeekView } from "./views/MyWeekView";
 import { WorkloadView } from "./views/WorkloadView";
 import { PortfolioView } from "./views/PortfolioView";
+import { ReportView } from "./views/ReportView";
 import { myWeekGroups, portfolioRows, shiftPatch } from "./data/overviews";
 import { THEMES, applyTheme, getTheme, type Theme } from "./theme";
 
@@ -58,7 +59,7 @@ import { THEMES, applyTheme, getTheme, type Theme } from "./theme";
 const DhtmlxGantt = lazy(() => import("./proto/DhtmlxGantt").then((m) => ({ default: m.DhtmlxGantt })));
 
 const params = new URLSearchParams(location.search);
-const VIEW0: ViewId = (["wheel", "board", "calendar", "week", "workload", "portfolio"] as const).find((v) => v === params.get("view")) ?? "gantt";
+const VIEW0: ViewId = (["wheel", "board", "calendar", "week", "workload", "portfolio", "report"] as const).find((v) => v === params.get("view")) ?? "gantt";
 
 /** Byter man språk monteras appen om (nyckeln), men lagret är kvar, så ingen data försvinner. */
 export function App() {
@@ -303,6 +304,8 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
       setWriteError(sv.recur.done(made.length));
     } catch (e) { setWriteError(friendlyError(e)); reload(); }
   };
+  // Utskriftsformatet (rapporten) styrs av vilken vy som visas
+  useEffect(() => { document.documentElement.dataset.view = view; return () => { delete document.documentElement.dataset.view; }; }, [view]);
   /** Allt som bestämmer hur projektet visas just nu, som en sparbar vy. */
   const currentView = (): import("./data/types").SavedView => ({
     id: "", name: "", view, zoom, boardGroup, columns: [...columns],
@@ -871,6 +874,7 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
         {state.kind === "ready" && projects.projectId && view === "board" && <BoardView statuses={project?.statuses} lastActivity={lastActivity} commentCounts={commentCounts} fields={fieldDefs} nextIds={nextIds} groupBy={boardGroup} cardFields={settings.cardFields} highlightOverdue={settings.highlightOverdue} markUndated={settings.markUndated} items={listItems} allItems={state.items} users={users} colors={colors} openId={editId} selected={selected} onOpen={setEditId} onSelect={selectRow} onBackground={dropSelection} onDrop={(m, k, b) => void dropCards(m, k, b)} onMoveTo={moveCardTo} onContext={openMenu} />}
         {state.kind === "ready" && projects.projectId && view === "calendar" && <CalendarView items={shown.items} today={todayISO()} markUndated={settings.markUndated} colors={colors} openId={editId} onOpen={setEditId} onShift={(id, d) => void shiftItem(id, d)} />}
         {state.kind === "ready" && projects.projectId && view === "workload" && <WorkloadView items={shown.items} users={users} fieldDefs={fieldDefs} fieldId={settings.workloadField} cap={settings.workloadCap} today={todayISO()} onOpen={setEditId} />}
+        {state.kind === "ready" && projects.projectId && project && view === "report" && <ReportView project={project} items={state.items} users={users} latest={statusUpdates.filter((u) => u.project_id === project.id).at(-1) ?? null} today={todayISO()} onOpen={setEditId} />}
         {view === "week" && projects.projects && projects.projects.length > 0 && <MyWeekView groups={myWeekGroups(allData, todayISO())} users={users} multi={projects.projects.length > 1} onOpen={openInProject} />}
         {view === "portfolio" && projects.projects && projects.projects.length > 0 && <PortfolioView rows={portfolioRows(allData, todayISO(), statusUpdates)} currentId={projects.projectId} onOpen={(pid) => { focusMedianOnNextProject(); projects.select(pid); setView("gantt"); }} />}
         {state.kind === "ready" && projects.projectId && view === "wheel" && <YearWheel items={shown.items} year={effectiveYear} colors={colors} selectedId={editId} onOpen={setEditId} onContext={openMenu} />}

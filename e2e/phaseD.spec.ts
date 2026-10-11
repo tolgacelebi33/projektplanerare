@@ -87,6 +87,7 @@ test("D6 inställningar: en avstängd vy försvinner ur listan, och belastningsg
   await d.getByRole("checkbox", { name: "Kalender" }).uncheck();
   await d.getByRole("checkbox", { name: "Min vecka" }).uncheck();
   await d.getByRole("checkbox", { name: "Belastning" }).uncheck();
+  await d.getByRole("checkbox", { name: "Rapport" }).uncheck();
   await page.keyboard.press("Escape");
   await expect(page.getByLabel("Fler vyer", { exact: true })).toHaveCount(0);
 });

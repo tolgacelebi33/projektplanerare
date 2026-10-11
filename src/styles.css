@@ -738,3 +738,33 @@ span.health-chip { cursor: default; }
 .occ-nav { display: flex; align-items: center; gap: 6px; margin-top: 4px; }
 .occ-nav .mini { min-width: 32px; }
 .occ-pos { font-size: var(--fs-sm); }
+
+/* Rapport */
+.report { padding: 16px; display: grid; gap: 18px; overflow: auto; }
+.rep-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; }
+.rep-title { margin: 0; font-family: var(--font-title); font-weight: 400; }
+.rep-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; }
+.rep-card { display: grid; gap: 6px; align-content: start; padding: 12px; background: var(--surface); border: var(--line-width) solid var(--grid-line); }
+.rep-num { font-family: var(--font-title); font-size: 28px; }
+.rep-stack { display: flex; height: 22px; border: var(--line-width) solid var(--bar-outline-color); overflow: hidden; }
+.rep-stack > span { min-width: 2px; }
+.rep-stack .st-not_started, .rep-dot.st-not_started { background: var(--status-not-started-bg); }
+.rep-stack .st-in_progress, .rep-dot.st-in_progress { background: var(--status-in-progress-bg); }
+.rep-stack .st-done, .rep-dot.st-done { background: var(--status-done-bg); }
+.rep-stack .st-blocked, .rep-dot.st-blocked { background: var(--status-blocked-bg); }
+.rep-legend { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px 18px; }
+.rep-dot { display: inline-block; width: 10px; height: 10px; border: var(--line-width) solid var(--bar-outline-color); }
+.rep-cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 18px; align-items: start; }
+.rep-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.rep-date { font-variant-numeric: tabular-nums; color: var(--text-muted, inherit); }
+.report h3 { margin: 0 0 8px; font-family: var(--font-title); font-weight: 400; font-size: 14px; }
+@media print {
+  /* Utskrift och PDF: bara rapporten, på ljus bakgrund */
+  html[data-view="report"] body * { visibility: hidden; }
+  html[data-view="report"] .report, html[data-view="report"] .report * { visibility: visible; }
+  html[data-view="report"] .report { position: absolute; left: 0; top: 0; width: 100%; padding: 0; overflow: visible; background: var(--sv-vit); color: var(--sv-svart); }
+  html[data-view="report"], html[data-view="report"] body { background: var(--sv-vit); }
+  html[data-view="report"] .rep-card, html[data-view="report"] .wl-table { background: transparent; }
+  html[data-view="report"] .no-print { display: none; }
+  html[data-view="report"] .rep-card, html[data-view="report"] section { break-inside: avoid; }
+}
