@@ -24,9 +24,9 @@ export async function buildBackup(store: MemoryStore, now: Date): Promise<{ file
   const out: unknown[] = [];
   let items = 0;
   for (const p of projects) {
-    const [it, deps] = await Promise.all([store.listItems(p.id), store.listDependencies(p.id)]);
+    const [it, deps, comments] = await Promise.all([store.listItems(p.id), store.listDependencies(p.id), store.listComments(p.id)]);
     items += it.length;
-    out.push(JSON.parse(toJson(toParsed(p, it, deps, users), now.toISOString())));
+    out.push(JSON.parse(toJson(toParsed(p, it, deps, users, comments), now.toISOString())));
   }
   const date = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
   return {

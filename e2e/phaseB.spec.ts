@@ -96,6 +96,7 @@ test("B4 länkar: https läggs till, farliga avvisas, länken öppnas säkert i 
 
 test("B5 uppdateringslogg: ny rad med tid, senaste överst, ta bort, och senaste raden på kortet om det är valt", async ({ page }) => {
   await open(page, "i7");
+  await page.locator("aside.panel").getByRole("tab", { name: "Logg" }).click(); // loggen är en egen flik i panelen
   const s = sec(page, "log");
   await s.getByLabel("Ny uppdatering").fill("Första"); await s.getByRole("button", { name: "Lägg till uppdatering" }).click();
   await expect.poll(async () => (await get(page, "i7")).log?.length).toBe(1);

@@ -5,12 +5,13 @@ import { DEPENDENCY_TYPES, GROUP_COLORS, RECURRENCES, type GroupColor, type Recu
 import type { DataStore } from "../data/DataStore";
 import { diffDays, isISODate, todayISO } from "../data/dates";
 import { MAX_DESCRIPTION, MAX_TITLE, RuleError, isOverdue, validateItemShape } from "../data/rules";
-import type { Baseline, Dependency, FieldDef, Item, Priority, Status, User } from "../data/types";
+import type { Baseline, Comment, Dependency, FieldDef, Item, Priority, Status, User } from "../data/types";
 import { friendlyError } from "../i18n/errors";
 import { sv } from "../i18n/sv";
 import { STATUS_GLYPH } from "../proto/statusUi";
 import { DatePicker } from "./DatePicker";
 import { PanelExtras } from "./PanelExtras";
+import { CommentsTab } from "./CommentsTab";
 import { PanelFields } from "./PanelFields";
 import { checklistPercent } from "../data/extras";
 import { DEFAULT_FEATURES, type Features } from "../settings";
@@ -25,10 +26,12 @@ type SaveState = { kind: "idle" } | { kind: "saving" } | { kind: "saved" } | { k
  * Detaljpanel för en post, fast bredd, dockad till höger. Ändringar sparas per fält direkt (inget spara-steg), så att man
  * kan hoppa mellan poster utan att tappa något. Läser alltid färska data från DataStore (drag i vyerna sparas direkt i storen).
  */
-export function ItemPanel({ baseline, fieldDefs = [], onDuplicate, onNewSeries, nextDate, features = DEFAULT_FEATURES, checklistProgress = false, store, projectId, itemId, dataVersion, autoSelectTitle = false, focusField = null, onFocusDone, onClose, onChanged, onOpen }: {
+export function ItemPanel({ me = "", onMe, baseline, fieldDefs = [], onDuplicate, onNewSeries, nextDate, features = DEFAULT_FEATURES, checklistProgress = false, store, projectId, itemId, dataVersion, autoSelectTitle = false, focusField = null, onFocusDone, onClose, onChanged, onOpen }: {
   features?: Features; checklistProgress?: boolean;
   /** Projektets egna fält. */
   fieldDefs?: FieldDef[];
+  /** Person som skriver kommentarer (id) och hur valet ändras. */
+  me?: string; onMe?: (id: string) => void;
   /** Projektets baslinje (om den finns), för att visa postens plan och glidning. */
   baseline?: Baseline | null;
   onDuplicate?: (id: string) => void; onNewSeries?: (item: Item, count: number) => void;
@@ -42,6 +45,15 @@ export function ItemPanel({ baseline, fieldDefs = [], onDuplicate, onNewSeries, 
   onClose: () => void; onChanged: () => void; onOpen: (id: string) => void;
 }) {
   const [data, setData] = useState<Loaded | null>(null);
+  const [tab, setTab] = useState<"details" | "comments" | "log">("details");
+  const [comments, setComments] = useState<Comment[]>([]);
+  useEffect(() => {
+    let on = true;
+    const load = () => void store.listComments(projectId).then((c) => { if (on) setComments(c); }).catch(() => undefined);
+    load();
+    const un = store.subscribe?.(load);
+    return () => { on = false; un?.(); };
+  }, [store, projectId, dataVersion]);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [save, setSave] = useState<SaveState>({ kind: "idle" });
   const [fieldError, setFieldError] = useState<{ field: string; message: string } | null>(null);
@@ -205,6 +217,7 @@ export function ItemPanel({ baseline, fieldDefs = [], onDuplicate, onNewSeries, 
   const children = all.filter((i) => i.parent_id === item.id).sort((a, b) => a.sort_order - b.sort_order);
   const overdue = isOverdue(item, todayISO());
   const choices = epicChoices(all, item.id);
+  const view = (tab === "comments" && !features.comments) || (tab === "log" && !features.log) ? "details" : tab;
   const subtreeCount = descendants(all, item.id).length;
   const doDelete = async () => {
     setSave({ kind: "saving" });
@@ -262,7 +275,14 @@ export function ItemPanel({ baseline, fieldDefs = [], onDuplicate, onNewSeries, 
             onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }} />
         </label>
         {err("title")}
-
+        {(features.comments || features.log) && (
+          <div className="panel-tabs" role="tablist" aria-label={sv.comments.tabs}>
+            {([["details", sv.comments.details], ...(features.comments ? [["comments", sv.comments.tabCount(comments.filter((c) => c.item_id === item.id).length)]] : []), ...(features.log ? [["log", sv.comments.log]] : [])] as [typeof tab, string][]).map(([k, label]) => (
+              <button key={k} type="button" role="tab" id={`panel-tab-${k}`} aria-selected={view === k} aria-controls={`panel-pane-${k}`} className="panel-tab" onClick={() => setTab(k)}>{label}</button>
+            ))}
+          </div>
+        )}
+        <div role="tabpanel" id="panel-pane-details" aria-labelledby="panel-tab-details" hidden={view !== "details"} className="panel-pane">
         <div className="panel-grid">
           <label className="panel-field">
             <span>{sv.panel.status}</span>
@@ -334,7 +354,7 @@ export function ItemPanel({ baseline, fieldDefs = [], onDuplicate, onNewSeries, 
         {err("description")}
         <PanelFields item={item} defs={fieldDefs} save={(patch) => depAction("fields", async () => { await store.updateItem(item.id, patch); })} />
         {err("fields")}
-        <PanelExtras item={item} all={all} features={features} error={err}
+        <PanelExtras only="rest" item={item} all={all} features={features} error={err}
           save={(patch) => depAction(Object.keys(patch)[0], async () => {
             const p = { ...patch };
             if (checklistProgress && p.checklist) { const pct = checklistPercent(p.checklist); if (pct !== null) p.progress = pct; } // checklistan styr framsteget
@@ -479,6 +499,18 @@ export function ItemPanel({ baseline, fieldDefs = [], onDuplicate, onNewSeries, 
           {err("delete")}
         </section>
         <p className="panel-muted panel-foot">{sv.panel.autosave}</p>
+        </div>
+        {features.comments && (
+          <div role="tabpanel" id="panel-pane-comments" aria-labelledby="panel-tab-comments" hidden={view !== "comments"} className="panel-pane">
+            <CommentsTab store={store} itemId={item.id} comments={comments} users={users} me={me} onMe={(id) => onMe?.(id)} />
+          </div>
+        )}
+        {features.log && (
+          <div role="tabpanel" id="panel-pane-log" aria-labelledby="panel-tab-log" hidden={view !== "log"} className="panel-pane">
+            <PanelExtras only="log" item={item} all={all} features={features} error={err}
+              save={(patch) => depAction(Object.keys(patch)[0], async () => { await store.updateItem(item.id, patch); })} />
+          </div>
+        )}
       </div>
     </aside>
   );

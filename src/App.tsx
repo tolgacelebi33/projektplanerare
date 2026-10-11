@@ -387,6 +387,16 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
   };
   // Säkerhetskopia: spara som fil, återställ som nya projekt, och en påminnelse när det gått länge
   const [lastBackup, setLastBackup] = useState<string | null>(lastBackupAt);
+  const [commentCounts, setCommentCounts] = useState<ReadonlyMap<string, number>>(new Map());
+  useEffect(() => {
+    const pid = projects.projectId;
+    if (!pid) return;
+    let on = true;
+    const load = () => void store.listComments(pid).then((cs) => { if (!on) return; const m = new Map<string, number>(); for (const c of cs) m.set(c.item_id, (m.get(c.item_id) ?? 0) + 1); setCommentCounts(m); }).catch(() => undefined);
+    load();
+    const un = store.subscribe(load);
+    return () => { on = false; un(); };
+  }, [store, projects.projectId]);
   const [backupPreview, setBackupPreview] = useState<{ file: string; summary: BackupSummary } | null>(null);
   const [nagHidden, setNagHidden] = useState(false);
   const saveBackupFile = async (): Promise<string> => {
@@ -720,7 +730,7 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
         {projects.projects && projects.projects.length === 0 && (
           <div className="empty-state"><p>{sv.project.none}</p><button type="button" className="btn btn-primary" onClick={() => void projects.create(sv.project.defaultName)}>{sv.project.createFirst}</button></div>
         )}
-        {state.kind === "ready" && projects.projectId && view === "board" && <BoardView fields={fieldDefs} nextIds={nextIds} groupBy={boardGroup} cardFields={settings.cardFields} highlightOverdue={settings.highlightOverdue} markUndated={settings.markUndated} items={listItems} allItems={state.items} users={users} colors={colors} openId={editId} selected={selected} onOpen={setEditId} onSelect={selectRow} onBackground={dropSelection} onDrop={(m, k, b) => void dropCards(m, k, b)} onMoveTo={moveCardTo} onContext={openMenu} />}
+        {state.kind === "ready" && projects.projectId && view === "board" && <BoardView commentCounts={commentCounts} fields={fieldDefs} nextIds={nextIds} groupBy={boardGroup} cardFields={settings.cardFields} highlightOverdue={settings.highlightOverdue} markUndated={settings.markUndated} items={listItems} allItems={state.items} users={users} colors={colors} openId={editId} selected={selected} onOpen={setEditId} onSelect={selectRow} onBackground={dropSelection} onDrop={(m, k, b) => void dropCards(m, k, b)} onMoveTo={moveCardTo} onContext={openMenu} />}
         {state.kind === "ready" && projects.projectId && view === "calendar" && <CalendarView items={shown.items} today={todayISO()} markUndated={settings.markUndated} colors={colors} openId={editId} onOpen={setEditId} onShift={(id, d) => void shiftItem(id, d)} />}
         {state.kind === "ready" && projects.projectId && view === "workload" && <WorkloadView items={shown.items} users={users} fieldDefs={fieldDefs} fieldId={settings.workloadField} cap={settings.workloadCap} today={todayISO()} onOpen={setEditId} />}
         {view === "week" && projects.projects && projects.projects.length > 0 && <MyWeekView groups={myWeekGroups(allData, todayISO())} users={users} multi={projects.projects.length > 1} onOpen={openInProject} />}
@@ -744,7 +754,7 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
        </Suspense>
       </main>
       {editId && (
-        <ItemPanel key="panel" baseline={project?.baseline ?? null} fieldDefs={fieldDefs} onDuplicate={(id) => void doDuplicateItem(id)} onNewSeries={(it, n) => { if (it.recur) { setRecurInit({ title: it.title, kind: it.recur, count: n }); setRecurOpen(true); } }} nextDate={state.kind === "ready" ? (() => { const cur = state.items.find((i) => i.id === editId); if (!cur?.series) return null; const nx = nextOccurrenceIds(state.items, todayISO()); return state.items.find((i) => i.series === cur.series && nx.has(i.id))?.start ?? null; })() : null} features={settings.features} checklistProgress={settings.checklistProgress} store={store} projectId={projects.projectId!} itemId={editId} dataVersion={state.kind === "ready" ? state.items : undefined} autoSelectTitle={editId === justCreated} focusField={panelFocus} onFocusDone={() => setPanelFocus(null)}
+        <ItemPanel key="panel" me={settings.me} onMe={(id) => setSettings({ ...settingsRef.current, me: id })} baseline={project?.baseline ?? null} fieldDefs={fieldDefs} onDuplicate={(id) => void doDuplicateItem(id)} onNewSeries={(it, n) => { if (it.recur) { setRecurInit({ title: it.title, kind: it.recur, count: n }); setRecurOpen(true); } }} nextDate={state.kind === "ready" ? (() => { const cur = state.items.find((i) => i.id === editId); if (!cur?.series) return null; const nx = nextOccurrenceIds(state.items, todayISO()); return state.items.find((i) => i.series === cur.series && nx.has(i.id))?.start ?? null; })() : null} features={settings.features} checklistProgress={settings.checklistProgress} store={store} projectId={projects.projectId!} itemId={editId} dataVersion={state.kind === "ready" ? state.items : undefined} autoSelectTitle={editId === justCreated} focusField={panelFocus} onFocusDone={() => setPanelFocus(null)}
           onClose={() => setEditId(null)} onChanged={() => void refresh()} onOpen={setEditId} />
       )}
       </div>

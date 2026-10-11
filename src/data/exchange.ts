@@ -1,5 +1,5 @@
 import { addDays, isISODate, recurringDates, todayISO } from "./dates";
-import { RuleError, validateBaseline, validateFieldDefs, validateItemShape, validateSavedViews } from "./rules";
+import { RuleError, validateBaseline, validateCommentText, validateFieldDefs, validateItemShape, validateSavedViews } from "./rules";
 import { newChecklistId, normalizeLink } from "./extras";
 import { importFieldValue, inferFieldDef, newFieldId } from "./fields";
 import { FIELD_LIMITS, LIMITS, type FieldValue } from "./types";
@@ -7,7 +7,7 @@ import { sv } from "../i18n/sv";
 import { enDict, svDict } from "../i18n/sv";
 import { friendlyError } from "../i18n/errors";
 import { DEPENDENCY_TYPES, MAX_LAG, type DependencyType } from "./types";
-import type { Baseline, Dependency, DependencyMode, FieldDef, ISODate, Item, ItemType, Priority, Project, Recurrence, SavedView, Status, User } from "./types";
+import type { Baseline, Comment, Dependency, DependencyMode, FieldDef, ISODate, Item, ItemType, Priority, Project, Recurrence, SavedView, Status, User } from "./types";
 
 /**
  * Export och import av projekt, utan beroende av lagring. JSON ger full återgivning (används också för att kopiera ett projekt).
@@ -42,6 +42,8 @@ export interface ParsedProject {
   report?: ImportReport;
   /** Baslinjen (JSON), med postnycklar som i filens id. */
   baseline?: Baseline;
+  /** Kommentarer (JSON): `item` och `id`/`parent` är filens id, författaren ett namn. */
+  comments?: { id: string; item: string; parent?: string; author: string | null; text: string; at: string; edited?: string }[];
 }
 
 /** Sammanfattning av det som ska läggas in (antal per typ, grupper med innehåll, serier, poster utan riktigt datum). */
@@ -70,7 +72,7 @@ const TYPES: ItemType[] = ["epic", "milestone", "task"];
 export class ImportError extends Error {}
 
 /** Lagrets poster som en neutral beskrivning (ansvarig som namn, inga projekt- eller workspace-id). */
-export function toParsed(project: Pick<Project, "name" | "dependency_mode"> & Partial<Pick<Project, "fields" | "views" | "baseline">>, items: Item[], deps: Dependency[], users: User[]): ParsedProject {
+export function toParsed(project: Pick<Project, "name" | "dependency_mode"> & Partial<Pick<Project, "fields" | "views" | "baseline">>, items: Item[], deps: Dependency[], users: User[], comments: Comment[] = []): ParsedProject {
   const name = new Map(users.map((u) => [u.id, u.name]));
   const ids = new Set(items.map((i) => i.id));
   return {
@@ -78,6 +80,7 @@ export function toParsed(project: Pick<Project, "name" | "dependency_mode"> & Pa
     dependency_mode: project.dependency_mode ?? "shift",
     ...(project.fields?.length ? { fields: project.fields } : {}), ...(project.views?.length ? { views: project.views } : {}),
     ...(project.baseline && Object.keys(project.baseline.items).length ? { baseline: { saved_at: project.baseline.saved_at, items: Object.fromEntries(Object.entries(project.baseline.items).filter(([k]) => ids.has(k))) } } : {}),
+    ...(comments.length ? { comments: comments.filter((c) => ids.has(c.item_id)).map((c) => ({ id: c.id, item: c.item_id, ...(c.parent_id ? { parent: c.parent_id } : {}), author: (c.author_id ? name.get(c.author_id) : undefined) ?? (c.author_name || null), text: c.text, at: c.created_at, ...(c.edited_at ? { edited: c.edited_at } : {}) })) } : {}),
     items: items.map(({ workspace_id: _w, project_id: _p, assignee_id, ...rest }) => ({ ...rest, assignee: assignee_id ? name.get(assignee_id) ?? null : null })),
     deps: deps.filter((d) => ids.has(d.from_item_id) && ids.has(d.to_item_id)).map((d) => ({ from: d.from_item_id, to: d.to_item_id, ...(d.type !== "finish_to_start" ? { type: d.type } : {}), ...(d.lag ? { lag: d.lag } : {}) })),
     warnings: [],
@@ -87,7 +90,7 @@ export function toParsed(project: Pick<Project, "name" | "dependency_mode"> & Pa
 // ---------- JSON ----------
 
 export function toJson(p: ParsedProject, exportedAt: string): string {
-  return JSON.stringify({ format: FORMAT, version: 1, exported_at: exportedAt, project: { name: p.name, dependency_mode: p.dependency_mode, ...(p.fields?.length ? { fields: p.fields } : {}), ...(p.views?.length ? { views: p.views } : {}), ...(p.baseline ? { baseline: p.baseline } : {}) }, items: p.items, dependencies: p.deps }, null, 2);
+  return JSON.stringify({ format: FORMAT, version: 1, exported_at: exportedAt, project: { name: p.name, dependency_mode: p.dependency_mode, ...(p.fields?.length ? { fields: p.fields } : {}), ...(p.views?.length ? { views: p.views } : {}), ...(p.baseline ? { baseline: p.baseline } : {}) }, items: p.items, dependencies: p.deps, ...(p.comments?.length ? { comments: p.comments } : {}) }, null, 2);
 }
 
 function shapeCheck(it: ParsedItem, n: number) {
@@ -166,6 +169,15 @@ export function parseJson(text: string): ParsedProject {
     dependency_mode: proj.dependency_mode === "none" ? "none" : "shift", items, deps, warnings: [],
   };
   if (Array.isArray(proj.fields)) { try { validateFieldDefs(proj.fields as FieldDef[]); } catch (er) { throw new ImportError(friendlyError(er)); } out.fields = proj.fields as FieldDef[]; }
+  if (Array.isArray(raw.comments)) {
+    const ids = new Set(items.map((i) => i.id));
+    out.comments = (raw.comments as unknown[]).flatMap((c, i) => {
+      if (!isObj(c) || typeof c.item !== "string" || typeof c.text !== "string" || typeof c.id !== "string") throw new ImportError(sv.ex.commentShape(i + 1));
+      if (!ids.has(c.item)) return []; // kommentar på en post som inte finns i filen
+      try { validateCommentText(c.text); } catch (er) { throw new ImportError(sv.ex.commentBad(i + 1, friendlyError(er))); }
+      return [{ id: c.id, item: c.item, ...(typeof c.parent === "string" ? { parent: c.parent } : {}), author: typeof c.author === "string" && c.author.trim() ? c.author.trim().slice(0, 60) : null, text: c.text, at: typeof c.at === "string" && !Number.isNaN(Date.parse(c.at)) ? c.at : new Date(0).toISOString(), ...(typeof c.edited === "string" ? { edited: c.edited } : {}) }];
+    });
+  }
   if (isObj(proj.baseline)) { try { validateBaseline(proj.baseline as unknown as Baseline); } catch (er) { throw new ImportError(friendlyError(er)); } out.baseline = proj.baseline as unknown as Baseline; }
   if (Array.isArray(proj.views)) { try { validateSavedViews(proj.views as SavedView[]); } catch (er) { throw new ImportError(friendlyError(er)); } out.views = proj.views as SavedView[]; }
   structureCheck(out);

@@ -26,6 +26,8 @@ export interface Settings {
   collapseSeries: boolean;
   /** Visa en förhandsgranskning (kolumner, grupper, serier, antal) innan en fil läggs in. */
   importPreview: boolean;
+  /** Person som skriver kommentarer (id), senast valda "Skriv som". */
+  me: string;
   /** Påminnelse om säkerhetskopia efter så många dagar (0 = aldrig). */
   backupReminderDays: number;
   /** Baslinjen (om projektet har en) ritas som tunna staplar under de verkliga. */
@@ -44,12 +46,12 @@ export interface Settings {
 export type ViewId = "gantt" | "wheel" | "board" | "calendar" | "week" | "workload" | "portfolio";
 export const MORE_VIEWS = ["calendar", "week", "workload", "portfolio"] as const;
 export type MoreView = (typeof MORE_VIEWS)[number];
-export interface Features { labels: boolean; checklist: boolean; links: boolean; log: boolean }
-export const DEFAULT_FEATURES: Features = { labels: true, checklist: true, links: true, log: true };
-export interface CardFields { date: boolean; assignee: boolean; priority: boolean; description: boolean; series: boolean; progress: boolean; labels: boolean; checklist: boolean; links: boolean; lastUpdate: boolean; code: boolean }
+export interface Features { labels: boolean; checklist: boolean; links: boolean; log: boolean; comments: boolean }
+export const DEFAULT_FEATURES: Features = { labels: true, checklist: true, links: true, log: true, comments: true };
+export interface CardFields { date: boolean; assignee: boolean; priority: boolean; description: boolean; series: boolean; progress: boolean; labels: boolean; checklist: boolean; links: boolean; lastUpdate: boolean; code: boolean; comments: boolean }
 export type BoardGroup = "status" | "assignee" | "priority" | "group" | `field:${string}`;
-export const DEFAULT_CARD_FIELDS: CardFields = { date: true, assignee: true, priority: true, description: false, series: true, progress: false, labels: true, checklist: true, links: true, lastUpdate: false, code: false };
-export const DEFAULT_SETTINGS: Settings = { touch: "auto", closeOnEmpty: true, markUndated: true, startView: "gantt", startZoom: "week", cardFields: { ...DEFAULT_CARD_FIELDS }, highlightOverdue: true, quickFilters: true, boardGroup: "status", features: { ...DEFAULT_FEATURES }, checklistProgress: false, hidePastSeries: false, collapseSeries: false, importPreview: true, backupReminderDays: 30, showBaseline: true, rules: { doneSetsProgress: false, seriesNext: false }, importExtraAsFields: true, moreViews: { calendar: true, week: true, workload: true, portfolio: true }, workloadField: "", workloadCap: 5 };
+export const DEFAULT_CARD_FIELDS: CardFields = { date: true, assignee: true, priority: true, description: false, series: true, progress: false, labels: true, checklist: true, links: true, lastUpdate: false, code: false, comments: true };
+export const DEFAULT_SETTINGS: Settings = { touch: "auto", closeOnEmpty: true, markUndated: true, startView: "gantt", startZoom: "week", cardFields: { ...DEFAULT_CARD_FIELDS }, highlightOverdue: true, quickFilters: true, boardGroup: "status", features: { ...DEFAULT_FEATURES }, checklistProgress: false, hidePastSeries: false, collapseSeries: false, importPreview: true, me: "", backupReminderDays: 30, showBaseline: true, rules: { doneSetsProgress: false, seriesNext: false }, importExtraAsFields: true, moreViews: { calendar: true, week: true, workload: true, portfolio: true }, workloadField: "", workloadCap: 5 };
 const KEY = "projektplanerare.settings";
 const bool = (v: unknown, d: boolean) => (typeof v === "boolean" ? v : d);
 const pick = <T extends string>(v: unknown, ok: readonly T[], d: T): T => (ok.includes(v as T) ? (v as T) : d);
@@ -62,15 +64,16 @@ export function normalizeSettings(raw: unknown): Settings {
     markUndated: typeof o.markUndated === "boolean" ? o.markUndated : DEFAULT_SETTINGS.markUndated,
     startView: pick(o.startView, ["gantt", "wheel", "board"], DEFAULT_SETTINGS.startView),
     startZoom: pick(o.startZoom, ["day", "week", "month"], DEFAULT_SETTINGS.startZoom),
-    cardFields: ((c) => ({ date: bool(c.date, DEFAULT_CARD_FIELDS.date), assignee: bool(c.assignee, DEFAULT_CARD_FIELDS.assignee), priority: bool(c.priority, DEFAULT_CARD_FIELDS.priority), description: bool(c.description, DEFAULT_CARD_FIELDS.description), series: bool(c.series, DEFAULT_CARD_FIELDS.series), progress: bool(c.progress, DEFAULT_CARD_FIELDS.progress), labels: bool(c.labels, DEFAULT_CARD_FIELDS.labels), checklist: bool(c.checklist, DEFAULT_CARD_FIELDS.checklist), links: bool(c.links, DEFAULT_CARD_FIELDS.links), lastUpdate: bool(c.lastUpdate, DEFAULT_CARD_FIELDS.lastUpdate), code: bool(c.code, DEFAULT_CARD_FIELDS.code) }))((o.cardFields && typeof o.cardFields === "object" ? o.cardFields : {}) as Record<string, unknown>),
+    cardFields: ((c) => ({ date: bool(c.date, DEFAULT_CARD_FIELDS.date), assignee: bool(c.assignee, DEFAULT_CARD_FIELDS.assignee), priority: bool(c.priority, DEFAULT_CARD_FIELDS.priority), description: bool(c.description, DEFAULT_CARD_FIELDS.description), series: bool(c.series, DEFAULT_CARD_FIELDS.series), progress: bool(c.progress, DEFAULT_CARD_FIELDS.progress), labels: bool(c.labels, DEFAULT_CARD_FIELDS.labels), checklist: bool(c.checklist, DEFAULT_CARD_FIELDS.checklist), links: bool(c.links, DEFAULT_CARD_FIELDS.links), lastUpdate: bool(c.lastUpdate, DEFAULT_CARD_FIELDS.lastUpdate), code: bool(c.code, DEFAULT_CARD_FIELDS.code), comments: bool(c.comments, DEFAULT_CARD_FIELDS.comments) }))((o.cardFields && typeof o.cardFields === "object" ? o.cardFields : {}) as Record<string, unknown>),
     highlightOverdue: bool(o.highlightOverdue, DEFAULT_SETTINGS.highlightOverdue),
     quickFilters: bool(o.quickFilters, DEFAULT_SETTINGS.quickFilters),
     boardGroup: typeof o.boardGroup === "string" && /^field:.{1,60}$/.test(o.boardGroup) ? (o.boardGroup as BoardGroup) : pick(o.boardGroup, ["status", "assignee", "priority", "group"], DEFAULT_SETTINGS.boardGroup),
-    features: ((f) => ({ labels: bool(f.labels, true), checklist: bool(f.checklist, true), links: bool(f.links, true), log: bool(f.log, true) }))((o.features && typeof o.features === "object" ? o.features : {}) as Record<string, unknown>),
+    features: ((f) => ({ labels: bool(f.labels, true), checklist: bool(f.checklist, true), links: bool(f.links, true), log: bool(f.log, true), comments: bool(f.comments, true) }))((o.features && typeof o.features === "object" ? o.features : {}) as Record<string, unknown>),
     checklistProgress: bool(o.checklistProgress, DEFAULT_SETTINGS.checklistProgress),
     hidePastSeries: bool(o.hidePastSeries, DEFAULT_SETTINGS.hidePastSeries),
     collapseSeries: bool(o.collapseSeries, DEFAULT_SETTINGS.collapseSeries),
     importPreview: bool(o.importPreview, DEFAULT_SETTINGS.importPreview),
+    me: typeof o.me === "string" && o.me.length <= 100 ? o.me : "",
     backupReminderDays: [0, 7, 14, 30, 90].includes(o.backupReminderDays as number) ? (o.backupReminderDays as number) : DEFAULT_SETTINGS.backupReminderDays,
     showBaseline: bool(o.showBaseline, DEFAULT_SETTINGS.showBaseline),
     rules: ((r) => ({ doneSetsProgress: bool(r.doneSetsProgress, false), seriesNext: bool(r.seriesNext, false) }))((o.rules && typeof o.rules === "object" ? o.rules : {}) as Record<string, unknown>),

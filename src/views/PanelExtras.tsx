@@ -6,7 +6,9 @@ import type { Features } from "../settings";
 import { sv } from "../i18n/sv";
 
 /** Etiketter, checklista, länkar och uppdateringslogg i panelen. Varje del kan stängas av under Inställningar. Ändringar går via `save` (en skrivning som ångras). */
-export function PanelExtras({ item, all, features, save, error }: {
+export function PanelExtras({ item, all, features, save, error, only = "rest" }: {
+  /** "rest": etiketter, checklista och länkar. "log": bara uppdateringsloggen (egen flik i panelen). */
+  only?: "rest" | "log";
   item: Item; all: Item[]; features: Features;
   save: (patch: Partial<Item>) => Promise<void>;
   error: (field: string) => React.ReactNode;
@@ -29,7 +31,7 @@ export function PanelExtras({ item, all, features, save, error }: {
   const newNote = async () => { const next = addLog(log, note); if (next) { await save({ log: next }); setNote(""); } };
   return (
     <>
-      {features.labels && (
+      {only === "rest" && features.labels && (
         <section className="panel-section" data-section="labels">
           <h3>{t.labels}</h3>
           {labels.length > 0 && (
@@ -51,7 +53,7 @@ export function PanelExtras({ item, all, features, save, error }: {
           {err(error, "labels")}
         </section>
       )}
-      {features.checklist && (
+      {only === "rest" && features.checklist && (
         <section className="panel-section" data-section="checklist">
           <h3>{t.checklist}{total > 0 && <span className="panel-muted"> {t.checklistCount(done, total)}</span>}</h3>
           {total > 0 && <div className="panel-meter" role="progressbar" aria-label={t.checklist} aria-valuemin={0} aria-valuemax={total} aria-valuenow={done}><div style={{ width: `${(done / total) * 100}%` }} /></div>}
@@ -74,7 +76,7 @@ export function PanelExtras({ item, all, features, save, error }: {
           {err(error, "checklist")}
         </section>
       )}
-      {features.links && (
+      {only === "rest" && features.links && (
         <section className="panel-section" data-section="links">
           <h3>{t.links}</h3>
           {links.length > 0 && (
@@ -98,7 +100,7 @@ export function PanelExtras({ item, all, features, save, error }: {
           {err(error, "links")}
         </section>
       )}
-      {features.log && (
+      {only === "log" && features.log && (
         <section className="panel-section" data-section="log">
           <h3>{t.log}</h3>
           <textarea name="log-new" rows={2} value={note} maxLength={2000} placeholder={t.logPlaceholder} aria-label={t.addLog} onChange={(e) => setNote(e.target.value)} />

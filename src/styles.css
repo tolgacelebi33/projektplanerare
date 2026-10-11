@@ -607,6 +607,25 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--text); }
 .baseline-bar-ui { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: var(--fs-md); }
 .baseline-date { font-size: 12px; color: var(--text-muted); }
 .backup-nag { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.panel-tabs { display: flex; gap: 2px; border-bottom: var(--line-width) solid var(--line); margin: 4px 0 8px; }
+.panel-tab { font: inherit; font-size: var(--fs-md); padding: 6px 12px; border: 0; border-bottom: 3px solid transparent; background: transparent; color: var(--text); cursor: pointer; }
+.panel-tab:hover { background: var(--surface-alt); }
+.panel-tab[aria-selected="true"] { border-bottom-color: var(--text); font-weight: var(--weight-strong); }
+.panel-pane[hidden] { display: none; }
+.comment-list, .comment-replies { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.comment-replies { margin: 8px 0 0 14px; padding-left: 10px; border-left: var(--line-width) solid var(--grid-line); }
+.comment { display: grid; gap: 4px; font-size: var(--fs-md); }
+.comment-head { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+.comment-head time { font-size: 12px; color: var(--text-muted); }
+.comment-text { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.comment-actions { display: flex; gap: 14px; }
+.comment-actions .panel-link { width: auto; flex: none; }
+.comment-list > .comment { padding-top: 10px; border-top: var(--line-width) solid var(--grid-line); }
+.comment-list > .comment:first-child { border-top: 0; padding-top: 0; }
+.comment-edit, .comment-compose { display: grid; gap: 6px; }
+.comment-hint { font-size: 12px; }
+.comment-compose .panel-row select { width: auto; }
+.mention { background: transparent; color: inherit; font-weight: var(--weight-strong); text-decoration: underline; text-underline-offset: 2px; }
 .panel-kind-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .code-tag { font-family: var(--font-title); font-size: 11px; letter-spacing: 0.04em; padding: 0 6px; border: var(--line-width) solid var(--line); border-radius: var(--radius-pill); white-space: nowrap; user-select: all; }
 .grid-code { font-family: var(--font-title); font-size: 11px; letter-spacing: 0.03em; white-space: nowrap; }

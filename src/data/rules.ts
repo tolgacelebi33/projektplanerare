@@ -1,5 +1,5 @@
 import { isISODate, dayNumber, addDays, diffDays } from "./dates";
-import { type Baseline, MAX_BASELINE_ITEMS, DEPENDENCY_TYPES, FIELD_LIMITS, FIELD_TYPES, GROUP_COLORS, LIMITS, MAX_LAG, RECURRENCES, type FieldDef, type SavedView, type Dependency, type Item, type Status } from "./types";
+import { COMMENT_LIMITS, type Baseline, MAX_BASELINE_ITEMS, DEPENDENCY_TYPES, FIELD_LIMITS, FIELD_TYPES, GROUP_COLORS, LIMITS, MAX_LAG, RECURRENCES, type FieldDef, type SavedView, type Dependency, type Item, type Status } from "./types";
 
 export class RuleError extends Error {
   constructor(public code: string, message: string, public data?: Record<string, string>) {
@@ -263,4 +263,12 @@ export function validateBaseline(b: Baseline): void {
     const e = b.items[id];
     if (!id || id.length > 100 || !e || !isISODate(e.start) || !isISODate(e.end) || dayNumber(e.end) < dayNumber(e.start)) bad("Ogiltig post i baslinjen");
   }
+}
+
+/** Kommentarens text och form (författare och förälder kontrolleras av lagret, som känner till personer och poster). */
+export function validateCommentText(text: string): string {
+  const t = text.trim();
+  if (!t) throw new RuleError("empty_comment", "Skriv en kommentar");
+  if (t.length > COMMENT_LIMITS.text) throw new RuleError("comment_too_long", `Kommentaren är längre än ${COMMENT_LIMITS.text} tecken`);
+  return t;
 }

@@ -177,7 +177,7 @@ describe("import och export av de nya fälten", () => {
 describe("inställningar för de nya delarna", () => {
   it("standard, och gamla eller trasiga värden", () => {
     const s = normalizeSettings({});
-    expect(s.features).toEqual({ labels: true, checklist: true, links: true, log: true });
+    expect(s.features).toEqual({ labels: true, checklist: true, links: true, log: true, comments: true });
     expect([s.checklistProgress, s.hidePastSeries]).toEqual([false, false]);
     expect(normalizeSettings({ features: { log: false }, hidePastSeries: true, checklistProgress: "ja" })).toMatchObject({ features: { log: false, labels: true }, hidePastSeries: true, checklistProgress: false });
   });

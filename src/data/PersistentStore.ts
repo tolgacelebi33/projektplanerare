@@ -50,7 +50,7 @@ export class PersistentStore extends MemoryStore {
 
   /** Kastar om data inte har rätt form eller bryter datamodellens regler. */
   static check(s: Snapshot) {
-    if (!s || !Array.isArray(s.projects) || !Array.isArray(s.items) || !Array.isArray(s.dependencies) || !Array.isArray(s.users) || typeof s.seq !== "number")
+    if (!s || !Array.isArray(s.projects) || !Array.isArray(s.items) || !Array.isArray(s.dependencies) || !Array.isArray(s.users) || typeof s.seq !== "number" || (s.comments !== undefined && !Array.isArray(s.comments)))
       throw new Error(sv.persist.badShape);
     const ids = new Set(s.items.map((i) => i.id));
     if (ids.size !== s.items.length) throw new Error(sv.persist.dupIds);

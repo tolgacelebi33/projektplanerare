@@ -1,11 +1,12 @@
 import type { DataStore } from "./DataStore";
-import { RuleError, earliestStart, rederiveEpics, shiftSuccessors, validateBaseline, validateDependency, validateFieldDefs, validateItemShape, validateParent, validateSavedViews } from "./rules";
+import { RuleError, earliestStart, rederiveEpics, shiftSuccessors, validateBaseline, validateCommentText, validateDependency, validateFieldDefs, validateItemShape, validateParent, validateSavedViews } from "./rules";
 import { addDays } from "./dates";
 import { extendSeries } from "./actions";
 import { PLACEHOLDER_RENAMES, placeholderOldName } from "./fixtures";
 import { countersFor, validCounters, type Counters, emptyCounters, itemCode, nextNumber, parseProjectCode, projectCode } from "./codes";
 import { applyPatch, isPatchList, json, makePatch, type Entry, type Patch } from "./patch";
-import type { Baseline, Dependency, DependencyMode, FieldDef, Fixture, Item, Project, SavedView, User } from "./types";
+import { COMMENT_LIMITS } from "./types";
+import type { Baseline, Comment, Dependency, DependencyMode, FieldDef, Fixture, Item, Project, SavedView, User } from "./types";
 
 /** Allt lagret håller, för att kunna sparas och återställas. */
 export interface Snapshot {
@@ -14,6 +15,8 @@ export interface Snapshot {
   project_seq?: number;
   /** Hur långt varje posttyps följd har kommit, per projekt. Ligger utanför ångra-historiken: ett nummer som delats ut går aldrig tillbaka. */
   counters?: Record<string, Counters>;
+  /** Kommentarer. Ligger utanför ångra-historiken. */
+  comments?: Comment[];
 }
 
 export interface MemoryStoreOptions {
@@ -44,6 +47,8 @@ export class MemoryStore implements DataStore {
   /** Enkla regler som användaren slagit på i Inställningar (se settings.ts). Gäller alla skrivningar, så vyerna behöver inte veta om dem. */
   rules: { doneSetsProgress: boolean; seriesNext: boolean } = { doneSetsProgress: false, seriesNext: false };
   protected counters = new Map<string, Counters>();
+  /** Kommentarer: ingen ångra-historik (Ångra tar aldrig bort en kommentar), och de finns kvar om en post tas bort (så att Ångra kan ge tillbaka posten med sina kommentarer). */
+  protected comments: Comment[] = [];
   private calls = 0;
   /** Logg över skrivanrop, används av tester för att bevisa att UI går via storen. */
   readonly writes: { method: string; args: unknown[] }[] = [];
@@ -190,8 +195,9 @@ export class MemoryStore implements DataStore {
     const now = this.snapshot();
     const target = applyPatch(now, patch);
     to.push(makePatch(target, now)); // från målläget tillbaka till nuläget, för att kunna gå åt andra hållet
-    const seq = this.seq, projectSeq = this.projectSeq, counters = this.counters;
+    const seq = this.seq, projectSeq = this.projectSeq, counters = this.counters, comments = this.comments;
     this.restore(target);
+    this.comments = comments; // Ångra och Gör om rör aldrig kommentarerna
     this.projectSeq = Math.max(projectSeq, this.projectSeq); // projektnummer och räkneverk går aldrig tillbaka, inte heller vid ångra
     for (const [pid, c] of counters) {
       const cur = this.counters.get(pid);
@@ -217,6 +223,7 @@ export class MemoryStore implements DataStore {
       seq: this.seq,
       project_seq: this.projectSeq,
       counters: Object.fromEntries(this.counters),
+      comments: this.comments,
     };
   }
 
@@ -227,6 +234,7 @@ export class MemoryStore implements DataStore {
     this.deps = this.track<Dependency>("deps"); snap.dependencies.forEach((d) => this.deps.set(d.id, { ...d }));
     this.users = snap.users.map((u) => ({ ...u }));
     this.seq = snap.seq;
+    this.comments = (snap.comments ?? []).map((c) => ({ ...c }));
     this.projectSeq = snap.project_seq ?? 0;
     this.counters = new Map();
     for (const [pid, c] of Object.entries(snap.counters ?? {})) if (this.projects.has(pid) && validCounters(c)) this.counters.set(pid, { ...c });
@@ -360,6 +368,7 @@ export class MemoryStore implements DataStore {
     for (const d of [...this.deps.values()]) if (gone.has(d.from_item_id) || gone.has(d.to_item_id)) this.deps.delete(d.id);
     this.projects.delete(id);
     this.counters.delete(id);
+    this.comments = this.comments.filter((c) => c.project_id !== id);
     this.writes.push({ method: "deleteProject", args: [id] });
     this.commit(true);
   }
@@ -444,6 +453,44 @@ export class MemoryStore implements DataStore {
     for (const d of [...this.deps.values()]) if (d.from_item_id === id || d.to_item_id === id) this.deps.delete(d.id);
     this.writes.push({ method: "deleteItem", args: [id] });
     this.commit();
+  }
+  async listComments(projectId: string): Promise<Comment[]> {
+    await this.tick("listComments");
+    return this.comments.filter((c) => c.project_id === projectId && this.items.has(c.item_id)).map((c) => ({ ...c })).sort((a, b) => (a.created_at < b.created_at ? -1 : a.created_at > b.created_at ? 1 : a.id < b.id ? -1 : 1));
+  }
+  async addComment(input: { item_id: string; text: string; author_id: string | null; author_name?: string; parent_id?: string | null; created_at?: string }): Promise<Comment> {
+    await this.tick("addComment");
+    const item = this.items.get(input.item_id);
+    if (!item) throw new RuleError("not_found", "Posten finns inte");
+    const text = validateCommentText(input.text);
+    const author = input.author_id === null ? null : this.users.find((u) => u.id === input.author_id);
+    if (author === undefined) throw new RuleError("bad_author", "Författaren finns inte");
+    const parent = input.parent_id ? this.comments.find((c) => c.id === input.parent_id) : null;
+    if (input.parent_id && (!parent || parent.item_id !== item.id || parent.parent_id !== null)) throw new RuleError("bad_parent", "Det går bara att svara på en kommentar på samma post (en nivå)");
+    if (this.comments.length >= COMMENT_LIMITS.total || this.comments.filter((c) => c.item_id === item.id).length >= COMMENT_LIMITS.perItem) throw new RuleError("too_many_comments", `Högst ${COMMENT_LIMITS.perItem} kommentarer per post`);
+    this.seq += 1;
+    const c: Comment = { id: `c_new${this.seq}`, workspace_id: item.workspace_id, project_id: item.project_id, item_id: item.id, parent_id: parent?.id ?? null, author_id: author?.id ?? null, author_name: author?.name ?? (input.author_name ?? "").slice(0, 60), text, created_at: input.created_at ?? new Date().toISOString() };
+    this.comments = [...this.comments, c];
+    this.commit();
+    return { ...c };
+  }
+  async editComment(id: string, text: string): Promise<Comment> {
+    await this.tick("editComment");
+    const cur = this.comments.find((c) => c.id === id);
+    if (!cur) throw new RuleError("not_found", "Kommentaren finns inte");
+    const next: Comment = { ...cur, text: validateCommentText(text), edited_at: new Date().toISOString() };
+    this.comments = this.comments.map((c) => (c.id === id ? next : c));
+    this.commit();
+    return { ...next };
+  }
+  /** Tar bort kommentaren och svaren på den. Returnerar antal borttagna. */
+  async deleteComment(id: string): Promise<number> {
+    await this.tick("deleteComment");
+    if (!this.comments.some((c) => c.id === id)) throw new RuleError("not_found", "Kommentaren finns inte");
+    const before = this.comments.length;
+    this.comments = this.comments.filter((c) => c.id !== id && c.parent_id !== id);
+    this.commit();
+    return before - this.comments.length;
   }
   async listDependencies(projectId: string) {
     await this.tick("listDependencies");

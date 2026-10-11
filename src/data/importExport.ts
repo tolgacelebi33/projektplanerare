@@ -11,8 +11,8 @@ export async function exportProject(store: MemoryStore, projectId: string, forma
   if (format === "template") return { filename: sv.ex.templateFile, mime: "text/csv;charset=utf-8", text: templateCsv() };
   const project = (await store.listProjects()).find((p) => p.id === projectId);
   if (!project) throw new Error(sv.ex.projectGone);
-  const [items, deps, users] = await Promise.all([store.listItems(projectId), store.listDependencies(projectId), store.listUsers()]);
-  const parsed = toParsed(project, items, deps, users);
+  const [items, deps, users, comments] = await Promise.all([store.listItems(projectId), store.listDependencies(projectId), store.listUsers(), store.listComments(projectId)]);
+  const parsed = toParsed(project, items, deps, users, comments);
   const date = todayISO();
   const base = `${fileSlug(project.name)}-${date}`;
   return format === "json"
@@ -90,6 +90,18 @@ export async function importParsed(store: MemoryStore, workspaceId: string, pars
       for (const [k, v] of Object.entries(parsed.baseline.items)) { const nid = idMap.get(k); if (nid) items[nid] = v; }
       if (Object.keys(items).length) await store.updateProject(project.id, { baseline: { saved_at: parsed.baseline.saved_at, items } });
     }
+    if (parsed.comments?.length) {
+      // Kommentarerna läggs in i tidsordning (en förälder före sina svar). Författaren matchas på namn, annars står namnet kvar utan person.
+      const cid = new Map<string, string>();
+      for (const c of [...parsed.comments].sort((a, b) => a.at.localeCompare(b.at))) {
+        const item = idMap.get(c.item);
+        if (!item) continue;
+        try {
+          const made = await store.addComment({ item_id: item, text: c.text, author_id: c.author ? byName.get(c.author.trim().toLowerCase()) ?? null : null, ...(c.author ? { author_name: c.author } : {}), ...(c.parent && cid.get(c.parent) ? { parent_id: cid.get(c.parent)! } : {}), created_at: c.at });
+          cid.set(c.id, made.id);
+        } catch { warnings.push(sv.ex.commentSkipped); }
+      }
+    }
     const skippedDeps: string[] = [];
     for (const d of parsed.deps) {
       try { createdDeps.push((await store.createDependency({ workspace_id: workspaceId, from_item_id: idMap.get(d.from)!, to_item_id: idMap.get(d.to)!, type: d.type ?? "finish_to_start", ...(d.lag ? { lag: d.lag } : {}) })).id); }
@@ -120,6 +132,6 @@ export async function importParsed(store: MemoryStore, workspaceId: string, pars
 export async function duplicateProject(store: MemoryStore, workspaceId: string, projectId: string): Promise<ImportResult> {
   const project = (await store.listProjects()).find((p) => p.id === projectId);
   if (!project) throw new Error(sv.ex.projectGone);
-  const [items, deps, users] = await Promise.all([store.listItems(projectId), store.listDependencies(projectId), store.listUsers()]);
-  return importParsed(store, workspaceId, toParsed(project, items, deps, users), sv.ex.copy(project.name));
+  const [items, deps, users, comments] = await Promise.all([store.listItems(projectId), store.listDependencies(projectId), store.listUsers(), store.listComments(projectId)]);
+  return importParsed(store, workspaceId, toParsed(project, items, deps, users, comments), sv.ex.copy(project.name));
 }

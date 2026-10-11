@@ -24,6 +24,17 @@ export interface Project {
   code?: string;
 }
 
+/** En kommentar på en post. Egen post (inte en lista på posten), så att den kan synkas och sammanfogas senare. Ett svar har `parent_id` (en nivå). */
+export interface Comment {
+  id: string; workspace_id: string; project_id: string; item_id: string;
+  parent_id: string | null;
+  /** Författaren (person) eller null. `author_name` är namnet när kommentaren skrevs, så att den går att läsa även om personen tas bort. */
+  author_id: string | null; author_name: string;
+  text: string;
+  created_at: string; edited_at?: string;
+}
+export const COMMENT_LIMITS = { text: 2000, perItem: 500, total: 50_000 } as const;
+
 export interface Baseline { saved_at: string; items: Record<string, { start: string; end: string }> }
 export const MAX_BASELINE_ITEMS = 50_000;
 

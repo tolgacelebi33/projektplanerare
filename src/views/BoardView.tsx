@@ -16,12 +16,14 @@ const firstLine = (t: string, n = 110) => { const l = t.split("\n").find((x) => 
  * värdet och ordningen, eller använd valet på kortet. Ctrl/Cmd-klick markerar flera kort och Shift-klick en följd, och ett klick på tom yta släpper både markering
  * och öppnad post. Grupper är inga kort: de syns som sökväg och som en smal färgkant på korten. Vad som visas på korten styrs av `cardFields`.
  */
-export function BoardView({ fields = [], nextIds, groupBy = "status", cardFields, highlightOverdue = true, markUndated = true, items, allItems, users, colors, openId, selected, onOpen, onSelect, onBackground, onDrop, onMoveTo, onContext }: {
+export function BoardView({ commentCounts, fields = [], nextIds, groupBy = "status", cardFields, highlightOverdue = true, markUndated = true, items, allItems, users, colors, openId, selected, onOpen, onSelect, onBackground, onDrop, onMoveTo, onContext }: {
   /** Id för nästa tillfälle i varje serie (märks med "Nästa"). */
   nextIds?: ReadonlySet<string>;
   /** Projektets egna fält (för kolumner per fält och fält som visas på korten). */
   fields?: FieldDef[];
   groupBy?: BoardGroup; cardFields: CardFields; highlightOverdue?: boolean; markUndated?: boolean;
+  /** Antal kommentarer per post (id), för räknaren på korten. */
+  commentCounts?: ReadonlyMap<string, number>;
   items: Item[]; allItems: Item[]; users: User[]; colors: ReadonlyMap<string, GroupColor | "none">;
   openId: string | null; selected: ReadonlySet<string>;
   onOpen: (id: string) => void;
@@ -144,6 +146,7 @@ export function BoardView({ fields = [], nextIds, groupBy = "status", cardFields
                     {cardFields.code && i.code && <span className="code-tag">{i.code}</span>}
                     {cardFields.date && (i.undated && markUndated ? <span className="board-undated">{sv.undated.tag}</span> : <span>{i.type === "milestone" ? i.end : `${i.start} – ${i.end}`}</span>)}
                     {cardFields.series && i.series && i.recur && <span className="board-series" title={sv.recur.series}>{"↻"} {sv.recur.kinds[i.recur]}{nextIds?.has(i.id) ? ` · ${sv.extras.nextBadge}` : ""}</span>}
+                    {cardFields.comments && (commentCounts?.get(i.id) ?? 0) > 0 && <span className="board-comments" title={sv.comments.cardCount(commentCounts!.get(i.id)!)}>{sv.comments.cardCount(commentCounts!.get(i.id)!)}</span>}
                     {cardFields.checklist && (i.checklist?.length ?? 0) > 0 && <span title={sv.extras.checklist}>{((c) => sv.extras.checklistOnCard(c.done, c.total))(checklistCount(i.checklist))}</span>}
                     {cardFields.links && (i.links?.length ?? 0) > 0 && <span>{sv.extras.linksOnCard(i.links!.length)}</span>}
                     {highlightOverdue && isOverdue(i, today) && <span className="board-over">{sv.overdue}</span>}
