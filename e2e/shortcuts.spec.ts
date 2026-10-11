@@ -48,6 +48,7 @@ test("SK3 / går till sökrutan och ? öppnar hjälpen, som stängs med Esc", as
   await page.mouse.click(1200, 700);
   await page.keyboard.press("?");
   await expect(page.getByRole("dialog", { name: "Så gör du" })).toBeVisible();
+  await expect(page.getByRole("dialog", { name: "Så gör du" }).getByRole("button").first()).toBeFocused(); // dialogens tangenthantering är då på plats
   await page.keyboard.press("Escape");
   await expect(page.getByRole("dialog")).toHaveCount(0);
 });

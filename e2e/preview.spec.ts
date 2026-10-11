@@ -48,6 +48,7 @@ test("IP2 Avbryt och Esc lägger inte in något, och dialogen visar vad som blir
   await expect(dlg(page)).toHaveCount(0);
   await page.getByLabel("Importfil").setInputFiles({ name: "x.csv", mimeType: "text/csv", buffer: Buffer.from(text, "utf8") });
   await expect(dlg(page)).toBeVisible();
+  await expect(dlg(page).getByRole("button", { name: "Importera" })).toBeFocused(); // dialogens tangenthantering är då på plats
   await page.keyboard.press("Escape");
   await expect(dlg(page)).toHaveCount(0);
   expect((await projects(page)).length).toBe(n0);
