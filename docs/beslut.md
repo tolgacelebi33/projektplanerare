@@ -463,3 +463,7 @@ Beslut: "Visa serier som en rad" är på som standard. Jag hade tolkat "Det ska 
 ## 2026-10-11: Tidsskalan når seriens sista tillfälle
 
 Fel: med serier som en rad räknades tidsskalans slut bara på de synliga raderna, så romber för senare tillfällen låg utanför skalan och gick inte att nå (en serie med 26 tillfällen visade bara några månader). Skalan omfattar nu även rombernas datum. Test SD2. Overifierat: om det var detta användaren såg.
+
+## 2026-10-11: Markeringen följer en klickad romb
+
+Fel: ett klick på en romb öppnade rätt tillfälle i panelen, men markeringen (radens markering och handtagen) låg kvar på radens egen post, så det såg ut som att markeringen inte flyttades. Nu markeras den klickade romben (ram och lite större), radens markering släpps, och nästa klick flyttar markeringen. Esc släpper den. Test SD3 (Chromium och WebKit).

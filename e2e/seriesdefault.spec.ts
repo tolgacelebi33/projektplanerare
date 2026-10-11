@@ -44,3 +44,31 @@ test("SD2 tidsskalan sträcker sig till seriens sista tillfälle, så att alla r
   await expect(page.locator("aside.panel")).toBeVisible();
   await expect(page.locator('aside.panel input[name="start"], aside.panel input[type="date"]').first()).toHaveValue("2027-10-05");
 });
+
+test("SD3 markeringen följer klicket: efter ett klick på en romb är det den som är markerad, och nästa klick flyttar markeringen", async ({ page }) => {
+  await page.setViewportSize({ width: 1472, height: 900 });
+  await page.clock.setFixedTime(new Date("2026-10-11T10:00:00"));
+  await openApp(page, "dhtmlx", { seriesRow: true });
+  await page.getByRole("button", { name: "+ Återkommande milstolpe..." }).click();
+  const d = page.getByRole("dialog", { name: "Återkommande milstolpe" });
+  await d.getByLabel("Titel").fill("M3 Styrgrupp"); const f = d.locator('input[name="first"]'); await f.fill("2026-10-12"); await f.blur();
+  await d.getByLabel("Återkommer").selectOption("weekly"); await d.getByLabel("Antal tillfällen").fill("4");
+  await d.getByRole("button", { name: "Skapa" }).click();
+  await page.getByRole("button", { name: "Dölj klara" }).click();
+  await page.locator(".gantt_grid_data").evaluate((e) => e.scrollTo(0, 99999));
+  const row = page.locator(".gantt_row", { hasText: "M3 Styrgrupp" });
+  await row.locator(".grid-title").click();
+  await expect(row).toHaveClass(/sel-row|gantt_selected/);
+  const code = () => page.locator("aside.panel .panel-kind-row").innerText();
+  const first = await code();
+  for (const t of ["2026-10-19", "2026-10-26"]) {
+    const m = page.locator(`.series-mark[title$="${t}"]`);
+    await m.click();
+    await expect(page.locator(`.series-mark[title$="${t}"]`)).toHaveClass(/sel/);
+    await expect(page.locator(".series-mark.sel")).toHaveCount(1);
+    await expect(row).not.toHaveClass(/sel-row|gantt_selected/);
+    expect(await code()).not.toBe(first);
+  }
+  await page.keyboard.press("Escape");
+  await expect(page.locator(".series-mark.sel")).toHaveCount(0);
+});

@@ -243,11 +243,11 @@ export function DhtmlxGantt({ store, items, deps, zoom, onError, onPersisted, re
           const d = toLocalDate(m.start);
           const cell = gantt.getTaskPosition(task, d, toLocalDate(addDays(m.start, 1)));
           const b = document.createElement("button");
-          b.type = "button"; b.className = `series-mark st-${m.status}`; b.dataset.id = m.id; b.dataset.series = repId;
+          b.type = "button"; b.className = `series-mark st-${m.status}${selectedRef.current.has(m.id) ? " sel" : ""}`; b.dataset.id = m.id; b.dataset.series = repId;
           b.style.left = `${(cell.left as number) + (cell.width as number) / 2 - 8}px`;
           b.style.top = `${pos.top + Math.max(0, ((pos.height as number) - 16) / 2)}px`;
           b.title = `${m.title}, ${m.start}`; b.setAttribute("aria-label", `${m.title}, ${m.start}`);
-          b.addEventListener("click", (e) => { e.stopPropagation(); openItemRef.current?.(m.id); });
+          b.addEventListener("click", (e) => { e.stopPropagation(); try { if (gantt.getSelectedId()) gantt.unselectTask(); } catch { /* ingen vald */ } openItemRef.current?.(m.id); });
           b.addEventListener("dblclick", (e) => e.stopPropagation());
           b.addEventListener("pointerdown", (e) => e.stopPropagation());
           wrap.appendChild(b);
@@ -644,6 +644,7 @@ export function DhtmlxGantt({ store, items, deps, zoom, onError, onPersisted, re
     const now = selected ?? new Set<string>(), was = drawnSel.current;
     for (const id of new Set([...now, ...was])) if (now.has(id) !== was.has(id) && gantt.isTaskExists(id)) gantt.refreshTask(id);
     drawnSel.current = new Set(now);
+    drawMarksRef.current?.(); // rombernas markering följer valet
   }, [selected, mapped]);
 
   // Idag-knappen

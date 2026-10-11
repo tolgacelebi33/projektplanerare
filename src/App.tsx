@@ -882,7 +882,7 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
             onCreateAt={({ rowId, date }) => void addItem("task", { anchorId: rowId, start: date }).catch(() => undefined)}
             onRename={(id) => { setJustCreated(id); setEditId(id); }}
             onContext={openMenu}
-            onToggleDone={(id) => void toggleDone(id)} onMoveRow={moveRow} onAddInGroup={(gid) => void addItem("task", { anchorId: gid }).catch(() => undefined)} store={store} items={listItems} deps={listDeps} seriesMarks={collapsed?.marks} onOpenItem={setEditId} baseline={settings.showBaseline ? project?.baseline ?? null : null} zoom={zoom}
+            onToggleDone={(id) => void toggleDone(id)} onMoveRow={moveRow} onAddInGroup={(gid) => void addItem("task", { anchorId: gid }).catch(() => undefined)} store={store} items={listItems} deps={listDeps} seriesMarks={collapsed?.marks} onOpenItem={(id) => { selAnchor.current = id; setSelected(new Set([id])); setEditId(id); }} baseline={settings.showBaseline ? project?.baseline ?? null : null} zoom={zoom}
             onError={(e) => { setWriteError(typeof e === "string" ? e : friendlyError(e)); reload(); }} />
           <GridResizer width={gridWidth} onChange={changeGrid} onCommit={commitGrid} onFit={fitGrid} />
           </div>
