@@ -71,7 +71,7 @@ test("SR4 boarden visar ett kort för serien, och kalendern visar alla tillfäll
   for (const i of s) await expect(cal.locator(`.cal-chip[data-id="${i.id}"]`).first()).toBeVisible();
 });
 
-test("SR5 knappen Serier som en rad i listraden slår på och av samma val som inställningen, och är av som standard", async ({ page }) => {
+test("SR5 knappen Serier som en rad i listraden slår på och av samma val som inställningen, och är av här (testerna startar med serier som egna rader)", async ({ page }) => {
   const s = (await items(page)).filter((i) => i.series);
   const btn = page.getByRole("button", { name: "Serier som en rad", exact: true });
   await expect(btn).toHaveAttribute("aria-pressed", "false");

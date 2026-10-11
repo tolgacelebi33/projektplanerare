@@ -455,3 +455,7 @@ Format: datum, beslut, skäl, vad som är overifierat.
 ## 2026-10-11: Fler ansvariga som chips
 
 Beslut: i postpanelen visas extra ansvariga som chips (namn och kryss för att ta bort) och en väljare "+ Person" bredvid Ansvarig, i stället för kryssrutelistan. Skäl: användaren var inte nöjd med kryssrutorna. Serier som en rad är fortsatt av som standard (användarens beslut), med knapp i verktygsfältet. Testat: tsc, vitest, e2e panel/board/coassignees/settingstabs.
+
+## 2026-10-11: Serier som en rad är nu standard (rättelse)
+
+Beslut: "Visa serier som en rad" är på som standard. Jag hade tolkat "Det ska gå men inte standard" som att en rad per tillfälle skulle vara standard; användaren menade att det är att flytta tillfällen var för sig som inte är standard. Inställningar sparade innan ändringen (utan markören `seriesRowV2`) får det nya värdet en gång; därefter gäller användarens eget val. Tillfällena är fortfarande egna poster och kan flyttas var för sig när valet stängs av. Testat: SD1 (standard + migrering), SR1-SR5.

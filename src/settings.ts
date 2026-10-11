@@ -24,6 +24,7 @@ export interface Settings {
   hidePastSeries: boolean;
   /** Varje serie visas som en rad i listan, tidslinjen och boarden (tillfällena som markeringar). Av som standard: tillfällena är egna rader som kan flyttas var för sig. */
   collapseSeries: boolean;
+  seriesRowV2: boolean;
   /** Visa en förhandsgranskning (kolumner, grupper, serier, antal) innan en fil läggs in. */
   importPreview: boolean;
   /** Markera den kritiska linjen i tidslinjen (de poster som styr projektets slut). */
@@ -55,7 +56,7 @@ export const DEFAULT_FEATURES: Features = { labels: true, checklist: true, links
 export interface CardFields { date: boolean; assignee: boolean; priority: boolean; description: boolean; series: boolean; progress: boolean; labels: boolean; checklist: boolean; links: boolean; lastUpdate: boolean; code: boolean; comments: boolean; estimate: boolean }
 export type BoardGroup = "status" | "assignee" | "priority" | "group" | `field:${string}`;
 export const DEFAULT_CARD_FIELDS: CardFields = { date: true, assignee: true, priority: true, description: false, series: true, progress: false, labels: true, checklist: true, links: true, lastUpdate: false, code: false, comments: true, estimate: false };
-export const DEFAULT_SETTINGS: Settings = { touch: "auto", closeOnEmpty: true, markUndated: true, startView: "gantt", startZoom: "week", cardFields: { ...DEFAULT_CARD_FIELDS }, highlightOverdue: true, quickFilters: true, boardGroup: "status", features: { ...DEFAULT_FEATURES }, checklistProgress: false, hidePastSeries: false, collapseSeries: false, importPreview: true, showCritical: false, reminders: { banner: true, os: false, scope: "all" }, me: "", backupReminderDays: 30, showBaseline: true, rules: { doneSetsProgress: false, seriesNext: false }, importExtraAsFields: true, moreViews: { calendar: true, week: true, workload: true, portfolio: true }, workloadField: "", workloadCap: 5 };
+export const DEFAULT_SETTINGS: Settings = { touch: "auto", closeOnEmpty: true, markUndated: true, startView: "gantt", startZoom: "week", cardFields: { ...DEFAULT_CARD_FIELDS }, highlightOverdue: true, quickFilters: true, boardGroup: "status", features: { ...DEFAULT_FEATURES }, checklistProgress: false, hidePastSeries: false, collapseSeries: true, seriesRowV2: true, importPreview: true, showCritical: false, reminders: { banner: true, os: false, scope: "all" }, me: "", backupReminderDays: 30, showBaseline: true, rules: { doneSetsProgress: false, seriesNext: false }, importExtraAsFields: true, moreViews: { calendar: true, week: true, workload: true, portfolio: true }, workloadField: "", workloadCap: 5 };
 const KEY = "projektplanerare.settings";
 const bool = (v: unknown, d: boolean) => (typeof v === "boolean" ? v : d);
 const pick = <T extends string>(v: unknown, ok: readonly T[], d: T): T => (ok.includes(v as T) ? (v as T) : d);
@@ -75,7 +76,9 @@ export function normalizeSettings(raw: unknown): Settings {
     features: ((f) => ({ labels: bool(f.labels, true), checklist: bool(f.checklist, true), links: bool(f.links, true), log: bool(f.log, true), comments: bool(f.comments, true) }))((o.features && typeof o.features === "object" ? o.features : {}) as Record<string, unknown>),
     checklistProgress: bool(o.checklistProgress, DEFAULT_SETTINGS.checklistProgress),
     hidePastSeries: bool(o.hidePastSeries, DEFAULT_SETTINGS.hidePastSeries),
-    collapseSeries: bool(o.collapseSeries, DEFAULT_SETTINGS.collapseSeries),
+    // Beslut 2026-10-11: serier som en rad är standard. Inställningar sparade innan dess (utan markören) får det nya standardvärdet en gång.
+    collapseSeries: o.seriesRowV2 === true ? bool(o.collapseSeries, true) : true,
+    seriesRowV2: true,
     importPreview: bool(o.importPreview, DEFAULT_SETTINGS.importPreview),
     showCritical: bool(o.showCritical, DEFAULT_SETTINGS.showCritical),
     reminders: ((r) => ({ banner: bool(r.banner, true), os: bool(r.os, false), scope: r.scope === "mine" ? ("mine" as const) : ("all" as const) }))((o.reminders && typeof o.reminders === "object" ? o.reminders : {}) as Record<string, unknown>),
