@@ -459,7 +459,7 @@ export class MemoryStore implements DataStore {
     if (patch.statuses) validateStatusDefs(patch.statuses);
     const next: Project = { ...cur, name, dependency_mode: patch.dependency_mode ?? cur.dependency_mode ?? "shift", ...(patch.fields !== undefined ? { fields: patch.fields } : {}), ...(patch.views !== undefined ? { views: patch.views } : {}) };
     if (patch.baseline === null) delete next.baseline; else if (patch.baseline) next.baseline = patch.baseline;
-    if (patch.statuses === null) delete next.statuses; else if (patch.statuses) next.statuses = patch.statuses.map((d) => ({ id: d.id, name: d.name.trim(), category: d.category }));
+    if (patch.statuses === null) delete next.statuses; else if (patch.statuses) next.statuses = patch.statuses.map((d) => ({ id: d.id, name: d.name.trim(), category: d.category, ...(d.color ? { color: d.color } : {}) }));
     if (patch.statuses !== undefined) { // poster vars egna status inte finns längre (eller har fel kategori) går tillbaka till grundstatusen
       const defs = statusDefs(next);
       for (const i of [...this.items.values()]) if (i.project_id === id && i.custom_status && !defs.some((d) => d.id === i.custom_status && d.category === i.status)) { const { custom_status: _c, ...rest } = i; void _c; this.items.set(i.id, rest); }

@@ -1,3 +1,4 @@
+import { STATUS_COLOR_IDS } from "./statusColors";
 import { isISODate, dayNumber, addDays, diffDays } from "./dates";
 import { ESTIMATE_MAX, MAX_CO_ASSIGNEES, COMMENT_LIMITS, STATUS_LIMITS, type StatusDef, type Baseline, MAX_BASELINE_ITEMS, DEPENDENCY_TYPES, FIELD_LIMITS, FIELD_TYPES, GROUP_COLORS, LIMITS, MAX_LAG, RECURRENCES, type FieldDef, type SavedView, type Dependency, type Item, type Status } from "./types";
 
@@ -304,6 +305,7 @@ export function validateStatusDefs(defs: StatusDef[]): void {
     if (STATUSES.includes(d.id as Status) && d.id !== d.category) bad("En grundstatus måste ligga i sin egen kategori");
     const n = typeof d.name === "string" ? d.name.trim() : "";
     if (!n || n.length > STATUS_LIMITS.name) bad(`Namnet på en status ska vara 1 till ${STATUS_LIMITS.name} tecken`);
+    if (d.color !== undefined && !STATUS_COLOR_IDS.includes(d.color as never)) bad("Ogiltig färg för en status");
     if (names.has(n.toLowerCase())) bad(`Två statusar heter "${n}"`);
     names.add(n.toLowerCase());
     cats.add(d.category);

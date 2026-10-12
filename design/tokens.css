@@ -59,6 +59,16 @@
   --status-done-fg: var(--sv-vit);
   --status-blocked-bg: var(--sv-rubinrod);
   --status-blocked-fg: var(--sv-vit);
+  /* Statusfärger (palett för egna statusar, se src/data/statusColors.ts). De fyra första är grundstatusarnas färger. Alla har kontrast minst 4,5 mot sin textfärg. */
+  --sc-brons-bg: var(--status-not-started-bg); --sc-brons-fg: var(--status-not-started-fg);
+  --sc-ockra-bg: var(--status-in-progress-bg); --sc-ockra-fg: var(--status-in-progress-fg);
+  --sc-gron-bg: var(--status-done-bg); --sc-gron-fg: var(--status-done-fg);
+  --sc-rod-bg: var(--status-blocked-bg); --sc-rod-fg: var(--status-blocked-fg);
+  --sc-koppar-bg: color-mix(in srgb, var(--sv-kopparrod) 78%, var(--sv-svart)); --sc-koppar-fg: var(--sv-vit);
+  --sc-stal-bg: color-mix(in srgb, var(--sv-stalgra) 72%, var(--sv-svart)); --sc-stal-fg: var(--sv-vit);
+  --sc-bla-bg: var(--sv-glasbla); --sc-bla-fg: var(--sv-svart);
+  --sc-guld-bg: var(--sv-guld); --sc-guld-fg: var(--sv-svart);
+  --sc-svart-bg: var(--sv-svart); --sc-svart-fg: var(--sv-vit);
 
   --line-width: 1px;
   --bar-outline: var(--line-width) solid var(--bar-outline-color);

@@ -11,6 +11,7 @@ import { defOf, defaultStatusDefs } from "../data/statuses";
 import type { CriticalResult } from "../data/critical";
 import { sv } from "../i18n/sv";
 import { datePatch, persistPatch } from "./persist";
+import { colorOf } from "../data/statusColors";
 import { STATUS_GLYPH } from "./statusUi";
 import type { Zoom } from "./zoom";
 
@@ -44,6 +45,10 @@ const dragLabel = (() => {
   };
 })();
 const isoLocal = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+
+/** Färgen (id) för en status i projektet: den valda, annars kategorins vanliga. */
+const scLookup = { defs: [] as StatusDef[] };
+const scOf = (sid: string): string => { const d = scLookup.defs.find((x) => x.id === sid); return d ? colorOf(d) : "brons"; };
 
 const ZOOM = {
   day: { scales: [{ unit: "month", step: 1, format: "%F %Y" }, { unit: "day", step: 1, format: "%j" }], min: 28 },
@@ -160,6 +165,7 @@ export function DhtmlxGantt({ store, items, deps, zoom, onError, onPersisted, re
   criticalRef.current = critical ?? null;
   const statusesRef = useRef<StatusDef[]>(statuses ?? defaultStatusDefs());
   statusesRef.current = statuses ?? defaultStatusDefs();
+  scLookup.defs = statusesRef.current;
   const widthsRef = useRef<ColumnWidths>(columnWidths ?? {});
   widthsRef.current = columnWidths ?? {};
   const resizeRef = useRef(onResizeColumn);
@@ -225,7 +231,7 @@ export function DhtmlxGantt({ store, items, deps, zoom, onError, onPersisted, re
     gantt.locale.date.month_full = [...sv.dates.monthsFull] as typeof gantt.locale.date.month_full;
     gantt.locale.date.month_short = [...sv.dates.monthsShort] as typeof gantt.locale.date.month_short;
     gantt.templates.link_class = (link) => (criticalRef.current?.links.has(String(link.id)) ? "critical-link" : "");
-    gantt.templates.task_class = (_s, _e, t) => `st-${(t as unknown as { status: Status }).status}${(t as unknown as { kind: string }).kind === "epic" ? " epic" : ""}${(t as unknown as TaskRow).und ? " undated" : ""}${(t as unknown as TaskRow).cr ? " critical" : ""}${openIdRef.current === String(t.id) ? " open-item" : ""}`;
+    gantt.templates.task_class = (_s, _e, t) => `st-${(t as unknown as { status: Status }).status}${(t as unknown as { kind: string }).kind === "epic" ? " epic" : ""}${(t as unknown as TaskRow).und ? " undated" : ""}${(t as unknown as TaskRow).cr ? " critical" : ""}${openIdRef.current === String(t.id) ? " open-item" : ""} sc-${scOf(String((t as unknown as TaskRow).sid))}`;
     gantt.templates.grid_row_class = (_s, _e, t) => `${(t as unknown as { kind: string }).kind === "epic" ? "epic-row" : ""} grp-${(t as unknown as TaskRow).color}${(t as unknown as TaskRow).rec ? " has-series" : ""}${(t as unknown as TaskRow).und ? " undated-row" : ""}${(t as unknown as TaskRow).od ? " overdue-row" : ""}${selectedRef.current.has(String(t.id)) ? " sel-row" : ""}`;
     gantt.templates.task_row_class = (_s, _e, t) => `${(t as unknown as { kind: string }).kind === "epic" ? "epic-row" : ""}${selectedRef.current.has(String(t.id)) ? " sel-row" : ""}`;
     gantt.templates.task_row_class = (_s, _e, t) => ((t as unknown as { kind: string }).kind === "epic" ? "epic-row" : "");
@@ -281,7 +287,7 @@ export function DhtmlxGantt({ store, items, deps, zoom, onError, onPersisted, re
           const d = toLocalDate(m.start);
           const cell = gantt.getTaskPosition(task, d, toLocalDate(addDays(m.start, 1)));
           const b = document.createElement("button");
-          b.type = "button"; b.className = `series-mark st-${m.status}${selectedRef.current.has(m.id) || openIdRef.current === m.id ? " sel" : ""}`; b.dataset.id = m.id; b.dataset.series = repId;
+          b.type = "button"; b.className = `series-mark st-${m.status} sc-${colorOf(defOf(m, statusesRef.current))}${selectedRef.current.has(m.id) || openIdRef.current === m.id ? " sel" : ""}`; b.dataset.id = m.id; b.dataset.series = repId;
           b.style.left = `${(cell.left as number) + (cell.width as number) / 2 - 8}px`;
           b.style.top = `${pos.top + Math.max(0, ((pos.height as number) - 16) / 2)}px`;
           b.title = `${m.title}, ${m.start}`; b.setAttribute("aria-label", `${m.title}, ${m.start}`);
@@ -379,7 +385,7 @@ export function DhtmlxGantt({ store, items, deps, zoom, onError, onPersisted, re
       { name: "text", label: sv.grid.title, tree: true, width: "*", template: (t) => {
         const st = (t as unknown as { status: Status }).status, done = st === "done", doing = st === "in_progress";
         // Bocken: klar eller inte klar direkt i raden. En knapp, så tangentbord (Enter, mellanslag) fungerar och skärmläsare får status.
-        const check = `<button type="button" class="row-check" role="checkbox" aria-checked="${done ? "true" : doing ? "mixed" : "false"}" aria-label="${done ? sv.check.undone : doing ? sv.check.done : sv.check.start}: ${String(t.text).replace(/"/g, "&quot;")}" data-check="${t.id}">${done ? "\u2713" : ""}</button>`;
+        const check = `<button type="button" class="row-check sc-${scOf((t as unknown as TaskRow).sid)}" role="checkbox" aria-checked="${done ? "true" : doing ? "mixed" : "false"}" aria-label="${done ? sv.check.undone : doing ? sv.check.done : sv.check.start}: ${String(t.text).replace(/"/g, "&quot;")}" data-check="${t.id}">${done ? "\u2713" : ""}</button>`;
         const isGroup = (t as unknown as { kind: string }).kind === "epic";
         const title = `<span class="grid-title" title="${String(t.text).replace(/"/g, "&quot;")}">${t.text}</span>`;
         if (!isGroup) return `${check}${title}`;
@@ -399,7 +405,7 @@ export function DhtmlxGantt({ store, items, deps, zoom, onError, onPersisted, re
     const COLS: Record<StaticColumnId, unknown> = {
       code: { name: "code", label: sv.cols.code, width: cw("code"), template: (t: Task) => `<span class="grid-code">${esc((t as unknown as TaskRow).code)}</span>` },
       status: { name: "status", label: sv.panel.status, width: cw("status"), template: (t: Task) => select(t, "status", sv.panel.status, (t as unknown as TaskRow).sid,
-        statusesRef.current.map((d) => [d.id, `${STATUS_GLYPH[d.category]} ${d.name}`] as [string, string]), `chip st-${(t as unknown as TaskRow).status}`) },
+        statusesRef.current.map((d) => [d.id, `${STATUS_GLYPH[d.category]} ${d.name}`] as [string, string]), `chip st-${(t as unknown as TaskRow).status} sc-${scOf((t as unknown as TaskRow).sid)}`) },
       assignee: { name: "assignee", label: sv.panel.assignee, width: cw("assignee"), template: (t: Task) => select(t, "assignee", sv.panel.assignee, (t as unknown as TaskRow).assignee,
         [["", sv.cols.none], ...latest.current.users.map((u) => [u.id, u.name] as [string, string])]) },
       priority: { name: "priority", label: sv.panel.priority, width: cw("priority"), template: (t: Task) => select(t, "priority", sv.panel.priority, (t as unknown as TaskRow).priority,

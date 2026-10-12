@@ -91,7 +91,7 @@ export const MAX_BASELINE_ITEMS = 50_000;
  * Egen status: ett namn som hör till en av de fyra grundkategorierna (Ej påbörjad, Pågår, Klar, Blockerad). Kategorin styr allt som beror på status
  * (försenat, klart, belastning, färg och symbol), namnet är det man ser och väljer. Id lika med kategorins nyckel är grundstatusen.
  */
-export interface StatusDef { id: string; name: string; category: Status }
+export interface StatusDef { id: string; name: string; category: Status; /** Färg ur paletten (se statusColors.ts). Saknas: kategorins vanliga färg. */ color?: string }
 export const STATUS_LIMITS = { count: 30, name: 40 } as const;
 
 export type FieldType = "text" | "number" | "date" | "select";

@@ -1,3 +1,4 @@
+import { colorOf } from "../data/statusColors";
 import { useRef, useState } from "react";
 import { todayISO } from "../data/dates";
 import { boardColumns, columnCards, type BoardGroup } from "../data/boardColumns";
@@ -100,7 +101,7 @@ export function BoardView({ statuses, lastActivity, commentCounts, fields = [], 
     <div className={`board${selected.size ? " has-sel" : ""}`} role="group" aria-label={sv.board.label} title={sv.board.dragHint} style={{ "--cols": cols.length } as React.CSSProperties}
       onClick={(e) => { if (!(e.target as Element).closest("article, select, button")) onBackground(); }}>
       {columns.map(({ col, list }) => (
-        <section key={col.key || "__none"} className={`board-col${col.status ? ` st-${col.status}` : ""}${at?.col === col.key ? " drop-on" : ""}`} aria-label={`${col.label}, ${list.length}`} data-status={col.status} data-col={col.key}
+        <section key={col.key || "__none"} className={`board-col${col.status ? ` st-${col.status}` : ""}${((d) => (d ? ` sc-${colorOf(d)}` : ""))(statuses?.find((x) => x.id === col.key))}${at?.col === col.key ? " drop-on" : ""}`} aria-label={`${col.label}, ${list.length}`} data-status={col.status} data-col={col.key}
           onDragOver={(e) => { if (drag) { e.preventDefault(); if (e.target === e.currentTarget || !(e.target as Element).closest("article")) setAt({ col: col.key, before: null }); } }}
           onDrop={(e) => { e.preventDefault(); const moved = drag; const where = at; finish(); if (moved && where) onDrop(moved, where.col, where.before); }}>
           <h3 className="board-head">{col.glyph && <span aria-hidden="true">{col.glyph}</span>} {col.label} <span className="board-count">{list.length}</span></h3>

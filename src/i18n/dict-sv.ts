@@ -251,7 +251,7 @@ export const svDict = {
   statuses: {
     title: "Statusar", button: "Statusar...", intro: "Egna statusar för projektet, till exempel Väntar på leverantör. Varje status hör till en av fyra kategorier som styr försenat, klart, belastning, färg och symbol. Minst en i varje kategori. En post utan egen status visar kategorins första status. Kolumnerna i boarden följer ordningen här.",
     nameOf: (n: string) => `Namn: ${n}`, up: (n: string) => `Flytta upp ${n}`, down: (n: string) => `Flytta ner ${n}`, remove: (n: string) => `Ta bort ${n}`, removeBtn: "Ta bort", lastInCategory: "Det måste finnas minst en status i varje kategori",
-    countHint: "Antal poster med statusen. Tas statusen bort får de kategorins första status.", newName: "Namn på ny status", newCategory: "Kategori för ny status", add: "Lägg till", save: "Spara", cancel: "Avbryt", close: "Stäng",
+    countHint: "Antal poster med statusen. Tas statusen bort får de kategorins första status.", newName: "Namn på ny status", newCategory: "Kategori för ny status", colorOf: (n: string) => `Färg för ${n}`, colorTaken: "används av en annan status", add: "Lägg till", unsaved: "Du har osparade ändringar i statusarna.", discard: "Släng ändringarna", keepEditing: "Fortsätt redigera", save: "Spara", cancel: "Avbryt", close: "Stäng",
     reset: "Tillbaka till grundstatusarna", confirmReset: "Tillbaka till de fyra grundstatusarna? Poster som har en egen status får kategorins grundstatus.", resetYes: "Återställ",
   },
   templates: {
@@ -353,6 +353,7 @@ export const svDict = {
   today: "Idag",
   filter: { listLabel: "Lista", clearAll: "Rensa alla filter", activeLabel: "Aktiva filter", activeCount: (n: number) => `${n} aktiva filter`, chipQuery: (q: string) => `Sök: ${q}`, removeOf: (l: string) => `Ta bort filtret ${l}`, label: "Filter", attrs: "Filtrera", clear: "Rensa filter", collapseAll: "Fäll ihop alla", expandAll: "Öppna alla", search: "Sök", placeholder: "Sök...", hideDone: "Dölj klara", count: (n: number, total: number) => `Visar ${n} av ${total}` },
   history: { label: "Historik", undo: "Ångra", redo: "Gör om", undoHint: "Ångra senaste ändringen (Cmd/Ctrl+Z)", redoHint: "Gör om (Cmd/Ctrl+Shift+Z)" },
+  statusColors: { brons: "Bronsbrun", ockra: "Ockra", gron: "Marmorgrön", rod: "Rubinröd", koppar: "Kopparröd", stal: "Stålgrå", bla: "Glasblå", guld: "Guld", svart: "Svart" } as Record<string, string>,
   check: { start: "Markera som pågående", done: "Markera som klar", undone: "Markera som inte påbörjad" },
   dismiss: "Stäng meddelandet",
   add: { label: "Lägg till", heading: "Nytt", task: "Uppgift", milestone: "Milstolpe", epic: "Grupp", hint: "Uppgift och milstolpe läggs i den grupp som är vald (eller bredvid vald post). En grupp läggs alltid på översta nivån. Högerklicka på en grupp för att skapa en grupp i den." },

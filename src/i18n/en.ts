@@ -246,7 +246,7 @@ export const enDict: Dict = {
   statuses: {
     title: "Statuses", button: "Statuses...", intro: "Custom statuses for the project, for example Waiting for supplier. Each status belongs to one of four categories that control overdue, done, workload, color and symbol. At least one in each category. An item without a custom status shows the first status of its category. The columns of the board follow the order here.",
     nameOf: (n: string) => `Name: ${n}`, up: (n: string) => `Move up ${n}`, down: (n: string) => `Move down ${n}`, remove: (n: string) => `Remove ${n}`, removeBtn: "Remove", lastInCategory: "There must be at least one status in each category",
-    countHint: "Number of items with the status. If the status is removed they get the first status of the category.", newName: "Name of new status", newCategory: "Category of new status", add: "Add", save: "Save", cancel: "Cancel", close: "Close",
+    countHint: "Number of items with the status. If the status is removed they get the first status of the category.", newName: "Name of new status", newCategory: "Category of new status", colorOf: (n: string) => `Colour for ${n}`, colorTaken: "used by another status", add: "Add", unsaved: "You have unsaved changes to the statuses.", discard: "Discard changes", keepEditing: "Keep editing", save: "Save", cancel: "Cancel", close: "Close",
     reset: "Back to the default statuses", confirmReset: "Back to the four default statuses? Items with a custom status get the default status of the category.", resetYes: "Reset",
   },
   templates: {
@@ -348,6 +348,7 @@ export const enDict: Dict = {
   today: "Today",
   filter: { listLabel: "List", clearAll: "Clear all filters", activeLabel: "Active filters", activeCount: (n: number) => `${n} active filters`, chipQuery: (q: string) => `Search: ${q}`, removeOf: (l: string) => `Remove the filter ${l}`, label: "Filter", attrs: "Filter by", clear: "Clear filters", collapseAll: "Collapse all", expandAll: "Expand all", search: "Search", placeholder: "Search...", hideDone: "Hide done", count: (n: number, total: number) => `Showing ${n} of ${total}` },
   history: { label: "History", undo: "Undo", redo: "Redo", undoHint: "Undo the last change (Cmd/Ctrl+Z)", redoHint: "Redo (Cmd/Ctrl+Shift+Z)" },
+  statusColors: { brons: "Bronze brown", ockra: "Ochre", gron: "Marble green", rod: "Ruby red", koppar: "Copper red", stal: "Steel grey", bla: "Glass blue", guld: "Gold", svart: "Black" } as Record<string, string>,
   check: { start: "Mark as in progress", done: "Mark as done", undone: "Mark as not started" },
   dismiss: "Dismiss the message",
   add: { label: "Add", heading: "New", task: "Task", milestone: "Milestone", epic: "Group", hint: "Tasks and milestones are added in the selected group (or next to the selected item). A group is always added at the top level. Right-click a group to create a group inside it." },

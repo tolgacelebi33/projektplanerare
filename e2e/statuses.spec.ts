@@ -103,3 +103,30 @@ test("EST6 flerval-raden och statuskolumnen i listan använder projektets status
   await sel.selectOption({ label: "■ Väntar" });
   await expect.poll(async () => (await items(page)).find((i) => i.id === "i7")).toMatchObject({ status: "blocked", custom_status: expect.stringMatching(/^s_/) });
 });
+
+test("EST7 osparade ändringar försvinner inte tyst: Esc, kryss och Avbryt frågar först, och ett skrivet namn som inte lagts till följer med Spara", async ({ page }) => {
+  await addStatus(page, "Väntar på svar", "Blockerad");
+  await page.keyboard.press("Escape");
+  await expect(dlg(page).getByText("Du har osparade ändringar i statusarna.")).toBeVisible();
+  await dlg(page).getByRole("button", { name: "Fortsätt redigera" }).click();
+  await expect(dlg(page).getByText("Du har osparade ändringar")).toHaveCount(0);
+  await dlg(page).getByRole("button", { name: "Stäng", exact: true }).click(); // kryss
+  await expect(dlg(page).getByText("Du har osparade ändringar i statusarna.")).toBeVisible();
+  await dlg(page).getByRole("button", { name: "Släng ändringarna" }).click();
+  await expect(dlg(page)).toHaveCount(0);
+  expect((await project(page)).statuses ?? []).toEqual([]); // inget sparades
+  // utan ändringar stänger Esc direkt
+  await page.getByRole("button", { name: "Statusar..." }).click();
+  await page.keyboard.press("Escape");
+  await expect(dlg(page)).toHaveCount(0);
+  // Spara i varningen sparar, och ett skrivet men inte tillagt namn följer med
+  await page.getByRole("button", { name: "Statusar..." }).click();
+  await dlg(page).getByLabel("Namn på ny status").fill("Granskning");
+  await dlg(page).getByLabel("Kategori för ny status").selectOption({ label: "Pågår" });
+  await dlg(page).getByRole("button", { name: "Spara", exact: true }).click(); // utan Lägg till
+  await expect(dlg(page)).toHaveCount(0);
+  expect(((await project(page)).statuses ?? []).map((s) => s.name)).toContain("Granskning");
+  await page.getByRole("group", { name: "Vy" }).getByRole("button", { name: "Board" }).click();
+  const heads = await page.evaluate(() => [...document.querySelectorAll("section[data-status]")].map((x) => (x.querySelector("h3,h2,header")?.textContent ?? "").replace(/[^\p{L} ]/gu, "").trim()));
+  expect(heads.some((h) => h.startsWith("Granskning"))).toBe(true); // en kolumn i boarden
+});

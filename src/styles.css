@@ -814,3 +814,92 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); opacity: 
 
 /* Bocken i raden har tre lägen: tom (Ej startad), halvfylld (Pågår), bock (Klar) */
 .dhx-host .row-check[aria-checked="mixed"] { background: linear-gradient(90deg, var(--status-in-progress-bg) 50%, transparent 50%); border-color: var(--bar-outline-color); }
+
+/* Statusfärger: en klass sc-<färg> på stapel, markering, bock och kolumn (se src/data/statusColors.ts) */
+.dhx-host .gantt_task_line.sc-brons { background: var(--sc-brons-bg); color: var(--sc-brons-fg); }
+.dhx-host .gantt_task_line.gantt_milestone.sc-brons { background: transparent; }
+.dhx-host .gantt_task_line.gantt_milestone.sc-brons .gantt_task_content { background: var(--sc-brons-bg); }
+.dhx-host .cell-select.chip.sc-brons { --chip-bg: var(--sc-brons-bg); --chip-fg: var(--sc-brons-fg); }
+.dhx-host .row-check.sc-brons[aria-checked="true"] { background: var(--sc-brons-bg); color: var(--sc-brons-fg); }
+.dhx-host .row-check.sc-brons[aria-checked="mixed"] { background: linear-gradient(90deg, var(--sc-brons-bg) 50%, transparent 50%); }
+.series-mark.sc-brons { background: var(--sc-brons-bg); }
+.board-col.sc-brons .board-head { box-shadow: inset 0 -3px 0 var(--sc-brons-bg); }
+.status-swatch.sc-brons { background: var(--sc-brons-bg); }
+.dhx-host .gantt_task_line.sc-ockra { background: var(--sc-ockra-bg); color: var(--sc-ockra-fg); }
+.dhx-host .gantt_task_line.gantt_milestone.sc-ockra { background: transparent; }
+.dhx-host .gantt_task_line.gantt_milestone.sc-ockra .gantt_task_content { background: var(--sc-ockra-bg); }
+.dhx-host .cell-select.chip.sc-ockra { --chip-bg: var(--sc-ockra-bg); --chip-fg: var(--sc-ockra-fg); }
+.dhx-host .row-check.sc-ockra[aria-checked="true"] { background: var(--sc-ockra-bg); color: var(--sc-ockra-fg); }
+.dhx-host .row-check.sc-ockra[aria-checked="mixed"] { background: linear-gradient(90deg, var(--sc-ockra-bg) 50%, transparent 50%); }
+.series-mark.sc-ockra { background: var(--sc-ockra-bg); }
+.board-col.sc-ockra .board-head { box-shadow: inset 0 -3px 0 var(--sc-ockra-bg); }
+.status-swatch.sc-ockra { background: var(--sc-ockra-bg); }
+.dhx-host .gantt_task_line.sc-gron { background: var(--sc-gron-bg); color: var(--sc-gron-fg); }
+.dhx-host .gantt_task_line.gantt_milestone.sc-gron { background: transparent; }
+.dhx-host .gantt_task_line.gantt_milestone.sc-gron .gantt_task_content { background: var(--sc-gron-bg); }
+.dhx-host .cell-select.chip.sc-gron { --chip-bg: var(--sc-gron-bg); --chip-fg: var(--sc-gron-fg); }
+.dhx-host .row-check.sc-gron[aria-checked="true"] { background: var(--sc-gron-bg); color: var(--sc-gron-fg); }
+.dhx-host .row-check.sc-gron[aria-checked="mixed"] { background: linear-gradient(90deg, var(--sc-gron-bg) 50%, transparent 50%); }
+.series-mark.sc-gron { background: var(--sc-gron-bg); }
+.board-col.sc-gron .board-head { box-shadow: inset 0 -3px 0 var(--sc-gron-bg); }
+.status-swatch.sc-gron { background: var(--sc-gron-bg); }
+.dhx-host .gantt_task_line.sc-rod { background: var(--sc-rod-bg); color: var(--sc-rod-fg); }
+.dhx-host .gantt_task_line.gantt_milestone.sc-rod { background: transparent; }
+.dhx-host .gantt_task_line.gantt_milestone.sc-rod .gantt_task_content { background: var(--sc-rod-bg); }
+.dhx-host .cell-select.chip.sc-rod { --chip-bg: var(--sc-rod-bg); --chip-fg: var(--sc-rod-fg); }
+.dhx-host .row-check.sc-rod[aria-checked="true"] { background: var(--sc-rod-bg); color: var(--sc-rod-fg); }
+.dhx-host .row-check.sc-rod[aria-checked="mixed"] { background: linear-gradient(90deg, var(--sc-rod-bg) 50%, transparent 50%); }
+.series-mark.sc-rod { background: var(--sc-rod-bg); }
+.board-col.sc-rod .board-head { box-shadow: inset 0 -3px 0 var(--sc-rod-bg); }
+.status-swatch.sc-rod { background: var(--sc-rod-bg); }
+.dhx-host .gantt_task_line.sc-koppar { background: var(--sc-koppar-bg); color: var(--sc-koppar-fg); }
+.dhx-host .gantt_task_line.gantt_milestone.sc-koppar { background: transparent; }
+.dhx-host .gantt_task_line.gantt_milestone.sc-koppar .gantt_task_content { background: var(--sc-koppar-bg); }
+.dhx-host .cell-select.chip.sc-koppar { --chip-bg: var(--sc-koppar-bg); --chip-fg: var(--sc-koppar-fg); }
+.dhx-host .row-check.sc-koppar[aria-checked="true"] { background: var(--sc-koppar-bg); color: var(--sc-koppar-fg); }
+.dhx-host .row-check.sc-koppar[aria-checked="mixed"] { background: linear-gradient(90deg, var(--sc-koppar-bg) 50%, transparent 50%); }
+.series-mark.sc-koppar { background: var(--sc-koppar-bg); }
+.board-col.sc-koppar .board-head { box-shadow: inset 0 -3px 0 var(--sc-koppar-bg); }
+.status-swatch.sc-koppar { background: var(--sc-koppar-bg); }
+.dhx-host .gantt_task_line.sc-stal { background: var(--sc-stal-bg); color: var(--sc-stal-fg); }
+.dhx-host .gantt_task_line.gantt_milestone.sc-stal { background: transparent; }
+.dhx-host .gantt_task_line.gantt_milestone.sc-stal .gantt_task_content { background: var(--sc-stal-bg); }
+.dhx-host .cell-select.chip.sc-stal { --chip-bg: var(--sc-stal-bg); --chip-fg: var(--sc-stal-fg); }
+.dhx-host .row-check.sc-stal[aria-checked="true"] { background: var(--sc-stal-bg); color: var(--sc-stal-fg); }
+.dhx-host .row-check.sc-stal[aria-checked="mixed"] { background: linear-gradient(90deg, var(--sc-stal-bg) 50%, transparent 50%); }
+.series-mark.sc-stal { background: var(--sc-stal-bg); }
+.board-col.sc-stal .board-head { box-shadow: inset 0 -3px 0 var(--sc-stal-bg); }
+.status-swatch.sc-stal { background: var(--sc-stal-bg); }
+.dhx-host .gantt_task_line.sc-bla { background: var(--sc-bla-bg); color: var(--sc-bla-fg); }
+.dhx-host .gantt_task_line.gantt_milestone.sc-bla { background: transparent; }
+.dhx-host .gantt_task_line.gantt_milestone.sc-bla .gantt_task_content { background: var(--sc-bla-bg); }
+.dhx-host .cell-select.chip.sc-bla { --chip-bg: var(--sc-bla-bg); --chip-fg: var(--sc-bla-fg); }
+.dhx-host .row-check.sc-bla[aria-checked="true"] { background: var(--sc-bla-bg); color: var(--sc-bla-fg); }
+.dhx-host .row-check.sc-bla[aria-checked="mixed"] { background: linear-gradient(90deg, var(--sc-bla-bg) 50%, transparent 50%); }
+.series-mark.sc-bla { background: var(--sc-bla-bg); }
+.board-col.sc-bla .board-head { box-shadow: inset 0 -3px 0 var(--sc-bla-bg); }
+.status-swatch.sc-bla { background: var(--sc-bla-bg); }
+.dhx-host .gantt_task_line.sc-guld { background: var(--sc-guld-bg); color: var(--sc-guld-fg); }
+.dhx-host .gantt_task_line.gantt_milestone.sc-guld { background: transparent; }
+.dhx-host .gantt_task_line.gantt_milestone.sc-guld .gantt_task_content { background: var(--sc-guld-bg); }
+.dhx-host .cell-select.chip.sc-guld { --chip-bg: var(--sc-guld-bg); --chip-fg: var(--sc-guld-fg); }
+.dhx-host .row-check.sc-guld[aria-checked="true"] { background: var(--sc-guld-bg); color: var(--sc-guld-fg); }
+.dhx-host .row-check.sc-guld[aria-checked="mixed"] { background: linear-gradient(90deg, var(--sc-guld-bg) 50%, transparent 50%); }
+.series-mark.sc-guld { background: var(--sc-guld-bg); }
+.board-col.sc-guld .board-head { box-shadow: inset 0 -3px 0 var(--sc-guld-bg); }
+.status-swatch.sc-guld { background: var(--sc-guld-bg); }
+.dhx-host .gantt_task_line.sc-svart { background: var(--sc-svart-bg); color: var(--sc-svart-fg); }
+.dhx-host .gantt_task_line.gantt_milestone.sc-svart { background: transparent; }
+.dhx-host .gantt_task_line.gantt_milestone.sc-svart .gantt_task_content { background: var(--sc-svart-bg); }
+.dhx-host .cell-select.chip.sc-svart { --chip-bg: var(--sc-svart-bg); --chip-fg: var(--sc-svart-fg); }
+.dhx-host .row-check.sc-svart[aria-checked="true"] { background: var(--sc-svart-bg); color: var(--sc-svart-fg); }
+.dhx-host .row-check.sc-svart[aria-checked="mixed"] { background: linear-gradient(90deg, var(--sc-svart-bg) 50%, transparent 50%); }
+.series-mark.sc-svart { background: var(--sc-svart-bg); }
+.board-col.sc-svart .board-head { box-shadow: inset 0 -3px 0 var(--sc-svart-bg); }
+.status-swatch.sc-svart { background: var(--sc-svart-bg); }
+
+/* Färgval för en status: små rutor ur paletten, en per färg; en färg som en annan status redan använder är spärrad så länge det finns lediga */
+.status-colors { display: inline-flex; gap: 3px; flex: none; }
+.status-swatch { width: 16px; height: 16px; padding: 0; border-radius: 3px; border: var(--line-width) solid var(--line); cursor: pointer; }
+.status-swatch.on { outline: 2px solid var(--text); outline-offset: 1px; }
+.status-swatch:disabled { opacity: 0.25; cursor: default; border-style: solid; }
