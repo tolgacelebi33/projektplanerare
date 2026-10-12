@@ -552,4 +552,4 @@ Varje regel i Egna regler har en redigera-knapp (penna) till vänster om kryssen
 
 ## 2026-10-12: Projektraden högst upp (beslut)
 
-Användaren valde efter förhandsbild: projektraden är svart (#000000) med svarta knappar, och text och ramar i sidans bakgrundsfärg (Standard: aluminiumgrå, Ljust: vit). I Mörkt är sidan redan svart, så där används den vanliga textfärgen. Tokens `--project-row-bg` och `--project-row-fg`. Bara projektraden: raderna Vy/Zoom och Filter/Lista är oförändrade. Kontrasttestet CT1 och temafilen går igenom.
+Användaren valde efter förhandsbild (och sa sedan att det bara gäller Standard-temat): projektraden är svart (#000000) med svarta knappar, och text och ramar i sidans bakgrundsfärg (Standard: aluminiumgrå, Ljust: vit). I Mörkt är sidan redan svart, så där används den vanliga textfärgen. Tokens `--project-row-bg` och `--project-row-fg`. Bara projektraden: raderna Vy/Zoom och Filter/Lista är oförändrade. Kontrasttestet CT1 och temafilen går igenom.

@@ -114,9 +114,8 @@ body {
   --grid-line-solid: #948F84; /* svart 18 % över aluminiumgrå. Ogenomskinlig: SVAR ritar rutnätet på en canvas som inte tolkar color-mix */
 }
 
-/* Projektraden högst upp (beslut 2026-10-12): svart rad med svarta knappar, text och ramar i sidans bakgrundsfärg. I Mörkt är sidan redan svart, där används textfärgen. */
-:root, [data-theme="standard"], [data-theme="ljust"] { --project-row-bg: var(--svart-ren); --project-row-fg: var(--bg-base); }
-[data-theme="morkt"] { --project-row-bg: var(--svart-ren); --project-row-fg: var(--text); }
+/* Projektraden högst upp (beslut 2026-10-12): bara i Standard-temat. Svart rad med svarta knappar, text och ramar i sidans bakgrundsfärg. */
+:root, [data-theme="standard"] { --project-row-bg: var(--svart-ren); --project-row-fg: var(--bg-base); }
 
 [data-theme="ljust"] {
   /* Gruppfärger i Ljust: paletten som den är (Standard har mörkare varianter, se ovan) */
