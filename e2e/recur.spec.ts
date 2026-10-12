@@ -58,7 +58,9 @@ test("RC3 varje tillfälle är en egen milstolpe: en kan bockas av utan att de a
   const d = await create(page, { title: "Kontroll", first: "2026-10-12", kind: "weekly", count: "3" });
   await d.getByRole("button", { name: "Skapa" }).click();
   const s = await series(page);
-  await page.locator(`[data-check="${s[0].id}"]`).click();
+  await page.locator(`[data-check="${s[0].id}"]`).click(); // Ej startad -> Pågår
+  await expect.poll(async () => (await series(page)).map((i) => i.status)).toEqual(["in_progress", "not_started", "not_started"]);
+  await page.locator(`[data-check="${s[0].id}"]`).click(); // Pågår -> Klar
   await expect.poll(async () => (await series(page)).map((i) => i.status)).toEqual(["done", "not_started", "not_started"]);
 });
 

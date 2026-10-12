@@ -348,7 +348,7 @@ export const enDict: Dict = {
   today: "Today",
   filter: { listLabel: "List", clearAll: "Clear all filters", activeLabel: "Active filters", activeCount: (n: number) => `${n} active filters`, chipQuery: (q: string) => `Search: ${q}`, removeOf: (l: string) => `Remove the filter ${l}`, label: "Filter", attrs: "Filter by", clear: "Clear filters", collapseAll: "Collapse all", expandAll: "Expand all", search: "Search", placeholder: "Search...", hideDone: "Hide done", count: (n: number, total: number) => `Showing ${n} of ${total}` },
   history: { label: "History", undo: "Undo", redo: "Redo", undoHint: "Undo the last change (Cmd/Ctrl+Z)", redoHint: "Redo (Cmd/Ctrl+Shift+Z)" },
-  check: { done: "Mark as done", undone: "Mark as not done" },
+  check: { start: "Mark as in progress", done: "Mark as done", undone: "Mark as not started" },
   dismiss: "Dismiss the message",
   add: { label: "Add", heading: "New", task: "Task", milestone: "Milestone", epic: "Group", hint: "Tasks and milestones are added in the selected group (or next to the selected item). A group is always added at the top level. Right-click a group to create a group inside it." },
   deps: { label: "Dependencies", shift: "Move successors", none: "No action", hint: "Move successors: a task that starts after another is pushed forward when the other moves, and cannot start before it is done. No action: dependencies are drawn but change no dates." },

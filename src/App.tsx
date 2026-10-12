@@ -372,7 +372,13 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
     if (state.kind !== "ready") return;
     const it = state.items.find((i) => i.id === id);
     if (!it) return;
-    try { await store.updateItem(id, { status: it.status === "done" ? "not_started" : "done" }); await refresh(); }
+    // Tre lägen: Ej startad (och Blockerad) -> Pågår -> Klar -> Ej startad. Med egna statusar väljs projektets första status i den kategorin.
+    const next: Status = it.status === "done" ? "not_started" : it.status === "in_progress" ? "done" : "in_progress";
+    try {
+      const proj = (await store.listProjects()).find((p) => p.id === it.project_id); // färska statusar (inte de som lästes in senast)
+      const def = statusDefs(proj).find((d) => d.category === next);
+      await store.updateItem(id, def ? statusPatch(def, it) : { status: next }); await refresh();
+    }
     catch (e) { setWriteError(friendlyError(e)); }
   };
   useEffect(() => {

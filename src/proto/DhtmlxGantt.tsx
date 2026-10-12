@@ -377,9 +377,9 @@ export function DhtmlxGantt({ store, items, deps, zoom, onError, onPersisted, re
     const shortDate = (t: Task) => { const e = t.end_date as Date, s = t.start_date as Date; const d = t.type === "milestone" ? s : new Date(e.getFullYear(), e.getMonth(), e.getDate() - 1); return `${d.getDate()} ${gantt.locale.date.month_short[d.getMonth()]}`; };
     gantt.config.columns = [
       { name: "text", label: sv.grid.title, tree: true, width: "*", template: (t) => {
-        const done = (t as unknown as { status: Status }).status === "done";
+        const st = (t as unknown as { status: Status }).status, done = st === "done", doing = st === "in_progress";
         // Bocken: klar eller inte klar direkt i raden. En knapp, så tangentbord (Enter, mellanslag) fungerar och skärmläsare får status.
-        const check = `<button type="button" class="row-check" role="checkbox" aria-checked="${done}" aria-label="${done ? sv.check.undone : sv.check.done}: ${String(t.text).replace(/"/g, "&quot;")}" data-check="${t.id}">${done ? "\u2713" : ""}</button>`;
+        const check = `<button type="button" class="row-check" role="checkbox" aria-checked="${done ? "true" : doing ? "mixed" : "false"}" aria-label="${done ? sv.check.undone : doing ? sv.check.done : sv.check.start}: ${String(t.text).replace(/"/g, "&quot;")}" data-check="${t.id}">${done ? "\u2713" : ""}</button>`;
         const isGroup = (t as unknown as { kind: string }).kind === "epic";
         const title = `<span class="grid-title" title="${String(t.text).replace(/"/g, "&quot;")}">${t.text}</span>`;
         if (!isGroup) return `${check}${title}`;

@@ -811,3 +811,6 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); opacity: 
 /* Dagens datum i tidslinjen: kopparrött. Dagvyn tonar dagens kolumn, vecko- och månadsvyn har en streckad linje på exakt dag */
 .gantt-host .wk-today, .gantt-host .gantt_task_cell.wk-today { background: color-mix(in srgb, var(--today-color) 32%, transparent); }
 .gantt-host .today-line { z-index: 2; pointer-events: none; width: 0; border-left: 2px dashed var(--today-color); }
+
+/* Bocken i raden har tre lägen: tom (Ej startad), halvfylld (Pågår), bock (Klar) */
+.dhx-host .row-check[aria-checked="mixed"] { background: linear-gradient(90deg, var(--status-in-progress-bg) 50%, transparent 50%); border-color: var(--bar-outline-color); }

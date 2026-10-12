@@ -353,7 +353,7 @@ export const svDict = {
   today: "Idag",
   filter: { listLabel: "Lista", clearAll: "Rensa alla filter", activeLabel: "Aktiva filter", activeCount: (n: number) => `${n} aktiva filter`, chipQuery: (q: string) => `Sök: ${q}`, removeOf: (l: string) => `Ta bort filtret ${l}`, label: "Filter", attrs: "Filtrera", clear: "Rensa filter", collapseAll: "Fäll ihop alla", expandAll: "Öppna alla", search: "Sök", placeholder: "Sök...", hideDone: "Dölj klara", count: (n: number, total: number) => `Visar ${n} av ${total}` },
   history: { label: "Historik", undo: "Ångra", redo: "Gör om", undoHint: "Ångra senaste ändringen (Cmd/Ctrl+Z)", redoHint: "Gör om (Cmd/Ctrl+Shift+Z)" },
-  check: { done: "Markera som klar", undone: "Markera som inte klar" },
+  check: { start: "Markera som pågående", done: "Markera som klar", undone: "Markera som inte påbörjad" },
   dismiss: "Stäng meddelandet",
   add: { label: "Lägg till", heading: "Nytt", task: "Uppgift", milestone: "Milstolpe", epic: "Grupp", hint: "Uppgift och milstolpe läggs i den grupp som är vald (eller bredvid vald post). En grupp läggs alltid på översta nivån. Högerklicka på en grupp för att skapa en grupp i den." },
   deps: { label: "Beroenden", shift: "Flytta efterföljare", none: "Ingen åtgärd", hint: "Flytta efterföljare: en uppgift som börjar efter en annan skjuts framåt när den andra flyttas, och kan inte börja före att den är klar. Ingen åtgärd: beroenden ritas men ändrar inga datum." },

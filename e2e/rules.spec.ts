@@ -44,9 +44,13 @@ test("RU3 med regeln på skapas nästa tillfälle när ett blir klart, och Ångr
   await rule(page, "När ett tillfälle i en serie blir klart, skapa nästa efter det sista", true);
   await page.waitForTimeout(400);
   const first = (await items(page)).filter((i) => i.series).sort((a, b) => a.start.localeCompare(b.start))[0];
-  await page.locator(`.gantt_row[data-task-id="${first.id}"] [data-check]`).first().click();
+  const chk = page.locator(`.gantt_row[data-task-id="${first.id}"] [data-check]`).first();
+  await chk.click(); // Ej startad -> Pågår
+  await expect.poll(async () => (await items(page)).find((i) => i.id === first.id)!.status).toBe("in_progress");
+  await page.waitForTimeout(400); // eget ångra-steg per klick
+  await chk.click(); // Pågår -> Klar
   await expect.poll(async () => (await items(page)).filter((i) => i.series).map((i) => i.start).sort()).toEqual(["2026-10-12", "2026-10-19", "2026-10-26", "2026-11-02"]);
   await page.getByRole("button", { name: "Ångra", exact: true }).click();
   await expect.poll(async () => (await items(page)).filter((i) => i.series).length).toBe(3);
-  expect((await items(page)).find((i) => i.id === first.id)!.status).toBe("not_started");
+  expect((await items(page)).find((i) => i.id === first.id)!.status).toBe("in_progress"); // tillbaka till läget före sista klicket
 });
