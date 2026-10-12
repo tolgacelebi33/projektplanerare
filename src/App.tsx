@@ -745,7 +745,7 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
         )}
         <span className="lib-tag" title={persistent?.persistGranted === true ? sv.project.persistYes : persistent?.persistGranted === false ? sv.project.persistNo : undefined}>{app.persistent ? sv.project.persisted : sv.project.demo}</span>
       </div>
-      <div className="toolbar">
+      <div className="toolbar toolbar-view">
         <span className="toolbar-label keep-narrow">{sv.view.label}</span>
         <div className="seg keep-narrow" role="group" aria-label={sv.view.label}>
           {(["gantt", "wheel", "board"] as const).map((v) => (

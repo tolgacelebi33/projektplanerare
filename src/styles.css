@@ -789,3 +789,8 @@ span.health-chip { cursor: default; }
 button:disabled, .mini[disabled], .mini-primary[disabled], .ctx-item[disabled], .btn[disabled] { opacity: 1; background: transparent; color: var(--text-muted); border-color: var(--text-muted); border-style: dashed; cursor: default; }
 .ctx-item[disabled] { border-style: none; }
 input::placeholder, textarea::placeholder { color: var(--placeholder); opacity: 1; }
+
+/* Verktygsraden Vy och Zoom: svart rad, svarta knappar med ljus text och ram, den markerade knappen i sidans bakgrundsfärg (tokens --toolbar-*) */
+.toolbar-view { background: var(--toolbar-bg); color: var(--toolbar-fg); --text: var(--toolbar-fg); --line: var(--toolbar-fg); --surface: var(--toolbar-bg); --surface-alt: var(--toolbar-bg); --text-muted: color-mix(in srgb, var(--toolbar-fg) 66%, transparent); --placeholder: color-mix(in srgb, var(--toolbar-fg) 70%, transparent); }
+.toolbar-view .seg button[aria-pressed="true"], .toolbar-view .mini[aria-pressed="true"], .toolbar-view .pill[aria-pressed="true"] { background: var(--toolbar-active-bg); color: var(--toolbar-active-fg); border-color: var(--toolbar-active-bg); }
+.toolbar-view select { background: var(--toolbar-bg); color: var(--toolbar-fg); }
