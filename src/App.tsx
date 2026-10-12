@@ -436,6 +436,7 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
       if (key === "n") run(() => addItem("task").catch(() => undefined));
       else if (key === "m") run(() => addItem("milestone").catch(() => undefined));
       else if (key === "g") run(() => addItem("epic", { anchorId: null }).catch(() => undefined));
+      else if (key === "h") run(() => setSettings({ ...settingsRef.current, toolsMin: !settingsRef.current.toolsMin }));
       else if (key === "/") run(() => document.querySelector<HTMLInputElement>("input.search")?.focus());
       else if (key === "?") run(() => window.dispatchEvent(new CustomEvent("pp:help")));
       else if (view === "gantt" && key === "t") run(() => setTodayToken((n) => n + 1));
@@ -719,7 +720,7 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
   const activeFilterCount = filterChips.length + (hideDone ? 1 : 0) + Object.values(quick).filter(Boolean).length; // Dölj klara och snabbfiltren är knappar som visas nedtryckta, de får ingen chip
 
   return (
-    <div className={`app${toolsOpen ? " tools-open" : ""}`}>
+    <div className={`app${toolsOpen ? " tools-open" : ""}${settings.toolsMin ? " tools-min" : ""}`}>
       <header className="app-header">
         <div className="logo-slot" aria-label={sv.logoSlot} />
         <h1 className="app-title">{sv.title}</h1>
@@ -749,6 +750,7 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
             onSelect={(id) => { focusMedianOnNextProject(); projects.select(id); }} onCreate={(n) => { focusMedianOnNextProject(); return projects.create(n); }} onRename={projects.rename} onRemove={(id) => { focusMedianOnNextProject(); return projects.remove(id); }} onDependencyMode={projects.setDependencyMode}
             onDuplicate={doDuplicate} onExport={doExport} onImport={doImport} />
         )}
+        <button type="button" className="mini tools-toggle" aria-expanded={!settings.toolsMin} aria-label={settings.toolsMin ? sv.tools.show : sv.tools.hide} title={`${settings.toolsMin ? sv.tools.show : sv.tools.hide} (H)`} onClick={() => setSettings({ ...settings, toolsMin: !settings.toolsMin })}>{settings.toolsMin ? "+" : "\u2212"}</button>
         <span className="lib-tag" title={persistent?.persistGranted === true ? sv.project.persistYes : persistent?.persistGranted === false ? sv.project.persistNo : undefined}>{app.persistent ? sv.project.persisted : sv.project.demo}</span>
       </div>
       <div className="toolbar">
@@ -784,7 +786,7 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
               ))}
             </div>
             <button type="button" className="mini" onClick={() => setTodayToken((n) => n + 1)}>{sv.today}</button>
-            <button type="button" className="mini" aria-pressed={settings.showToday} title={sv.zoom.todayMarkHint} onClick={() => setSettings({ ...settings, showToday: !settings.showToday })}>{sv.zoom.todayMark}</button>
+            <button type="button" className="mini min-hide" aria-pressed={settings.showToday} title={sv.zoom.todayMarkHint} onClick={() => setSettings({ ...settings, showToday: !settings.showToday })}>{sv.zoom.todayMark}</button>
           </>
         ) : view === "wheel" ? (
           <>
@@ -798,7 +800,7 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
           </>
         ) : null}
         <span className="toolbar-sep" aria-hidden="true" />
-        <div className="add-group keep-narrow" role="group" aria-label={sv.add.label} title={sv.add.hint}>
+        <div className="add-group keep-narrow min-hide" role="group" aria-label={sv.add.label} title={sv.add.hint}>
           <span className="toolbar-label" aria-hidden="true">{sv.add.heading}</span>
           {(["task", "milestone", "epic"] as ItemType[]).map((k) => (
             <button key={k} type="button" className="mini" disabled={!projects.projectId || state.kind !== "ready"} onClick={() => void addItem(k, k === "epic" ? { anchorId: null } : {}).catch(() => undefined)}>+ {sv.add[k]}</button>

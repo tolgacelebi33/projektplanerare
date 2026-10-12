@@ -186,6 +186,7 @@ export const svDict = {
     renameAll: "Titel för hela serien", renameAllBtn: "Byt namn på alla", changeEvery: "Ändra upprepning", changeEveryBtn: "Ändra för detta och senare", changeEveryHint: "Det här tillfället och alla senare får nya datum med det nya avståndet. Tidigare tillfällen behåller sina datum.",
   },
   narrow: { tools: "Verktyg", hideTools: "Dölj verktyg" },
+  tools: { hide: "Dölj verktyg", show: "Visa verktyg" },
   importPreview: {
     title: "Förhandsgranska import", file: "Fil", into: (name: string) => `Läggs in sist i projektet "${name}" (kan ångras).`, asNew: (name: string) => `Läggs in som ett nytt projekt: "${name}".`,
     counts: (g: number, m: number, t: number) => `${g} grupper, ${m} milstolpar, ${t} uppgifter.`, groups: "Grupper", groupLine: (n: string, c: number) => `${n}: ${c} poster`, none: "Inga",
@@ -273,7 +274,7 @@ export const svDict = {
     infoStorage: "Allt sparas i den här webbläsaren, på den här enheten. Inget skickas till någon server. Exportera då och då (JSON) som säkerhetskopia, och importera för att flytta data till en annan webbläsare.",
     infoCodes: "Varje projekt och varje post har en kod som delas ut automatiskt och inte kan ändras: PRJ0001 för projekt, GRP0001-003 för grupp, MIL0001-0041 för milstolpe och TSK0001-0123 för uppgift. Siffran efter PRJ är projektets nummer, och den efter bindestrecket räknar posterna av samma typ i projektet. En kod används aldrig två gånger. Visa den i listan (Kolumner, ID) eller på korten, och sök på den i sökrutan.",
     shortcutsTitle: "Kortkommandon", shortcutsHint: "Gäller när du inte skriver i ett fält.",
-    shortcuts: ["Ny uppgift", "Ny milstolpe", "Ny grupp", "Gå till sökrutan", "Sök överallt och kör kommandon", "Gå till idag (Gantt)", "Zoom dag, vecka, månad (Gantt)", "Öppna eller stäng hjälpen", "Ångra", "Gör om", "Flytta den öppna posten i sin grupp", "Släpp markeringen, eller stäng dialogen"],
+    shortcuts: ["Ny uppgift", "Ny milstolpe", "Ny grupp", "Gå till sökrutan", "Sök överallt och kör kommandon", "Gå till idag (Gantt)", "Zoom dag, vecka, månad (Gantt)", "Öppna eller stäng hjälpen", "Ångra", "Gör om", "Flytta den öppna posten i sin grupp", "Dölj eller visa verktygsraderna", "Släpp markeringen, eller stäng dialogen"],
     openHelp: "Öppna hjälpen",
     close: "Stäng", reset: "Återställ standard",
     cardFields: { date: "Datum", assignee: "Ansvarig (initialer)", priority: "Prioritet", description: "Första raden av beskrivningen", series: "Upprepning för serier", progress: "Framsteg", labels: "Etiketter", checklist: "Checklista (räknare)", links: "Länkar (antal)", lastUpdate: "Senaste uppdatering", comments: "Kommentarer (antal)", estimate: "Uppskattning (timmar)", code: "Kod (till exempel MIL0001-0041)" },

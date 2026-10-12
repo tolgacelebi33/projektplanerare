@@ -7,7 +7,7 @@ import { RuleBuilder } from "./RuleBuilder";
 /** Inställningar: ändras direkt och sparas i webbläsaren. Esc, Stäng eller klick utanför stänger. */
 const TABS = ["list", "board", "views", "item", "rules", "reminders", "people", "start", "touch", "backup", "info"] as const;
 type Tab = (typeof TABS)[number];
-const KEYS = ["N", "M", "G", "/", "Cmd/Ctrl + K", "T", "1, 2, 3", "?", "Cmd/Ctrl + Z", "Cmd/Ctrl + Shift + Z, Cmd/Ctrl + Y", "Alt + ↑ / ↓", "Esc"]; // samma på alla språk, texterna står i ordlistan i samma ordning
+const KEYS = ["N", "M", "G", "/", "Cmd/Ctrl + K", "T", "1, 2, 3", "?", "Cmd/Ctrl + Z", "Cmd/Ctrl + Shift + Z, Cmd/Ctrl + Y", "Alt + ↑ / ↓", "H", "Esc"]; // samma på alla språk, texterna står i ordlistan i samma ordning
 const TAB0_KEY = "projektplanerare.settingsTab";
 
 export interface InstallApi { available: boolean; installed: boolean; onInstall: () => void }

@@ -932,3 +932,8 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); opacity: 
 .wheel-arc[data-sc="svart"] .wheel-shape, .wheel-ms[data-sc="svart"] .wheel-shape { fill: var(--sc-svart-bg); }
 .wheel-arc[data-sc="svart"] .wheel-text, .wheel-ms[data-sc="svart"] .wheel-no { fill: var(--sc-svart-fg); }
 .rep-stack .sc-svart, .rep-dot.sc-svart { background: var(--sc-svart-bg); }
+
+/* Minimerade verktygsrader (knappen - / +, tangenten H): bara projektet, vyn, zoomen, Ångra och Gör om ligger kvar */
+.tools-toggle { margin-left: auto; min-width: 28px; font-size: 16px; line-height: 1; }
+.tools-min .project-bar > *:not(.toolbar-label):not(select.project-select:not(.project-select-sm)) { display: none; }
+.tools-min .project-row .lib-tag, .tools-min .filter-row, .tools-min .min-hide { display: none; }

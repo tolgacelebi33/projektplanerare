@@ -181,6 +181,7 @@ export const enDict: Dict = {
     renameAll: "Title for the whole series", renameAllBtn: "Rename all", changeEvery: "Change repetition", changeEveryBtn: "Change for this and later", changeEveryHint: "This occurrence and all later ones get new dates with the new interval. Earlier occurrences keep their dates.",
   },
   narrow: { tools: "Tools", hideTools: "Hide tools" },
+  tools: { hide: "Hide tools", show: "Show tools" },
   importPreview: {
     title: "Preview import", file: "File", into: (name: string) => `Added at the end of the project "${name}" (can be undone).`, asNew: (name: string) => `Added as a new project: "${name}".`,
     counts: (g: number, m: number, t: number) => `${g} groups, ${m} milestones, ${t} tasks.`, groups: "Groups", groupLine: (n: string, c: number) => `${n}: ${c} items`, none: "None",
@@ -268,7 +269,7 @@ export const enDict: Dict = {
     infoStorage: "Everything is saved in this browser, on this device. Nothing is sent to a server. Export now and then (JSON) as a backup, and import to move data to another browser.",
     infoCodes: "Every project and every item has a code that is assigned automatically and cannot be changed: PRJ0001 for a project, GRP0001-003 for a group, MIL0001-0041 for a milestone and TSK0001-0123 for a task. The number after PRJ is the project number, and the one after the hyphen counts the items of the same type in the project. A code is never used twice. Show it in the list (Columns, ID) or on the cards, and search for it in the search box.",
     shortcutsTitle: "Keyboard shortcuts", shortcutsHint: "Apply when you are not typing in a field.",
-    shortcuts: ["New task", "New milestone", "New group", "Go to the search box", "Search everywhere and run commands", "Go to today (Gantt)", "Zoom day, week, month (Gantt)", "Open or close help", "Undo", "Redo", "Move the open item within its group", "Clear the selection, or close the dialog"],
+    shortcuts: ["New task", "New milestone", "New group", "Go to the search box", "Search everywhere and run commands", "Go to today (Gantt)", "Zoom day, week, month (Gantt)", "Open or close help", "Undo", "Redo", "Move the open item within its group", "Hide or show the toolbars", "Clear the selection, or close the dialog"],
     openHelp: "Open help",
     close: "Close", reset: "Reset to defaults",
     cardFields: { date: "Date", assignee: "Assignee (initials)", priority: "Priority", description: "First line of the description", series: "Repetition for series", progress: "Progress", labels: "Labels", checklist: "Checklist (counter)", links: "Links (count)", lastUpdate: "Latest update", comments: "Comments (count)", estimate: "Estimate (hours)", code: "Code (for example MIL0001-0041)" },
