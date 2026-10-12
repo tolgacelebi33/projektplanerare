@@ -92,7 +92,8 @@ export class PersistentStore extends MemoryStore {
         this.restore(snapshot); this.setHistory(history);
         const numbered = this.backfillCodes(); // äldre data får koder (ett fält som läggs till), och sparas
         const renamed = this.renamePlaceholderUsers(); // platshållarnamnen byts mot de verkliga (bara oförändrade)
-        this.finish(this.rescued || numbered || renamed); // en återställd reservkopia sparas i den vanliga lagringen
+        const healed = this.healEpicDates(); // gruppers datum stämmer med innehållet (härledda uppgifter)
+        this.finish(this.rescued || numbered || renamed || healed); // en återställd reservkopia sparas i den vanliga lagringen
         return;
       }
       catch (e) { await this.setAside(raw, msg(e)); }
@@ -115,7 +116,7 @@ export class PersistentStore extends MemoryStore {
             this.loadWarning = sv.persist.migrationFailed(msg(e));
             this.backend = this.legacy.fallback();
           }
-          { const a = this.backfillCodes(), b = this.renamePlaceholderUsers(); this.finish(a || b); } return;
+          { const a = this.backfillCodes(), b = this.renamePlaceholderUsers(), c = this.healEpicDates(); this.finish(a || b || c); } return;
         }
       }
     }

@@ -777,3 +777,6 @@ span.health-chip { cursor: default; }
 .rule-list li { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 10px; border: var(--line-width) solid var(--grid-line); background: var(--surface); }
 .rule-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; align-items: end; }
 .rule-actions { display: flex; align-items: center; gap: 10px; }
+/* En grupps datum räknas ur innehållet: stapeln går inte att dra eller ändra, och ser inte ut som att den går det */
+.dhx-host .gantt_task_line.epic { cursor: default; }
+.dhx-host .gantt_task_line.epic .gantt_task_drag { display: none; }

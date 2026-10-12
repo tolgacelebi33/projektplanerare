@@ -336,7 +336,7 @@ export function DhtmlxGantt({ store, items, deps, zoom, onError, onPersisted, re
         const title = `<span class="grid-title" title="${String(t.text).replace(/"/g, "&quot;")}">${t.text}</span>`;
         if (!isGroup) return `${check}${title}`;
         // Grupprad: ikon, antal direkta poster och "+" för att lägga till en uppgift sist i gruppen (synlig vid hovring, alltid synlig i en tom grupp)
-        const n = gantt.getChildren(t.id).length;
+        const n = gantt.getChildren(t.id).reduce((a, k) => a + 1 + (marksRef.current.get(String(k))?.length ?? 0), 0); // en serie som en rad räknas med alla sina tillfällen
         const add = `<button type="button" class="row-add${n === 0 ? " empty" : ""}" data-add-in="${t.id}" aria-label="${sv.group.addTask(String(t.text)).replace(/"/g, "&quot;")}" title="${sv.group.addTask(String(t.text)).replace(/"/g, "&quot;")}">+</button>`;
         return `${check}${EPIC_GLYPH}${title}<span class="group-tools"><span class="group-count" title="${sv.group.count(n)}">${n || ""}</span>${add}</span>`;
       } },

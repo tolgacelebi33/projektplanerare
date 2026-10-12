@@ -517,3 +517,12 @@ Fel: markerades en romb (ring) och man sedan klickade på radens egen stapel (de
 Fel (återskapat av användaren, flera gånger): med en serie på fyra tillfällen blev alltid ett av dem inte markerat. Det var seriens egen stapel (nästa tillfälle, ett riktigt Gantt-objekt): romberna fick en ram när de valdes, men stapeln fick bara radens markering, och när man bläddrade till den med pilarna i panelen låg den ofta utanför bild (tidslinjen rullade bara till romber). Nu: den öppna posten får samma ram vare sig det är en romb eller seriens egen stapel (klassen `open-item`), tidslinjen rullar till tillfället när man bläddrar med pilarna (`navToken`, så att vanliga klick inte flyttar vyn), och det finns aldrig två ramar samtidigt. Test SD7 (alla fyra tillfällen fram och tillbaka, ram på exakt ett, i bild).
 
 Kalendern i datumfältet i Återkommande-dialogen låg delvis utanför dialogen på låga fönster. Dialogerna är nu högre (mindre marginal upptill) och kalendern rullas in i bild när den öppnas. Test DP600/700/900 (föll på 600 före rättningen).
+
+## 2026-10-12: Rensning av fel (inga nya funktioner)
+
+Användaren: verktyget ska kunna användas, inga nya funktioner nu. Åtgärder:
+- **Gruppens datum stämde inte med innehållet** (en grupps stapel började och slutade fel jämfört med sina tillfällen). Datumen räknas i lagret vid varje ändring och stämde i alla vägar jag provade (skapa serie, ändra upprepning, ta bort senare, utöka, flytta, klarmarkera), så orsaken är sannolikt sparad data från en äldre version. Nu räknas alla gruppers datum om ur innehållet när sparad data läses in (`healEpicDates`, ingen historikpost, sparas), och en grupp utan innehåll behåller sina datum. Overifierat: exakt hur användarens grupp blev fel.
+- Gruppens datum går inte att dra eller ändra för hand (de härleds ur innehållet, beslut sedan fas 1). Stapeln visar nu inte dragkanter och har vanlig muspekare, så att det inte ser ut som att det går.
+- Gruppens siffra räknar alla tillfällen även när serier visas som en rad.
+- Tidigare i dag: markering av alla tillfällen i en serie, kalender i dialog, flaky UX12.
+Testat: tests/persist.test.ts (2 nya), e2e SD8.

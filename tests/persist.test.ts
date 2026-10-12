@@ -295,3 +295,31 @@ describe("sparningar samlas", () => {
     expect(JSON.stringify(be.data)).toContain("Direkt");
   });
 });
+
+describe("sparad data med grupper vars datum inte stämmer", () => {
+  it("datumen räknas om ur innehållet vid inläsning, utan att något hamnar i historiken, och sparas", async () => {
+    const be = new MemoryBackend();
+    const a = await open(be);
+    await a.flush();
+    const raw = structuredClone(be.data) as { snapshot: { items: { id: string; start: string; end: string }[] } };
+    const g = raw.snapshot.items.find((i) => i.id === "i4")!;
+    const right = { start: g.start, end: g.end };
+    g.start = "2026-10-18"; g.end = "2026-10-22"; // som en grupp som inte följt med sitt innehåll
+    const b = await open(new MemoryBackend(raw));
+    const healed = (await b.listItems("proj_1")).find((i) => i.id === "i4")!;
+    expect({ start: healed.start, end: healed.end }).toEqual(right);
+    expect(b.canUndo).toBe(false); // ingen ångra-post för en härledd rättning
+    await b.flush();
+    const saved = ((b as unknown as { backend: { data: typeof raw } }).backend.data).snapshot.items.find((i) => i.id === "i4")!;
+    expect({ start: saved.start, end: saved.end }).toEqual(right);
+  });
+  it("en grupp utan innehåll behåller sina datum", async () => {
+    const be = new MemoryBackend();
+    const a = await open(be);
+    await a.createItem(base({ type: "epic", title: "Tom", start: "2026-10-18", end: "2026-10-22" }));
+    await a.flush();
+    const b = await open(new MemoryBackend(structuredClone(be.data)));
+    const tom = (await b.listItems("proj_1")).find((i) => i.title === "Tom")!;
+    expect([tom.start, tom.end]).toEqual(["2026-10-18", "2026-10-22"]);
+  });
+});

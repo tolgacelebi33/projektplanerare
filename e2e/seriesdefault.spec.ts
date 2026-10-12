@@ -179,3 +179,22 @@ test("SD7 varje tillfälle får samma ram när det är öppet: också seriens eg
     }).toBe(true);
   }
 });
+
+test("SD8 gruppens siffra räknar alla tillfällen även när serien visas som en rad", async ({ page }) => {
+  await page.setViewportSize({ width: 1472, height: 900 });
+  await page.clock.setFixedTime(new Date("2026-10-11T10:00:00"));
+  await openApp(page, "dhtmlx", { seriesRow: true });
+  await page.getByRole("button", { name: "+ Grupp" }).click();
+  await page.waitForTimeout(300);
+  await page.locator("aside.panel input").first().fill("Mina styrgrupper");
+  await page.keyboard.press("Tab");
+  await page.getByRole("button", { name: "+ Återkommande milstolpe..." }).click();
+  const d = page.getByRole("dialog", { name: "Återkommande milstolpe" });
+  await d.getByLabel("Titel").fill("M3"); const f = d.locator('input[name="first"]'); await f.fill("2026-10-12"); await f.blur();
+  await d.getByLabel("Återkommer").selectOption("monthly"); await d.getByLabel("Antal tillfällen").fill("4");
+  await d.getByRole("button", { name: "Skapa" }).click();
+  const row = page.locator(".gantt_row", { hasText: "Mina styrgrupper" });
+  await expect(row.locator(".group-count")).toHaveText("4");
+  await page.getByRole("button", { name: "Serier som en rad" }).click(); // av: fyra rader
+  await expect(row.locator(".group-count")).toHaveText("4");
+});

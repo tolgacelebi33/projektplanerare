@@ -349,6 +349,15 @@ export class MemoryStore implements DataStore {
   }
 
   /**
+   * Räknar om datumen för alla grupper som har innehåll ur innehållet (de härleds alltid, men sparad data kan ha en grupp vars datum inte längre stämmer,
+   * till exempel från en äldre version). Ger ingen historik: det är en härledd uppgift, inte en ändring användaren gjort. Returnerar om något ändrades.
+   */
+  healEpicDates(): boolean {
+    const prev = this.suppress; this.suppress = true;
+    try { return rederiveEpics(this.items, [...this.items.values()].map((i) => i.parent_id)).length > 0; } finally { this.suppress = prev; }
+  }
+
+  /**
    * Byter platshållarnamnen från provdatan (Anna Lind, Erik Berg, Maria Holm) mot de verkliga, men bara de som fortfarande har sitt ursprungsnamn
    * (en person användaren redan döpt om rörs inte). Id är oförändrade, så tilldelningar följer med. Ger ingen historik. Returnerar om något ändrades.
    */
