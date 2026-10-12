@@ -745,7 +745,7 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
         )}
         <span className="lib-tag" title={persistent?.persistGranted === true ? sv.project.persistYes : persistent?.persistGranted === false ? sv.project.persistNo : undefined}>{app.persistent ? sv.project.persisted : sv.project.demo}</span>
       </div>
-      <div className="toolbar toolbar-view">
+      <div className="toolbar">
         <span className="toolbar-label keep-narrow">{sv.view.label}</span>
         <div className="seg keep-narrow" role="group" aria-label={sv.view.label}>
           {(["gantt", "wheel", "board"] as const).map((v) => (
@@ -792,7 +792,7 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
         ) : null}
         <span className="toolbar-sep" aria-hidden="true" />
         <div className="add-group keep-narrow" role="group" aria-label={sv.add.label} title={sv.add.hint}>
-          <span className="toolbar-label">{sv.add.label}</span>
+          <span className="toolbar-label" aria-hidden="true">{sv.add.heading}</span>
           {(["task", "milestone", "epic"] as ItemType[]).map((k) => (
             <button key={k} type="button" className="mini" disabled={!projects.projectId || state.kind !== "ready"} onClick={() => void addItem(k, k === "epic" ? { anchorId: null } : {}).catch(() => undefined)}>+ {sv.add[k]}</button>
           ))}

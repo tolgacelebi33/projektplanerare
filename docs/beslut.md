@@ -542,6 +542,10 @@ Användaren: förstora och förminska staplar snappar inte rätt. Mätning (e2e,
 - Vit text i Standard-temat (användaren visade): platshållartexten i fält i inställningar och dialoger (webbläsarens ljusa standard, kontrast 1,9) och inaktiva knappar som Ångra, Gör om, Lägg till (kontrast 2,1). Nu: platshållare via `--placeholder` överallt, och inaktiva knappar med dämpad textfärg och streckad ram i stället för halv genomskinlighet.
 - Min tidigare kontrollkörning missade detta av två skäl: den räknade bara vanlig text (inte platshållare eller inaktiva knappar), och den hoppade över färger angivna som `color-mix` (webbläsaren ger dem i ett annat format som mitt mätskript inte läste). Båda är rättade i kontrasttestet CT1, som nu även mäter platshållare och inaktiva knappar.
 
-## 2026-10-12: Verktygsraden Vy och Zoom
+## 2026-10-12: Verktygsraderna högst upp har oförändrade färger (rättelse)
 
-Raden Vy och Zoom är en svart rad (ren svart, #000000) med svarta knappar, ljus text och ljus ram, och den markerade knappen har sidans bakgrundsfärg med mörk text. I Mörkt tema är den markerade ljus (sidan är redan svart). Tokens `--toolbar-bg`, `--toolbar-fg`, `--toolbar-active-bg`, `--toolbar-active-fg` per tema i design/tokens.css. Övriga rader är oförändrade. Skäl: användarens beslut efter förhandsbilder. Observera att det tidigare var Svedbergs svart (#2C2724, en varm brun nyans) som gällde för mörka detaljer i Standard.
+Jag gjorde raden Vy och Zoom svart (`635cd6b`) efter att användaren beskrivit en variant och sett förhandsbilder, men användaren hade inte bestämt det: det var frågor om hur det skulle se ut. Ändringen är borttagen. Inga färger på navigationsraderna högst upp ändras utan ett uttryckligt beslut. Kvar från samma stycke: etiketten NYTT/NEW framför knapparna för att lägga till (användarens önskemål, samma format som VY och ZOOM).
+
+## 2026-10-12: Redigera en regel
+
+Varje regel i Egna regler har en redigera-knapp (penna) till vänster om kryssen. Ett klick fyller formuläret med regeln, och det syns att det är den befintliga som ändras: formuläret får ram och rubriken "Du redigerar en befintlig regel: ...", raden märks "Redigeras" och markeras, och knappen heter Spara ändringar (med Avbryt) i stället för Lägg till regel. Att spara ersätter regeln med samma id (och behåller om den är påslagen), den läggs inte till som en ny. Ett klick på pennan igen, Avbryt eller att ta bort regeln släpper redigeringen och tömmer formuläret. En regel för ett annat projekt än det valda behåller sitt projekt. Test RB6, RB7.

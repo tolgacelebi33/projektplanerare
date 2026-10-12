@@ -316,6 +316,7 @@ export const svDict = {
   },
   rb: {
     title: "Egna regler", intro: "När något händer, gör något. Reglerna gäller på den här enheten, för alla projekt eller ett valt, och körs när du ändrar en post. Tidsregler körs bara medan appen är öppen. Det en regel ändrar syns i loggen som automatiskt.",
+    editBtn: (n: string) => `Redigera regeln ${n}`, editBadge: "Redigeras", editing: (s: string) => `Du redigerar en befintlig regel: ${s}`, save: "Spara ändringar", cancel: "Avbryt", otherProject: "Ett annat projekt",
     none: "Inga egna regler ännu.", name: "Namn (valfritt)", when: "När", cond: "Om (valfritt)", then: "Gör", scope: "Gäller", allProjects: "Alla projekt", thisProject: (n: string) => `Bara ${n}`,
     whenStatus: (s: string) => `Status blir ${s}`, whenCreated: "En post skapas", whenOverdue: "En post blir försenad", whenDueIn: "En post slutar inom ett antal dagar", days: "Antal dagar",
     anyType: "Alla typer", anyPriority: "Alla prioriteter", typeLabel: "Typ", priorityLabel: "Prioritet",
@@ -353,7 +354,7 @@ export const svDict = {
   history: { label: "Historik", undo: "Ångra", redo: "Gör om", undoHint: "Ångra senaste ändringen (Cmd/Ctrl+Z)", redoHint: "Gör om (Cmd/Ctrl+Shift+Z)" },
   check: { done: "Markera som klar", undone: "Markera som inte klar" },
   dismiss: "Stäng meddelandet",
-  add: { label: "Lägg till", task: "Uppgift", milestone: "Milstolpe", epic: "Grupp", hint: "Uppgift och milstolpe läggs i den grupp som är vald (eller bredvid vald post). En grupp läggs alltid på översta nivån. Högerklicka på en grupp för att skapa en grupp i den." },
+  add: { label: "Lägg till", heading: "Nytt", task: "Uppgift", milestone: "Milstolpe", epic: "Grupp", hint: "Uppgift och milstolpe läggs i den grupp som är vald (eller bredvid vald post). En grupp läggs alltid på översta nivån. Högerklicka på en grupp för att skapa en grupp i den." },
   deps: { label: "Beroenden", shift: "Flytta efterföljare", none: "Ingen åtgärd", hint: "Flytta efterföljare: en uppgift som börjar efter en annan skjuts framåt när den andra flyttas, och kan inte börja före att den är klar. Ingen åtgärd: beroenden ritas men ändrar inga datum." },
   project: {
     duplicate: "Kopiera", import: "Importera...", importFile: "Importfil", export: "Exportera", exportJson: "JSON (hela projektet)", exportCsv: "CSV (för Excel)", exportTemplate: "Importmall (CSV)",

@@ -28,7 +28,7 @@
 :root {
   /* Palett (riktlinjerna) */
   --sv-svart: #2C2724;
-  --svart-ren: #000000; /* ren svart: Mörkt tema och verktygsraden Vy och Zoom */
+  --svart-ren: #000000; /* ren svart: Mörkt tema */
   --sv-vit: #FFFFFF;
   --sv-guld: #CCB163;
   --sv-kopparrod: #BD5E4F;
@@ -112,20 +112,6 @@ body {
   --accent: var(--sv-bronsbrun);
   --bar-outline-color: var(--sv-svart);
   --grid-line-solid: #948F84; /* svart 18 % över aluminiumgrå. Ogenomskinlig: SVAR ritar rutnätet på en canvas som inte tolkar color-mix */
-}
-
-/* Verktygsraden Vy och Zoom (beslut 2026-10-12): svart rad med svarta knappar och ljus text, den markerade knappen i sidans bakgrundsfärg */
-:root, [data-theme="standard"], [data-theme="ljust"] {
-  --toolbar-bg: var(--svart-ren);
-  --toolbar-fg: color-mix(in srgb, var(--sv-vit) 83%, var(--svart-ren));
-  --toolbar-active-bg: var(--bg-base);
-  --toolbar-active-fg: var(--sv-svart);
-}
-[data-theme="morkt"] {
-  --toolbar-bg: var(--svart-ren);
-  --toolbar-fg: color-mix(in srgb, var(--sv-vit) 83%, var(--svart-ren));
-  --toolbar-active-bg: color-mix(in srgb, var(--sv-vit) 83%, var(--svart-ren));
-  --toolbar-active-fg: var(--svart-ren);
 }
 
 [data-theme="ljust"] {

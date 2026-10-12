@@ -21,6 +21,13 @@ const AUDIT = () => {
       const k0 = `ctl ${el.tagName}.${(el as HTMLElement).className}|${(el as HTMLInputElement).name ?? ""}`;
       if (rr < 3.2 && !seen.has(k0)) { seen.add(k0); out.push(`${rr.toFixed(2)} ${cs.color} on rgb(${Math.round(bg0.r)},${Math.round(bg0.g)},${Math.round(bg0.b)}) <${el.tagName.toLowerCase()} name="${(el as HTMLInputElement).name}" class="${String((el as HTMLElement).className).slice(0, 30)}"> (kontroll)`); }
     }
+    // Fält med vit bakgrund, och inbyggda (vita) kryssrutor och radioknappar: allt ska följa temats ytor
+    if (/^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName)) {
+      const type = (el as HTMLInputElement).type;
+      const k3 = `white ${el.tagName}.${type}.${(el as HTMLInputElement).name ?? ""}`;
+      if ((type === "radio" || type === "checkbox") && cs.appearance !== "none" && !seen.has(k3)) { seen.add(k3); out.push(`inbyggd ${type} (vit) name="${(el as HTMLInputElement).name}"`); }
+      else if (type !== "radio" && type !== "checkbox" && type !== "range" && type !== "hidden" && !seen.has(k3)) { const b3 = bgOf(el); if (lum(b3) > 0.8) { seen.add(k3); out.push(`vit bakgrund rgb(${Math.round(b3.r)},${Math.round(b3.g)},${Math.round(b3.b)}) <${el.tagName.toLowerCase()} name="${(el as HTMLInputElement).name}">`); } }
+    }
     // Platshållartext i fält som är tomma, och inaktiva knappar (webbläsarens egna färger är ljusa och går inte att läsa i Standard-temat)
     if (/^(INPUT|TEXTAREA)$/.test(el.tagName) && (el as HTMLInputElement).placeholder && !(el as HTMLInputElement).value) {
       const bg0 = bgOf(el), pc = parse(getComputedStyle(el, "::placeholder").color);
@@ -67,6 +74,7 @@ test("CT1 all text i Standard-temat har läsbar kontrast i vyer, panel, inställ
   for (const t of await d.getByRole("tab").all()) { await t.click(); await page.waitForTimeout(250); await run("inst-" + (await t.innerText())); }
   await page.keyboard.press("Escape");
   // dialoger
+  await page.getByRole("button", { name: /Ingen status/ }).first().click({ timeout: 1500 }).catch(() => {}); await page.waitForTimeout(300); await run("projektstatus"); await page.keyboard.press("Escape");
   for (const [btn, name] of [[/Återkommande/, "Återkommande milstolpe"], [/Statusar/, null], [/Egna fält/, null], [/Från mall/, null], [/Vyer/, null], [/Hjälp/, null]] as const) {
     await page.getByRole("button", { name: btn }).first().click({ timeout: 1500 }).catch(() => {}); await page.waitForTimeout(400); await run("dialog-" + btn.source); await page.keyboard.press("Escape"); await page.waitForTimeout(200);
   }

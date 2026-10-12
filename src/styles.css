@@ -436,7 +436,7 @@ body[data-overlay] .gantt_tooltip { display: none !important; }
 .modal-row { display: grid; grid-template-columns: 1.3fr 1.2fr 0.9fr; gap: 10px; }
 .modal-err { margin: 0; font-weight: var(--weight-strong); }
 .modal-actions { justify-content: flex-start; }
-.modal input, .modal select { font: inherit; font-size: 14px; color: var(--text); background: var(--surface-alt); border: var(--line-width) solid var(--line); border-radius: 6px; padding: 7px 9px; width: 100%; box-sizing: border-box; }
+.modal input, .modal select, .modal textarea { font: inherit; font-size: 14px; color: var(--text); background: var(--surface-alt); border: var(--line-width) solid var(--line); border-radius: 6px; padding: 7px 9px; width: 100%; box-sizing: border-box; }
 .modal input:focus-visible, .modal select:focus-visible, .modal button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 @media (max-width: 560px) { .modal-row { grid-template-columns: 1fr; } }
 /* Återkommande: markering i listan och boarden */
@@ -483,8 +483,6 @@ body[data-overlay] .gantt_tooltip { display: none !important; }
   .bulk-bar { padding: 6px 12px; }
   .notice { padding: 6px 12px; font-size: 13px; }
 }
-/* Kompaktare verktygsfält: knapparna "+ Uppgift" och så vidare förklarar sig själva, så etiketten "Lägg till" behövs inte */
-.add-group > .toolbar-label:first-child { display: none; }
 .toolbar { gap: 6px 10px; }
 
 /* Poster utan riktigt datum: streckad stapel, "Ej satt" i listan, och en rad i panelen */
@@ -515,7 +513,17 @@ body[data-overlay] .gantt_tooltip { display: none !important; }
   .settings-tab[aria-selected="true"] { border-bottom-color: var(--text); }
   .settings-keys > div { grid-template-columns: 1fr; gap: 2px; }
 }
-input[type="checkbox"], input[type="radio"] { accent-color: var(--text); }
+/* Kryssrutor och radioknappar: egna (webbläsarens är vita), en ruta med temats yta och en mörk markering */
+input[type="checkbox"], input[type="radio"] { accent-color: var(--text); appearance: none; -webkit-appearance: none; flex: none; width: 16px; height: 16px; margin: 0 6px 0 0; padding: 0; vertical-align: middle; display: inline-grid; place-content: center; background: var(--surface-alt); border: var(--line-width) solid var(--line); cursor: pointer; }
+input[type="checkbox"] { border-radius: 3px; }
+input[type="radio"] { border-radius: 50%; }
+input[type="checkbox"]::before { content: ""; width: 9px; height: 5px; border-left: 2px solid var(--surface); border-bottom: 2px solid var(--surface); transform: rotate(-45deg) translate(1px, -1px) scale(0); }
+input[type="radio"]::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--surface); transform: scale(0); }
+input[type="checkbox"]:checked, input[type="radio"]:checked { background: var(--text); }
+input[type="checkbox"]:checked::before { transform: rotate(-45deg) translate(1px, -1px) scale(1); }
+input[type="radio"]:checked::before { transform: scale(1); }
+input[type="checkbox"]:disabled, input[type="radio"]:disabled { border-style: dashed; cursor: default; }
+.modal input[type="checkbox"], .modal input[type="radio"] { width: 16px; padding: 0; }
 .settings h3 { margin: 4px 0 6px; font-family: var(--font-title); font-size: 12px; font-weight: 400; letter-spacing: 0.06em; }
 .settings section { display: grid; gap: 8px; }
 .settings-check { display: flex; gap: 10px; align-items: flex-start; font-size: var(--fs-md); cursor: pointer; }
@@ -790,7 +798,9 @@ button:disabled, .mini[disabled], .mini-primary[disabled], .ctx-item[disabled], 
 .ctx-item[disabled] { border-style: none; }
 input::placeholder, textarea::placeholder { color: var(--placeholder); opacity: 1; }
 
-/* Verktygsraden Vy och Zoom: svart rad, svarta knappar med ljus text och ram, den markerade knappen i sidans bakgrundsfärg (tokens --toolbar-*) */
-.toolbar-view { background: var(--toolbar-bg); color: var(--toolbar-fg); --text: var(--toolbar-fg); --line: var(--toolbar-fg); --surface: var(--toolbar-bg); --surface-alt: var(--toolbar-bg); --text-muted: color-mix(in srgb, var(--toolbar-fg) 66%, transparent); --placeholder: color-mix(in srgb, var(--toolbar-fg) 70%, transparent); }
-.toolbar-view .seg button[aria-pressed="true"], .toolbar-view .mini[aria-pressed="true"], .toolbar-view .pill[aria-pressed="true"] { background: var(--toolbar-active-bg); color: var(--toolbar-active-fg); border-color: var(--toolbar-active-bg); }
-.toolbar-view select { background: var(--toolbar-bg); color: var(--toolbar-fg); }
+/* Redigera en regel: formuläret och raden markeras tydligt så att det syns att det är den befintliga regeln som ändras */
+.rule-tools { display: inline-flex; gap: 6px; flex: none; }
+.rule-list li.editing { border-color: var(--text); box-shadow: inset 4px 0 0 var(--text); }
+.rule-badge { font-size: var(--fs-sm); font-weight: var(--weight-strong); padding: 1px 8px; border: var(--line-width) solid var(--text); border-radius: var(--radius-pill); margin-left: auto; margin-right: 8px; }
+.rule-form.editing { padding: 10px 12px; border: 2px solid var(--text); border-radius: 6px; background: var(--surface-alt); }
+.rule-editing { grid-column: 1 / -1; margin: 0; font-weight: var(--weight-strong); }

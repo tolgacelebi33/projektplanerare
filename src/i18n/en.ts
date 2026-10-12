@@ -311,6 +311,7 @@ export const enDict: Dict = {
   },
   rb: {
     title: "Custom rules", intro: "When something happens, do something. Rules apply on this device, for all projects or a chosen one, and run when you change an item. Time rules only run while the app is open. What a rule changes shows in the log as automatic.",
+    editBtn: (n: string) => `Edit the rule ${n}`, editBadge: "Editing", editing: (s: string) => `You are editing an existing rule: ${s}`, save: "Save changes", cancel: "Cancel", otherProject: "Another project",
     none: "No custom rules yet.", name: "Name (optional)", when: "When", cond: "If (optional)", then: "Do", scope: "Applies to", allProjects: "All projects", thisProject: (n: string) => `Only ${n}`,
     whenStatus: (s: string) => `Status becomes ${s}`, whenCreated: "An item is created", whenOverdue: "An item becomes overdue", whenDueIn: "An item ends within a number of days", days: "Number of days",
     anyType: "All types", anyPriority: "All priorities", typeLabel: "Type", priorityLabel: "Priority",
@@ -348,7 +349,7 @@ export const enDict: Dict = {
   history: { label: "History", undo: "Undo", redo: "Redo", undoHint: "Undo the last change (Cmd/Ctrl+Z)", redoHint: "Redo (Cmd/Ctrl+Shift+Z)" },
   check: { done: "Mark as done", undone: "Mark as not done" },
   dismiss: "Dismiss the message",
-  add: { label: "Add", task: "Task", milestone: "Milestone", epic: "Group", hint: "Tasks and milestones are added in the selected group (or next to the selected item). A group is always added at the top level. Right-click a group to create a group inside it." },
+  add: { label: "Add", heading: "New", task: "Task", milestone: "Milestone", epic: "Group", hint: "Tasks and milestones are added in the selected group (or next to the selected item). A group is always added at the top level. Right-click a group to create a group inside it." },
   deps: { label: "Dependencies", shift: "Move successors", none: "No action", hint: "Move successors: a task that starts after another is pushed forward when the other moves, and cannot start before it is done. No action: dependencies are drawn but change no dates." },
   project: {
     duplicate: "Copy", import: "Import...", importFile: "Import file", export: "Export", exportJson: "JSON (whole project)", exportCsv: "CSV (for Excel)", exportTemplate: "Import template (CSV)",

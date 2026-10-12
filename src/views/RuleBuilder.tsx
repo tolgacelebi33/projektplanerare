@@ -25,10 +25,12 @@ export function RuleBuilder({ rules, users, projects, projectId, onChange }: { r
   const [days, setDays] = useState("3");
   const [type, setType] = useState<"" | "task" | "milestone">("");
   const [priority, setPriority] = useState<"" | Priority>("");
-  const [scope, setScope] = useState<"all" | "this">("all");
+  const [scope, setScope] = useState<"all" | "this" | "keep">("all");
   const [doKind, setDoKind] = useState<RuleAction["kind"]>("progress");
   const [value, setValue] = useState("100");
   const [err, setErr] = useState("");
+  const [editing, setEditing] = useState<string | null>(null); // id för regeln som redigeras (null: en ny regel skapas)
+  const [keepProject, setKeepProject] = useState<string | null>(null); // projektet en redigerad regel gäller, om det inte är det valda
   const when = (): RuleTrigger => {
     if (whenKind.startsWith("status:")) return { kind: "status", to: whenKind.slice(7) as Status };
     if (whenKind === "due_in") return { kind: "due_in", days: Math.max(0, Math.min(RULE_LIMITS.days, Math.floor(Number(days) || 0))) };
@@ -52,10 +54,21 @@ export function RuleBuilder({ rules, users, projects, projectId, onChange }: { r
     const a = build();
     if (!a) { setErr(t.needValue); return; }
     if (timeBased && a.kind === "comment") { setErr(t.commentNotTime); return; }
-    const rule: CustomRule = { id: newRuleId(), name: name.trim().slice(0, RULE_LIMITS.name), enabled: true, project: scope === "this" ? projectId : null, when: when(), then: a };
+    const old = editing ? rules.find((r) => r.id === editing) : undefined;
+    const project = scope === "this" ? projectId : scope === "keep" ? keepProject : null;
+    const rule: CustomRule = { id: old?.id ?? newRuleId(), name: name.trim().slice(0, RULE_LIMITS.name), enabled: old?.enabled ?? true, project, when: when(), then: a };
     if (type) rule.type = type;
     if (priority) rule.priority = priority;
-    onChange([...rules, rule]); setErr(""); setName("");
+    onChange(old ? rules.map((r) => (r.id === old.id ? rule : r)) : [...rules, rule]); setErr(""); setName("");
+    if (old) stopEdit();
+  };
+  const stopEdit = () => { setEditing(null); setKeepProject(null); setErr(""); setName(""); setWhenKind("status:done"); setDays("3"); setType(""); setPriority(""); setScope("all"); setDoKind("progress"); setValue("100"); };
+  const startEdit = (r: CustomRule) => {
+    setEditing(r.id); setErr(""); setName(r.name);
+    setWhenKind(r.when.kind === "status" ? `status:${r.when.to}` : r.when.kind); if (r.when.kind === "due_in") setDays(String(r.when.days));
+    setType(r.type ?? ""); setPriority(r.priority ?? "");
+    setScope(!r.project ? "all" : r.project === projectId ? "this" : "keep"); setKeepProject(r.project && r.project !== projectId ? r.project : null);
+    setDoKind(r.then.kind); setValue(r.then.kind === "assignee" ? r.then.value ?? "" : String(r.then.value));
   };
   const valueControl = () => {
     if (doKind === "priority") return <select name="rb-value" value={value} onChange={(e) => setValue(e.target.value)}>{PRIORITIES.map((p) => <option key={p} value={p}>{sv.panel.priorities[p]}</option>)}</select>;
@@ -73,15 +86,20 @@ export function RuleBuilder({ rules, users, projects, projectId, onChange }: { r
           {rules.map((r) => {
             const label = r.name || ruleSentence(r, users, projects);
             return (
-              <li key={r.id} data-rule={r.id}>
+              <li key={r.id} data-rule={r.id} className={editing === r.id ? "editing" : undefined} aria-current={editing === r.id ? "true" : undefined}>
                 <label className="settings-check"><input type="checkbox" checked={r.enabled} aria-label={t.toggle(label)} onChange={(e) => onChange(rules.map((x) => (x.id === r.id ? { ...x, enabled: e.target.checked } : x)))} /><span>{r.name ? <strong>{r.name}: </strong> : null}{ruleSentence(r, users, projects)}</span></label>
-                <button type="button" className="mini" aria-label={t.remove(label)} onClick={() => onChange(rules.filter((x) => x.id !== r.id))}>{"×"}</button>
+                {editing === r.id && <span className="rule-badge">{t.editBadge}</span>}
+                <span className="rule-tools">
+                  <button type="button" className="mini" aria-label={t.editBtn(label)} title={t.editBtn(label)} aria-pressed={editing === r.id} onClick={() => (editing === r.id ? stopEdit() : startEdit(r))}>{"\u270E"}</button>
+                  <button type="button" className="mini" aria-label={t.remove(label)} onClick={() => { if (editing === r.id) stopEdit(); onChange(rules.filter((x) => x.id !== r.id)); }}>{"×"}</button>
+                </span>
               </li>
             );
           })}
         </ul>
       )}
-      <div className="rule-form">
+      <div className={`rule-form${editing ? " editing" : ""}`} data-mode={editing ? "edit" : "new"}>
+        {editing && <p className="rule-editing" role="status">{t.editing(ruleSentence(rules.find((r) => r.id === editing)!, users, projects))}</p>}
         <label className="panel-field"><span>{t.name}</span><input name="rb-name" value={name} maxLength={RULE_LIMITS.name} onChange={(e) => setName(e.target.value)} /></label>
         <label className="panel-field"><span>{t.when}</span>
           <select name="rb-when" value={whenKind} onChange={(e) => { setWhenKind(e.target.value); if ((e.target.value === "overdue" || e.target.value === "due_in") && doKind === "comment") { setDoKind("priority"); setValue("urgent"); } }}>
@@ -100,8 +118,8 @@ export function RuleBuilder({ rules, users, projects, projectId, onChange }: { r
           </select></label>
         <label className="panel-field"><span>{t.value}</span>{valueControl()}</label>
         <label className="panel-field"><span>{t.scope}</span>
-          <select name="rb-scope" value={scope} onChange={(e) => setScope(e.target.value as "all" | "this")}><option value="all">{t.allProjects}</option>{projectId && <option value="this">{t.thisProject(projects.find((p) => p.id === projectId)?.name ?? "")}</option>}</select></label>
-        <div className="rule-actions"><button type="button" className="btn" onClick={add}>{t.add}</button>{err && <span className="field-error" role="alert">{err}</span>}</div>
+          <select name="rb-scope" value={scope} onChange={(e) => setScope(e.target.value as "all" | "this" | "keep")}><option value="all">{t.allProjects}</option>{scope === "keep" && <option value="keep">{projects.find((p) => p.id === keepProject)?.name ?? t.otherProject}</option>}{projectId && <option value="this">{t.thisProject(projects.find((p) => p.id === projectId)?.name ?? "")}</option>}</select></label>
+        <div className="rule-actions"><button type="button" className="btn" onClick={add}>{editing ? t.save : t.add}</button>{editing && <button type="button" className="btn" onClick={stopEdit}>{t.cancel}</button>}{err && <span className="field-error" role="alert">{err}</span>}</div>
       </div>
     </div>
   );
