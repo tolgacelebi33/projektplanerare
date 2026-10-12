@@ -190,7 +190,8 @@ test("UX12 ett klick på tom tidslinje bredvid en stapel stänger också panelen
   await expect(panel(page)).toBeVisible();
   await expect(page.locator(".gantt_row[data-task-id=\"i9\"]")).toBeVisible(); // raderna ritas om när panelen öppnats
   const tl = (await page.locator(".gantt_task").first().boundingBox())!;
-  const r = (await page.locator(".gantt_row[data-task-id=\"i9\"]").boundingBox())!;
-  await page.mouse.click(tl.x + 40, r.y + r.height / 2); // vänstra delen av tidslinjen, långt från stapeln
+  let r: { y: number; height: number } | null = null; // raden ritas om när panelen tar plats: hämta lägesboxen tills den finns
+  await expect.poll(async () => { r = await page.locator(".gantt_row[data-task-id=\"i9\"]").boundingBox(); return !!r; }).toBe(true);
+  await page.mouse.click(tl.x + 40, r!.y + r!.height / 2); // vänstra delen av tidslinjen, långt från stapeln
   await expect(panel(page)).toHaveCount(0);
 });
