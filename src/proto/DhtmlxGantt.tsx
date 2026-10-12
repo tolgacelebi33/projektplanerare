@@ -20,6 +20,9 @@ import type { Zoom } from "./zoom";
 const EPIC_GLYPH = `<svg class="epic-glyph" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>`;
 const TYPE: Record<Item["type"], string> = { epic: "task", milestone: "milestone", task: "task" };
 
+/** Närmaste hela dag (lokal midnatt): från klockan 12 rundas uppåt. */
+const nearestDay = (d: Date): Date => { const f = new Date(d.getFullYear(), d.getMonth(), d.getDate()); return d.getTime() - f.getTime() >= 12 * 3600_000 ? new Date(f.getFullYear(), f.getMonth(), f.getDate() + 1) : f; };
+
 const ZOOM = {
   day: { scales: [{ unit: "month", step: 1, format: "%F %Y" }, { unit: "day", step: 1, format: "%j" }], min: 28 },
   week: { scales: [{ unit: "month", step: 1, format: "%F %Y" }, { unit: "week", step: 1, format: "%j" }], min: 50 },
@@ -173,6 +176,9 @@ export function DhtmlxGantt({ store, items, deps, zoom, onError, onPersisted, re
     gantt.config.details_on_create = false;
     gantt.config.fit_tasks = true; // tidsskalan utökas så att alla poster ryms (annars syns inte en post som läggs utanför det första spannet)
     gantt.config.drag_progress = false;
+    // Avrundning av datum vid dragning görs här (till närmaste hela dag, i alla zoomlägen). Bibliotekets egen avrundning gick efter skalans enhet: i vecko- och månadsvyn
+    // hoppade en kant flera dagar åt gången, och i dagvyn rundades det nedåt (en halv dag räckte inte).
+    gantt.config.round_dnd_dates = false;
     gantt.config.drag_project = false;
     gantt.config.grid_width = gridWidthRef.current;
     gantt.config.order_branch = "marker"; // rader kan dras i rutnätet för att byta plats ...
@@ -417,6 +423,19 @@ export function DhtmlxGantt({ store, items, deps, zoom, onError, onPersisted, re
         return true;
       }, {}),
       gantt.attachEvent("onBeforeTaskDrag", (id) => (gantt.getTask(id) as unknown as { kind: string }).kind !== "epic", {}),
+      (gantt.attachEvent as unknown as (n: string, f: (id: string | number, mode: string, task: Task, original: Task) => void, c: object) => string)("onTaskDrag", (_id, mode, task, original) => {
+        const os = original.start_date as Date, oe = original.end_date as Date;
+        if (mode === "move") {
+          const days = Math.max(0, Math.round(diffDays(fromLocalDate(os), fromLocalDate(oe))));
+          const s = nearestDay(task.start_date as Date);
+          task.start_date = s; task.end_date = new Date(s.getFullYear(), s.getMonth(), s.getDate() + days);
+        } else if (mode === "resize") {
+          const startMoved = (task.start_date as Date).getTime() !== os.getTime();
+          if (startMoved) task.start_date = nearestDay(task.start_date as Date); else task.end_date = nearestDay(task.end_date as Date);
+          const s = task.start_date as Date, e = task.end_date as Date;
+          if (e.getTime() <= s.getTime()) { if (startMoved) task.start_date = new Date(e.getFullYear(), e.getMonth(), e.getDate() - 1); else task.end_date = new Date(s.getFullYear(), s.getMonth(), s.getDate() + 1); }
+        }
+      }, {}),
       gantt.attachEvent("onAfterTaskDrag", (id) => {
         const t = gantt.getTask(id);
         const patch = datePatch(known.current, String(id), t.start_date, t.end_date);

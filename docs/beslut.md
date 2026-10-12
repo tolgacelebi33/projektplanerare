@@ -526,3 +526,7 @@ Användaren: verktyget ska kunna användas, inga nya funktioner nu. Åtgärder:
 - Gruppens siffra räknar alla tillfällen även när serier visas som en rad.
 - Tidigare i dag: markering av alla tillfällen i en serie, kalender i dialog, flaky UX12.
 Testat: tests/persist.test.ts (2 nya), e2e SD8.
+
+## 2026-10-12: Dragning snappar till närmaste hela dag i alla zoomlägen
+
+Användaren: förstora och förminska staplar snappar inte rätt. Mätning (e2e, pekaren flyttad i kvartsdagssteg): bibliotekets egen avrundning gick efter skalans enhet. I månadsvyn gjorde vänsterkanten ingenting alls inom fem dagars dragning, i vecko- och månadsvyn hoppade högerkanten flera dagar åt gången, och i dagvyn rundades det nedåt. Beslut: `round_dnd_dates` är av och avrundningen görs i `onTaskDrag` till närmaste hela dag (från klockan 12 uppåt), för högerkant, vänsterkant och flytt (längden bevaras, minst en dag). Datumen i verktyget är hela dagar, så en finare snap behövs inte. Testat: e2e/snap.spec.ts i alla tre zoomlägen (föll på månadsvyn före rättningen), övriga dragtester (41) går igenom. Obs: bibliotekets egna regel att en dragning startar först efter 50 ms eller 20 px syns bara i tester med låst klocka (Date.now står still); snap-testet kör därför med riktig klocka. Overifierat: känslan i din egen webbläsare (Safari); testat i Chromium.
