@@ -50,7 +50,7 @@ function treeOrder(items: Item[]): string[] {
 
 export interface ContextArgs { id: string | null; x: number; y: number; date: ISODate | null }
 
-export function DhtmlxGantt({ store, items, deps, zoom, onError, onPersisted, revealId, onNotice, onCreateAt, onRename, onContext, onToggleDone, onMoveRow, onAddInGroup, onEditField, onSelect, selected, touchMode, fieldDefs, gridWidth, columns, users, collapse, colors, todayToken, seriesMarks, onOpenItem, baseline, columnWidths, onResizeColumn, statuses, critical }: {
+export function DhtmlxGantt({ store, items, deps, zoom, onError, onPersisted, revealId, onNotice, onCreateAt, onRename, onContext, onToggleDone, onMoveRow, onAddInGroup, onEditField, onSelect, selected, touchMode, fieldDefs, gridWidth, columns, users, collapse, colors, todayToken, seriesMarks, openId, onOpenItem, baseline, columnWidths, onResizeColumn, statuses, critical }: {
   /** Kritisk linje: poster och länkar som markeras (null: ingen markering). */
   critical?: CriticalResult | null;
   /** Projektets statusar (egna eller grundstatusarna), för statuskolumnen och verktygstipsen. */
@@ -62,6 +62,8 @@ export function DhtmlxGantt({ store, items, deps, zoom, onError, onPersisted, re
   baseline?: Baseline | null;
   /** Serier som visas som en rad: raden (id) och de andra tillfällena, som ritas som romber på raden. */
   seriesMarks?: ReadonlyMap<string, Item[]>;
+  /** Posten som är öppen i panelen (en romb ritas som vald också när den är öppnad utan att vara markerad). */
+  openId?: string | null;
   /** Klick på en romb: öppna det tillfället. */
   onOpenItem?: (id: string) => void;
   /** Markerade rader (flerval). Klick med Ctrl/Cmd växlar, Shift markerar en följd, ett vanligt klick avmarkerar. */
@@ -117,6 +119,8 @@ export function DhtmlxGantt({ store, items, deps, zoom, onError, onPersisted, re
   openItemRef.current = onOpenItem;
   const latest = useRef({ store, onError, workspaceId, onPersisted, onNotice, onCreateAt, onRename, onContext, onToggleDone, onMoveRow, onAddInGroup, onEditField, onSelect, users });
   latest.current = { store, onError, workspaceId, onPersisted, onNotice, onCreateAt, onRename, onContext, onToggleDone, onMoveRow, onAddInGroup, onEditField, onSelect, users };
+  const openIdRef = useRef<string | null>(openId ?? null);
+  openIdRef.current = openId ?? null;
   const selectedRef = useRef<ReadonlySet<string>>(selected ?? new Set());
   selectedRef.current = selected ?? selectedRef.current;
   const gridWidthRef = useRef(gridWidth);
@@ -243,7 +247,7 @@ export function DhtmlxGantt({ store, items, deps, zoom, onError, onPersisted, re
           const d = toLocalDate(m.start);
           const cell = gantt.getTaskPosition(task, d, toLocalDate(addDays(m.start, 1)));
           const b = document.createElement("button");
-          b.type = "button"; b.className = `series-mark st-${m.status}${selectedRef.current.has(m.id) ? " sel" : ""}`; b.dataset.id = m.id; b.dataset.series = repId;
+          b.type = "button"; b.className = `series-mark st-${m.status}${selectedRef.current.has(m.id) || openIdRef.current === m.id ? " sel" : ""}`; b.dataset.id = m.id; b.dataset.series = repId;
           b.style.left = `${(cell.left as number) + (cell.width as number) / 2 - 8}px`;
           b.style.top = `${pos.top + Math.max(0, ((pos.height as number) - 16) / 2)}px`;
           b.title = `${m.title}, ${m.start}`; b.setAttribute("aria-label", `${m.title}, ${m.start}`);
@@ -627,6 +631,7 @@ export function DhtmlxGantt({ store, items, deps, zoom, onError, onPersisted, re
     gantt.render();
   }, [critical]);
   useEffect(() => { const id = requestAnimationFrame(() => { drawMarksRef.current?.(); drawResizersRef.current?.(); }); return () => cancelAnimationFrame(id); }, [mapped, seriesMarks, baseline, gridWidth, columns, columnWidths]);
+  useEffect(() => { drawMarksRef.current?.(); }, [openId]); // en romb som öppnas eller släpps (en annan post öppnas) ritas om direkt
 
   useEffect(() => {
     gantt.config.scales = ZOOM[zoom].scales as never;

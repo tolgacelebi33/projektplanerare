@@ -127,3 +127,28 @@ test("SD5 pilarna i panelen släpper radens egen markering och rullar tidslinjen
   expect(box.x).toBeGreaterThanOrEqual(area.x);
   expect(box.x + box.width).toBeLessThanOrEqual(area.x + area.width); // det valda tillfället syns
 });
+
+test("SD6 ett klick på seriens egen stapel flyttar markeringen från en romb (inte två markerade samtidigt)", async ({ page }) => {
+  await page.setViewportSize({ width: 1472, height: 900 });
+  await page.clock.setFixedTime(new Date("2026-10-11T10:00:00"));
+  await openApp(page, "dhtmlx", { seriesRow: true });
+  await page.getByRole("button", { name: "+ Återkommande milstolpe..." }).click();
+  const d = page.getByRole("dialog", { name: "Återkommande milstolpe" });
+  await d.getByLabel("Titel").fill("Maintenance"); const f = d.locator('input[name="first"]'); await f.fill("2026-10-12"); await f.blur();
+  await d.getByLabel("Återkommer").selectOption("monthly"); await d.getByLabel("Antal tillfällen").fill("6");
+  await d.getByRole("button", { name: "Skapa" }).click();
+  await page.getByRole("button", { name: "Dölj klara" }).click();
+  const repId = await page.evaluate(() => (window as any).__store.listItems("proj_1").then((l: any[]) => l.find((i) => i.title === "Maintenance" && i.start === "2026-10-12").id));
+  await page.evaluate((id) => (window as any).__dhx.showTask(id), repId);
+  const bar = page.locator(`.gantt_task_line[data-task-id="${repId}"] .gantt_task_content`).first();
+  await expect(bar).toBeVisible();
+  const mark = page.locator('.series-mark[title$="2026-12-12"]');
+  await mark.click();
+  await expect(page.locator(".series-mark.sel")).toHaveCount(1);
+  await bar.click();
+  await expect(page.locator(".series-mark.sel")).toHaveCount(0); // romben släpper markeringen
+  await expect(page.locator("aside.panel .occ-pos")).toContainText("1 av 6");
+  await mark.click();
+  await expect(page.locator(".series-mark.sel")).toHaveCount(1);
+  await expect(page.locator("aside.panel .occ-pos")).toContainText("3 av 6");
+});

@@ -123,7 +123,9 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
   const [year, setYear] = useState<number | null>(uiCarry.year ?? null);
   uiCarry.zoom = zoom; uiCarry.view = view; uiCarry.year = year;
   // "Visa serier som en rad": bara listan, tidslinjen och boarden. Kalendern och de andra vyerna visar alla tillfällen.
+  const markIdsRef = useRef<ReadonlySet<string>>(new Set());
   const collapsed = useMemo(() => (settings.collapseSeries && (view === "gantt" || view === "board") ? collapseSeries(shown, todayISO()) : null), [settings.collapseSeries, view, shown]);
+  markIdsRef.current = useMemo(() => (collapsed ? new Set([...collapsed.marks.values()].flat().map((m) => m.id)) : new Set<string>()), [collapsed]);
   const listItems = collapsed?.items ?? shown.items, listDeps = collapsed?.deps ?? shown.deps;
   const [theme, setTheme] = useState<Theme>(getTheme);
   const firstYear = state.kind === "ready" && state.items.length ? Number(state.items.map((i) => i.start).sort()[0].slice(0, 4)) : new Date().getFullYear();
@@ -169,6 +171,9 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
       if (e.metaKey || e.ctrlKey || e.shiftKey) return; // markering av flera rader, inte öppna
       if (Math.hypot(e.clientX - d.x, e.clientY - d.y) > 4) return; // drag, inte klick
       if (itemsRef.current.has(d.id)) setEditId(d.id);
+      // Var en romb (ett dolt tillfälle i en serie) vald släpps den: ett klick på en stapel flyttar valet dit, så att inte två ser valda ut
+      const hidden = markIdsRef.current;
+      if (hidden.size) setSelected((cur) => ([...cur].some((id) => hidden.has(id)) ? new Set() : cur));
     };
     main.addEventListener("pointerdown", onDown, true);
     main.addEventListener("pointerup", onUp, true);
@@ -894,7 +899,7 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
         {state.kind === "ready" && projects.projectId && view === "gantt" && (
           <div className="gantt-wrap">
           <div className="gantt-main">
-          <DhtmlxGantt critical={view === "gantt" ? critical : null} statuses={statusList} fieldDefs={fieldDefs} key={`${theme}-${settings.touch}`} touchMode={settings.touch} selected={selected} onSelect={selectRow} colors={colors} collapse={collapse} gridWidth={gridWidth} columns={columns} columnWidths={colWidths} onResizeColumn={resizeColumn} users={users} onEditField={editField} revealId={reveal} todayToken={todayToken} onPersisted={() => void refresh()}
+          <DhtmlxGantt openId={editId} critical={view === "gantt" ? critical : null} statuses={statusList} fieldDefs={fieldDefs} key={`${theme}-${settings.touch}`} touchMode={settings.touch} selected={selected} onSelect={selectRow} colors={colors} collapse={collapse} gridWidth={gridWidth} columns={columns} columnWidths={colWidths} onResizeColumn={resizeColumn} users={users} onEditField={editField} revealId={reveal} todayToken={todayToken} onPersisted={() => void refresh()}
             onNotice={setWriteError}
             onCreateAt={({ rowId, date }) => void addItem("task", { anchorId: rowId, start: date }).catch(() => undefined)}
             onRename={(id) => { setJustCreated(id); setEditId(id); }}

@@ -507,3 +507,7 @@ Testat: tests/subtasks.test.ts (7), uppdaterade data.test och persist.test, e2e/
 ## 2026-10-12: Markering och rullning när valet byts med pilarna
 
 Fel: när tillfället byttes med pilarna i panelen låg bibliotekets egen markering kvar på radens egen post, och ett valt tillfälle långt bort på tidslinjen syntes inte. Nu släpps radens markering när valet flyttas utanför Gantt, och tidslinjen rullar till det valda tillfället om det ligger utanför. Test SD5 (föll utan rättningen). Overifierat: om det var detta användaren såg.
+
+## 2026-10-12: Ett klick på seriens egen stapel släpper markerad romb
+
+Fel: markerades en romb (ring) och man sedan klickade på radens egen stapel (den som är ett riktigt tillfälle), låg ringen kvar på romben medan panelen visade stapelns tillfälle, så två såg valda ut. Nu släpps markerade rombers val vid ett vanligt klick på en stapel, och en romb ritas som vald också när den är öppen i panelen. Test SD6.
