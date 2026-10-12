@@ -101,3 +101,29 @@ test("SD4 pilarna i panelen går till föregående och nästa tillfälle, är sl
   await page.locator(".gantt_row", { hasText: "Driftsättning" }).locator(".grid-title").click();
   await expect(page.getByRole("group", { name: "Tillfällen i serien" })).toHaveCount(0);
 });
+
+test("SD5 pilarna i panelen släpper radens egen markering och rullar tidslinjen till det valda tillfället", async ({ page }) => {
+  await page.setViewportSize({ width: 1472, height: 900 });
+  await page.clock.setFixedTime(new Date("2026-10-11T10:00:00"));
+  await openApp(page, "dhtmlx", { seriesRow: true });
+  await page.getByRole("button", { name: "Månad" }).click();
+  await page.getByRole("button", { name: "+ Återkommande milstolpe..." }).click();
+  const d = page.getByRole("dialog", { name: "Återkommande milstolpe" });
+  await d.getByLabel("Titel").fill("Styrgrupp"); const f = d.locator('input[name="first"]'); await f.fill("2026-10-12"); await f.blur();
+  await d.getByLabel("Återkommer").selectOption("monthly"); await d.getByLabel("Antal tillfällen").fill("12");
+  await d.getByRole("button", { name: "Skapa" }).click();
+  await page.getByRole("button", { name: "Dölj klara" }).click();
+  await page.locator(".gantt_grid_data").evaluate((e) => e.scrollTo(0, 99999));
+  const row = page.locator(".gantt_row", { hasText: "Styrgrupp" });
+  await row.locator(".grid-title").click();
+  await expect(row).toHaveClass(/gantt_selected|sel-row/);
+  const nav = page.getByRole("group", { name: "Tillfällen i serien" }).first();
+  for (let i = 0; i < 7; i++) await nav.getByRole("button", { name: "Nästa tillfälle" }).click();
+  await expect(nav).toContainText("8 av 12");
+  await expect(row).not.toHaveClass(/gantt_selected|sel-row/); // radens egen markering är släppt
+  const sel = page.locator(".series-mark.sel");
+  await expect(sel).toHaveCount(1);
+  const box = (await sel.boundingBox())!, area = (await page.locator(".gantt_task").first().boundingBox())!;
+  expect(box.x).toBeGreaterThanOrEqual(area.x);
+  expect(box.x + box.width).toBeLessThanOrEqual(area.x + area.width); // det valda tillfället syns
+});

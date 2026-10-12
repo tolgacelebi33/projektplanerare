@@ -503,3 +503,7 @@ Regeländring: tidigare kunde bara en grupp (epic) innehålla andra poster. Nu k
 - Sparad data och gamla filer påverkas inte: regeln blev bara mer tillåtande och ingen befintlig post har en uppgift som förälder. Smart import av CSV/Excel gör fortfarande om en post med innehåll till en grupp (oförändrat), JSON-import tar emot uppgifter som föräldrar.
 - Belastning och rapport räknar både uppgiften och underuppgifterna som poster (som Asana), så timmar kan räknas dubbelt om båda har uppskattning.
 Testat: tests/subtasks.test.ts (7), uppdaterade data.test och persist.test, e2e/subtasks.spec.ts (4).
+
+## 2026-10-12: Markering och rullning när valet byts med pilarna
+
+Fel: när tillfället byttes med pilarna i panelen låg bibliotekets egen markering kvar på radens egen post, och ett valt tillfälle långt bort på tidslinjen syntes inte. Nu släpps radens markering när valet flyttas utanför Gantt, och tidslinjen rullar till det valda tillfället om det ligger utanför. Test SD5 (föll utan rättningen). Overifierat: om det var detta användaren såg.

@@ -652,7 +652,20 @@ export function DhtmlxGantt({ store, items, deps, zoom, onError, onPersisted, re
     const now = selected ?? new Set<string>(), was = drawnSel.current;
     for (const id of new Set([...now, ...was])) if (now.has(id) !== was.has(id) && gantt.isTaskExists(id)) gantt.refreshTask(id);
     drawnSel.current = new Set(now);
+    // Valet kan flyttas utanför Gantt (pilarna i panelen, en romb): bibliotekets egen markering av raden släpps då, så att bara det valda ser valt ut
+    try { const sid = gantt.getSelectedId(); if (sid && now.size && !now.has(String(sid))) gantt.unselectTask(); } catch { /* ingen vald */ }
     drawMarksRef.current?.(); // rombernas markering följer valet
+    // Är det valda ett tillfälle som visas som en romb ska det synas: tidslinjen rullar dit om det ligger utanför
+    if (now.size === 1) {
+      const only = [...now][0];
+      for (const others of marksRef.current.values()) {
+        const m = others.find((x) => x.id === only);
+        if (!m) continue;
+        const st = gantt.getScrollState() as { x: number; inner_width?: number }, x = gantt.posFromDate(toLocalDate(m.start)), w = st.inner_width ?? 0;
+        if (x < (st.x ?? 0) + 20 || x > (st.x ?? 0) + w - 40) gantt.scrollTo(Math.max(0, x - w / 2), null);
+        break;
+      }
+    }
   }, [selected, mapped]);
 
   // Idag-knappen
