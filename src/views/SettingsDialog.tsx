@@ -50,6 +50,7 @@ export function SettingsDialog({ fieldDefs = [], settings, people, projects = []
             <h3>{t.tabs[tab]}</h3>
             {tab === "list" && (<section>
               {check(t.closeOnEmpty, t.closeOnEmptyHint, settings.closeOnEmpty, (v) => set("closeOnEmpty", v))}
+              {check(t.showToday, t.showTodayHint, settings.showToday, (v) => set("showToday", v))}
               {check(t.markUndated, t.markUndatedHint, settings.markUndated, (v) => set("markUndated", v))}
               {check(t.highlightOverdue, t.highlightOverdueHint, settings.highlightOverdue, (v) => set("highlightOverdue", v))}
               {check(t.quickFilters, t.quickFiltersHint, settings.quickFilters, (v) => set("quickFilters", v))}

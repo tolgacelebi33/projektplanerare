@@ -553,3 +553,7 @@ Varje regel i Egna regler har en redigera-knapp (penna) till vänster om kryssen
 ## 2026-10-12: Projektraden högst upp (beslut)
 
 Användaren valde efter förhandsbild (och sa sedan att det bara gäller Standard-temat): projektraden är svart (#000000) med svarta knappar, och text och ramar i sidans bakgrundsfärg (Standard: aluminiumgrå, Ljust: vit). I Mörkt är sidan redan svart, så där används den vanliga textfärgen. Tokens `--project-row-bg` och `--project-row-fg`. Bara projektraden: raderna Vy/Zoom och Filter/Lista är oförändrade. Kontrasttestet CT1 och temafilen går igenom.
+
+## 2026-10-12: Dagens datum i tidslinjen
+
+Beslut (användaren): dagvyn tonar dagens kolumn i kopparrött (token `--today-color`, Svedbergs kopparröd), inte den gamla bruna. Vecko- och månadsvyn tonar ingen kolumn (den vore en hel vecka eller månad) utan har en streckad röd linje mitt på dagens ruta, alltså på exakt dag. Linjen ligger i tidslinjens dataområde (rullar med), tar inga klick (`pointer-events: none`) och ritas om vid zoom, rullning och ändring. Inställningen `showToday` (standard på) slår av båda över alla vyer, i Inställningar (Listvy) och med knappen Visa idag bredvid Zoom, och sparas. Overifierat: att den bara gäller Gantt (Kalender och Min vecka har egna dagsmarkeringar och är oförändrade), och att linjen byts vid midnatt först vid nästa omritning. Test e2e/today.spec.ts (5).

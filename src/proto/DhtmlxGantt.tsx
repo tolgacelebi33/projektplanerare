@@ -75,7 +75,7 @@ function treeOrder(items: Item[]): string[] {
 
 export interface ContextArgs { id: string | null; x: number; y: number; date: ISODate | null }
 
-export function DhtmlxGantt({ store, items, deps, zoom, onError, onPersisted, revealId, onNotice, onCreateAt, onRename, onContext, onToggleDone, onMoveRow, onAddInGroup, onEditField, onSelect, selected, touchMode, fieldDefs, gridWidth, columns, users, collapse, colors, todayToken, seriesMarks, openId, navToken, onOpenItem, baseline, columnWidths, onResizeColumn, statuses, critical }: {
+export function DhtmlxGantt({ store, items, deps, zoom, onError, onPersisted, revealId, onNotice, onCreateAt, onRename, onContext, onToggleDone, onMoveRow, onAddInGroup, onEditField, onSelect, selected, touchMode, fieldDefs, gridWidth, columns, users, collapse, colors, todayToken, seriesMarks, openId, navToken, showToday, onOpenItem, baseline, columnWidths, onResizeColumn, statuses, critical }: {
   /** Kritisk linje: poster och länkar som markeras (null: ingen markering). */
   critical?: CriticalResult | null;
   /** Projektets statusar (egna eller grundstatusarna), för statuskolumnen och verktygstipsen. */
@@ -89,6 +89,8 @@ export function DhtmlxGantt({ store, items, deps, zoom, onError, onPersisted, re
   seriesMarks?: ReadonlyMap<string, Item[]>;
   /** Posten som är öppen i panelen (en romb ritas som vald också när den är öppnad utan att vara markerad). */
   openId?: string | null;
+  /** Markera idag: dagens kolumn i dagvyn, en streckad linje på exakt dag i vecko- och månadsvyn. */
+  showToday?: boolean;
   /** Räknas upp när ett tillfälle i en serie öppnas med pilarna i panelen: då rullas tidslinjen till det om det ligger utanför bild. */
   navToken?: number;
   /** Klick på en romb: öppna det tillfället. */
@@ -132,6 +134,8 @@ export function DhtmlxGantt({ store, items, deps, zoom, onError, onPersisted, re
 }) {
   const host = useRef<HTMLDivElement>(null);
   const known = useRef(new Map<string, Item>());
+  const showTodayRef = useRef(showToday ?? true);
+  showTodayRef.current = showToday ?? true;
   const zoomRef = useRef(zoom);
   zoomRef.current = zoom;
   const workspaceId = items[0]?.workspace_id ?? "";
@@ -306,7 +310,23 @@ export function DhtmlxGantt({ store, items, deps, zoom, onError, onPersisted, re
       }
       host.appendChild(wrap);
     };
-    drawMarksRef.current = drawMarks;
+    // Streckad röd linje på exakt dag i vecko- och månadsvyn (mitt på dagens ruta), ritad i tidslinjens dataområde
+    const drawToday = () => {
+      const area = (gantt as unknown as { $task_data?: HTMLElement }).$task_data;
+      const host2 = (area?.querySelector(".gantt_data_area") as HTMLElement | null) ?? area ?? null;
+      if (!host2) return;
+      host2.querySelectorAll(":scope > .today-line").forEach((e) => e.remove());
+      if (!showTodayRef.current || zoomRef.current === "day") return;
+      const t = new Date(), d0 = new Date(t.getFullYear(), t.getMonth(), t.getDate()), d1 = new Date(t.getFullYear(), t.getMonth(), t.getDate() + 1);
+      const x0 = gantt.posFromDate(d0), x1 = gantt.posFromDate(d1);
+      const st = gantt.getState();
+      if (!Number.isFinite(x0) || !Number.isFinite(x1) || (st.min_date && d0 < st.min_date) || (st.max_date && d0 > st.max_date)) return;
+      const line = document.createElement("div");
+      line.className = "today-line"; line.setAttribute("aria-hidden", "true"); line.title = sv.zoom.todayMark;
+      line.style.cssText = `position:absolute;top:0;height:${Math.max(host2.scrollHeight, area?.scrollHeight ?? 0)}px;left:${(x0 + x1) / 2 - 1}px;`;
+      host2.appendChild(line);
+    };
+    drawMarksRef.current = () => { drawMarks(); drawToday(); };
     // Kolumnrubrikernas kanter går att dra (Community-utgåvan saknar det): ett handtag i varje rubrik. Titeln ändrar rutnätets bredd, de andra sin egen.
     const colOf = (name: string): ColumnId | "title" | null => name === "text" ? "title" : name === "start_date" ? "start" : name === "end_date" ? "end" : name === "progress_pct" ? "progress" : name.startsWith("field_") ? (`f:${name.slice(6)}` as ColumnId) : (COLUMN_ORDER as string[]).includes(name) ? (name as ColumnId) : null;
     const drawResizers = () => {
@@ -345,7 +365,7 @@ export function DhtmlxGantt({ store, items, deps, zoom, onError, onPersisted, re
     drawResizersRef.current = drawResizers;
     const dropKeyFocus = (e: Event) => { if (!(e.target as Element | null)?.closest?.(".col-resizer")) keyFocusRef.current = null; };
     document.addEventListener("pointerdown", dropKeyFocus, true); document.addEventListener("focusin", dropKeyFocus, true);
-    const markEvents = ["onGanttRender", "onGanttReady", "onGridResizeEnd", "onDataRender", "onAfterTaskUpdate", "onAfterTaskAdd", "onAfterTaskDelete", "onGanttScroll"].map((ev) => gantt.attachEvent(ev as never, (() => { drawMarks(); drawResizers(); return true; }) as never));
+    const markEvents = ["onGanttRender", "onGanttReady", "onGridResizeEnd", "onDataRender", "onAfterTaskUpdate", "onAfterTaskAdd", "onAfterTaskDelete", "onGanttScroll"].map((ev) => gantt.attachEvent(ev as never, (() => { drawMarks(); drawToday(); drawResizers(); return true; }) as never));
     gantt.plugins({ tooltip: true });
     gantt.templates.tooltip_text = (start, end, t) => {
       const status = (t as unknown as { status: Status }).status;
@@ -400,12 +420,11 @@ export function DhtmlxGantt({ store, items, deps, zoom, onError, onPersisted, re
     gantt.plugins({ keyboard_navigation: true });
     // Helger skuggas (lördag och söndag), bara när dagar är den minsta enheten
     const weekend = (d: Date) => (zoomRef.current === "day" && (d.getDay() === 0 || d.getDay() === 6) ? "wk-end" : "");
-    // Dagens kolumn tonas: dagen i dagzoom, veckan i veckozoom, månaden i månadszoom
+    // Dagens datum: i dagvyn tonas dagens kolumn i kopparrött. I vecko- och månadsvyn (där en kolumn är en hel vecka eller månad) ritas i stället en streckad linje på exakt dag (drawToday).
     const isToday = (d: Date) => {
+      if (!showTodayRef.current || zoomRef.current !== "day") return false;
       const t = new Date();
-      if (zoomRef.current === "day") return d.getFullYear() === t.getFullYear() && d.getMonth() === t.getMonth() && d.getDate() === t.getDate();
-      if (zoomRef.current === "week") { const end = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 7); return t >= d && t < end; }
-      return d.getFullYear() === t.getFullYear() && d.getMonth() === t.getMonth();
+      return d.getFullYear() === t.getFullYear() && d.getMonth() === t.getMonth() && d.getDate() === t.getDate();
     };
     const cellClass = (d: Date) => `${weekend(d)} ${isToday(d) ? "wk-today" : ""}`.trim();
     gantt.templates.timeline_cell_class = (_t, d) => cellClass(d);
@@ -709,7 +728,7 @@ export function DhtmlxGantt({ store, items, deps, zoom, onError, onPersisted, re
     gantt.config.scales = ZOOM[zoom].scales as never;
     gantt.config.min_column_width = ZOOM[zoom].min;
     gantt.render();
-  }, [zoom, mapped]);
+  }, [zoom, mapped, showToday]);
 
   // Fäll ihop alla eller öppna alla grupper
   const collapseSeen = useRef(collapse?.n ?? 0);

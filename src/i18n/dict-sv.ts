@@ -133,7 +133,7 @@ export const svDict = {
   loading: "Laddar...",
   error: "Något gick fel",
   retry: "Försök igen",
-  zoom: { label: "Zoom", day: "Dag", week: "Vecka", month: "Månad" },
+  zoom: { label: "Zoom", day: "Dag", week: "Vecka", month: "Månad", todayMark: "Visa idag", todayMarkHint: "Markera dagens datum i tidslinjen: i dagvyn dagens kolumn i kopparrött, i vecko- och månadsvyn en streckad röd linje på exakt dag." },
   status: {
     not_started: "Ej påbörjad",
     in_progress: "Pågår",
@@ -287,6 +287,7 @@ export const svDict = {
     boardGroup: "Kolumner i boarden", boardGroupHint: "Vad boardens kolumner är. Går också att byta i verktygsfältet.",
     highlightOverdue: "Markera förfallna poster", highlightOverdueHint: "Förfallna poster får understruket och fetstilt datum i listan, och en markering på korten.", quickFilters: "Visa snabbfilter", quickFiltersHint: "Knappar för Försenade, Denna vecka, Utan ansvarig och Utan datum bredvid sök och filter.",
         closeOnEmpty: "Klick på en tom yta stänger panelen", closeOnEmptyHint: "Klicka på en tom del av skärmen för att stänga panelen och släppa markeringen. Annars stänger du med krysset eller Esc.",
+    showToday: "Markera dagens datum i tidslinjen", showTodayHint: "Dagvyn: dagens kolumn i kopparrött. Vecko- och månadsvyn: en streckad röd linje på exakt dag. Går också att slå av och på med knappen Visa idag bredvid Zoom.",
     markUndated: "Märk poster utan datum", markUndatedHint: "Poster som fått platshållardatum vid import visas streckade och som Ej schemalagda tills du sätter ett datum.",
     startView: "Startvy", startZoom: "Startzoom",
     touch: "Pekläge i tidslinjen", touchAuto: "Automatiskt (rekommenderat)", touchOn: "På: dra med finger", touchOff: "Av",

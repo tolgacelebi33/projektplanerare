@@ -778,6 +778,7 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
               ))}
             </div>
             <button type="button" className="mini" onClick={() => setTodayToken((n) => n + 1)}>{sv.today}</button>
+            <button type="button" className="mini" aria-pressed={settings.showToday} title={sv.zoom.todayMarkHint} onClick={() => setSettings({ ...settings, showToday: !settings.showToday })}>{sv.zoom.todayMark}</button>
           </>
         ) : view === "wheel" ? (
           <>
@@ -900,7 +901,7 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
         {state.kind === "ready" && projects.projectId && view === "gantt" && (
           <div className="gantt-wrap">
           <div className="gantt-main">
-          <DhtmlxGantt navToken={navToken} openId={editId} critical={view === "gantt" ? critical : null} statuses={statusList} fieldDefs={fieldDefs} key={`${theme}-${settings.touch}`} touchMode={settings.touch} selected={selected} onSelect={selectRow} colors={colors} collapse={collapse} gridWidth={gridWidth} columns={columns} columnWidths={colWidths} onResizeColumn={resizeColumn} users={users} onEditField={editField} revealId={reveal} todayToken={todayToken} onPersisted={() => void refresh()}
+          <DhtmlxGantt showToday={settings.showToday} navToken={navToken} openId={editId} critical={view === "gantt" ? critical : null} statuses={statusList} fieldDefs={fieldDefs} key={`${theme}-${settings.touch}`} touchMode={settings.touch} selected={selected} onSelect={selectRow} colors={colors} collapse={collapse} gridWidth={gridWidth} columns={columns} columnWidths={colWidths} onResizeColumn={resizeColumn} users={users} onEditField={editField} revealId={reveal} todayToken={todayToken} onPersisted={() => void refresh()}
             onNotice={setWriteError}
             onCreateAt={({ rowId, date }) => void addItem("task", { anchorId: rowId, start: date }).catch(() => undefined)}
             onRename={(id) => { setJustCreated(id); setEditId(id); }}

@@ -30,6 +30,7 @@
   --sv-svart: #2C2724;
   --svart-ren: #000000; /* ren svart: Mörkt tema */
   --sv-vit: #FFFFFF;
+  --today-color: var(--sv-kopparrod); /* dagens datum i tidslinjen */
   --sv-guld: #CCB163;
   --sv-kopparrod: #BD5E4F;
   --sv-rubinrod: #893849;

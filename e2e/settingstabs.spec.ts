@@ -16,7 +16,7 @@ test("TB1 flikarna står till vänster i rätt ordning, och varje flik visar bar
   expect(box!.x + box!.width).toBeLessThanOrEqual(panel!.x + 1); // fliklisten ligger till vänster om innehållet
   const labels = async () => (await dlg(page).getByRole("tabpanel").locator("label").allInnerTexts()).join("|");
   await expect(dlg(page).getByRole("tab", { name: "Listvy" })).toHaveAttribute("aria-selected", "true");
-  expect(await dlg(page).getByRole("tabpanel").getByRole("checkbox").count()).toBe(6);
+  expect(await dlg(page).getByRole("tabpanel").getByRole("checkbox").count()).toBe(7);
   await expect(dlg(page).getByRole("tabpanel")).not.toContainText("Checklistan styr framsteget");
   await dlg(page).getByRole("tab", { name: "Boardvy" }).click();
   expect(await labels()).toContain("Datum");

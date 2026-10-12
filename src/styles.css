@@ -218,7 +218,6 @@ html, body, #root { height: 100%; margin: 0; }
 .panel-danger { padding-top: 8px; border-top: var(--line-width) solid var(--grid-line); }
 
 /* Dagens kolumn */
-.gantt-host .wk-today, .gantt-host .gantt_task_cell.wk-today { background: color-mix(in srgb, var(--accent) 16%, transparent); }
 
 /* Snabbmeny */
 .ctx-menu { position: fixed; z-index: 20000; min-width: 220px; max-width: 320px; padding: 4px; background: var(--surface); color: var(--text); border: var(--line-width) solid var(--line); border-radius: 8px; box-shadow: 0 8px 28px color-mix(in srgb, var(--sv-svart) 35%, transparent); font-family: var(--font-body); }
@@ -808,3 +807,7 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); opacity: 
 /* Projektraden högst upp, bara i Standard-temat: svart rad, svarta knappar, text och ramar i sidans bakgrundsfärg (tokens --project-row-*) */
 [data-theme="standard"] .project-row { background: var(--project-row-bg); color: var(--project-row-fg); --text: var(--project-row-fg); --line: var(--project-row-fg); --surface: var(--project-row-bg); --surface-alt: var(--project-row-bg); --text-muted: color-mix(in srgb, var(--project-row-fg) 75%, var(--project-row-bg)); --placeholder: color-mix(in srgb, var(--project-row-fg) 75%, var(--project-row-bg)); }
 [data-theme="standard"] .project-row select { background: var(--project-row-bg); color: var(--project-row-fg); }
+
+/* Dagens datum i tidslinjen: kopparrött. Dagvyn tonar dagens kolumn, vecko- och månadsvyn har en streckad linje på exakt dag */
+.gantt-host .wk-today, .gantt-host .gantt_task_cell.wk-today { background: color-mix(in srgb, var(--today-color) 32%, transparent); }
+.gantt-host .today-line { z-index: 2; pointer-events: none; width: 0; border-left: 2px dashed var(--today-color); }
