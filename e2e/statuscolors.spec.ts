@@ -45,3 +45,26 @@ test("SCO2 alla nio färger har läsbar text: kontrast minst 4,5 mellan färg oc
   });
   for (const [id, r] of ratios) expect(r, `${id}: ${r.toFixed(2)}`).toBeGreaterThanOrEqual(4.5);
 });
+
+test("SCO3 färgen gäller också årshjulet och rapporten", async ({ page }) => {
+  await page.getByRole("button", { name: "Statusar..." }).click();
+  await dlg(page).getByLabel("Namn på ny status").fill("Granskning");
+  await dlg(page).getByLabel("Kategori för ny status").selectOption({ label: "Pågår" });
+  await dlg(page).getByRole("button", { name: "Lägg till" }).click();
+  const row = dlg(page).locator("li").filter({ has: page.getByLabel("Namn: Granskning") });
+  await row.getByRole("radio", { name: "Glasblå" }).click();
+  await dlg(page).getByRole("button", { name: "Spara", exact: true }).click();
+  await page.locator('.gantt_row[data-task-id="i10"] .grid-title').click();
+  await page.locator('aside.panel select[name="status"]').selectOption({ label: "◐ Granskning" });
+  await page.keyboard.press("Escape");
+  const v = page.getByRole("group", { name: "Vy" });
+  await v.getByRole("button", { name: "Årshjul" }).click();
+  await expect(page.locator('.wheel-arc[data-id="i10"], .wheel-ms[data-id="i10"]').first()).toHaveAttribute("data-sc", "bla");
+  const fill = await page.locator('.wheel-arc[data-id="i10"] .wheel-shape, .wheel-ms[data-id="i10"] .wheel-shape').first().evaluate((e) => getComputedStyle(e).fill);
+  const probe = await page.evaluate(() => { const d = document.createElement("div"); d.style.background = "var(--sc-bla-bg)"; document.body.appendChild(d); const c = getComputedStyle(d).backgroundColor; d.remove(); return c; });
+  expect(fill.replace(/\s/g, "")).toBe(probe.replace(/\s/g, ""));
+  await v.getByRole("button", { name: "Gantt" }).click();
+  await page.getByLabel("Fler vyer", { exact: true }).selectOption({ label: "Rapport" });
+  await expect(page.locator('.rep-stack .sc-bla')).toHaveCount(1);
+  await expect(page.locator('.rep-legend li[data-status] .rep-dot.sc-bla')).toHaveCount(1);
+});

@@ -903,3 +903,32 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); opacity: 
 .status-swatch { width: 16px; height: 16px; padding: 0; border-radius: 3px; border: var(--line-width) solid var(--line); cursor: pointer; }
 .status-swatch.on { outline: 2px solid var(--text); outline-offset: 1px; }
 .status-swatch:disabled { opacity: 0.25; cursor: default; border-style: solid; }
+
+/* Statusfärger i årshjulet och rapporten */
+.wheel-arc[data-sc="brons"] .wheel-shape, .wheel-ms[data-sc="brons"] .wheel-shape { fill: var(--sc-brons-bg); }
+.wheel-arc[data-sc="brons"] .wheel-text, .wheel-ms[data-sc="brons"] .wheel-no { fill: var(--sc-brons-fg); }
+.rep-stack .sc-brons, .rep-dot.sc-brons { background: var(--sc-brons-bg); }
+.wheel-arc[data-sc="ockra"] .wheel-shape, .wheel-ms[data-sc="ockra"] .wheel-shape { fill: var(--sc-ockra-bg); }
+.wheel-arc[data-sc="ockra"] .wheel-text, .wheel-ms[data-sc="ockra"] .wheel-no { fill: var(--sc-ockra-fg); }
+.rep-stack .sc-ockra, .rep-dot.sc-ockra { background: var(--sc-ockra-bg); }
+.wheel-arc[data-sc="gron"] .wheel-shape, .wheel-ms[data-sc="gron"] .wheel-shape { fill: var(--sc-gron-bg); }
+.wheel-arc[data-sc="gron"] .wheel-text, .wheel-ms[data-sc="gron"] .wheel-no { fill: var(--sc-gron-fg); }
+.rep-stack .sc-gron, .rep-dot.sc-gron { background: var(--sc-gron-bg); }
+.wheel-arc[data-sc="rod"] .wheel-shape, .wheel-ms[data-sc="rod"] .wheel-shape { fill: var(--sc-rod-bg); }
+.wheel-arc[data-sc="rod"] .wheel-text, .wheel-ms[data-sc="rod"] .wheel-no { fill: var(--sc-rod-fg); }
+.rep-stack .sc-rod, .rep-dot.sc-rod { background: var(--sc-rod-bg); }
+.wheel-arc[data-sc="koppar"] .wheel-shape, .wheel-ms[data-sc="koppar"] .wheel-shape { fill: var(--sc-koppar-bg); }
+.wheel-arc[data-sc="koppar"] .wheel-text, .wheel-ms[data-sc="koppar"] .wheel-no { fill: var(--sc-koppar-fg); }
+.rep-stack .sc-koppar, .rep-dot.sc-koppar { background: var(--sc-koppar-bg); }
+.wheel-arc[data-sc="stal"] .wheel-shape, .wheel-ms[data-sc="stal"] .wheel-shape { fill: var(--sc-stal-bg); }
+.wheel-arc[data-sc="stal"] .wheel-text, .wheel-ms[data-sc="stal"] .wheel-no { fill: var(--sc-stal-fg); }
+.rep-stack .sc-stal, .rep-dot.sc-stal { background: var(--sc-stal-bg); }
+.wheel-arc[data-sc="bla"] .wheel-shape, .wheel-ms[data-sc="bla"] .wheel-shape { fill: var(--sc-bla-bg); }
+.wheel-arc[data-sc="bla"] .wheel-text, .wheel-ms[data-sc="bla"] .wheel-no { fill: var(--sc-bla-fg); }
+.rep-stack .sc-bla, .rep-dot.sc-bla { background: var(--sc-bla-bg); }
+.wheel-arc[data-sc="guld"] .wheel-shape, .wheel-ms[data-sc="guld"] .wheel-shape { fill: var(--sc-guld-bg); }
+.wheel-arc[data-sc="guld"] .wheel-text, .wheel-ms[data-sc="guld"] .wheel-no { fill: var(--sc-guld-fg); }
+.rep-stack .sc-guld, .rep-dot.sc-guld { background: var(--sc-guld-bg); }
+.wheel-arc[data-sc="svart"] .wheel-shape, .wheel-ms[data-sc="svart"] .wheel-shape { fill: var(--sc-svart-bg); }
+.wheel-arc[data-sc="svart"] .wheel-text, .wheel-ms[data-sc="svart"] .wheel-no { fill: var(--sc-svart-fg); }
+.rep-stack .sc-svart, .rep-dot.sc-svart { background: var(--sc-svart-bg); }

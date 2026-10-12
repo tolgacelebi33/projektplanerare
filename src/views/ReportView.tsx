@@ -1,3 +1,4 @@
+import { colorOf } from "../data/statusColors";
 import { useMemo } from "react";
 import { projectReport } from "../data/report";
 import type { Item, Project, StatusUpdate, User } from "../data/types";
@@ -38,10 +39,10 @@ export function ReportView({ project, items, users, latest, today, onOpen }: { p
         {r.total === 0 ? <p className="panel-muted">{t.noItems}</p> : (
           <>
             <div className="rep-stack" role="img" aria-label={r.byStatus.filter((s) => s.count).map((s) => `${s.def.name}: ${s.count}`).join(", ")}>
-              {r.byStatus.filter((s) => s.count).map((s) => <span key={s.def.id} className={`st-${s.category}`} style={{ flexGrow: s.count }} title={`${s.def.name}: ${s.count}`} />)}
+              {r.byStatus.filter((s) => s.count).map((s) => <span key={s.def.id} className={`st-${s.category} sc-${colorOf(s.def)}`} style={{ flexGrow: s.count }} title={`${s.def.name}: ${s.count}`} />)}
             </div>
             <ul className="rep-legend">
-              {r.byStatus.map((s) => <li key={s.def.id} data-status={s.def.id}><span className={`rep-dot st-${s.category}`} aria-hidden="true" /> {s.def.name}: <strong>{s.count}</strong> ({Math.round((s.count / r.total) * 100)} %)</li>)}
+              {r.byStatus.map((s) => <li key={s.def.id} data-status={s.def.id}><span className={`rep-dot st-${s.category} sc-${colorOf(s.def)}`} aria-hidden="true" /> {s.def.name}: <strong>{s.count}</strong> ({Math.round((s.count / r.total) * 100)} %)</li>)}
             </ul>
           </>
         )}

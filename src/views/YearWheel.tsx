@@ -1,7 +1,9 @@
+import { colorOf } from "../data/statusColors";
+import { defOf, defaultStatusDefs } from "../data/statuses";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { todayISO } from "../data/dates";
 import { isOverdue } from "../data/rules";
-import type { GroupColor, Item, Status } from "../data/types";
+import type { GroupColor, Item, Status, StatusDef } from "../data/types";
 import { sv } from "../i18n/sv";
 import { STATUS_GLYPH } from "../proto/statusUi";
 import {
@@ -24,7 +26,7 @@ interface Placed {
 }
 interface Band { letter: string; color: GroupColor | null; epic: Item | null; rIn: number; rOut: number; placed: Placed[] }
 
-export function YearWheel({ items, year, colors, selectedId = null, onOpen, onContext }: { items: Item[]; year: number; colors?: ReadonlyMap<string, GroupColor | "none">; selectedId?: string | null; onOpen?: (id: string) => void; onContext?: (a: { id: string | null; x: number; y: number }) => void }) {
+export function YearWheel({ items, year, colors, statuses, selectedId = null, onOpen, onContext }: { items: Item[]; year: number; statuses?: StatusDef[]; colors?: ReadonlyMap<string, GroupColor | "none">; selectedId?: string | null; onOpen?: (id: string) => void; onContext?: (a: { id: string | null; x: number; y: number }) => void }) {
   const [hover, setHover] = useState<string | null>(null);
   const source = useRef<"shape" | "row">("row");
   const legendRef = useRef<HTMLElement>(null);
@@ -123,7 +125,7 @@ export function YearWheel({ items, year, colors, selectedId = null, onOpen, onCo
   if (!count) return <p role="status" className="wheel-empty" onContextMenu={onContextMenu}>{sv.wheel.empty(year)}</p>;
   return (
     <div className="wheel" ref={rootRef} onContextMenu={onContextMenu}>
-      <WheelSvg layout={layout} year={year} size={size} onEnter={onEnterShape} onLeave={onLeave} onToggle={onToggle} />
+      <WheelSvg layout={layout} year={year} size={size} statuses={statuses} onEnter={onEnterShape} onLeave={onLeave} onToggle={onToggle} />
       <WheelLegend bands={bands} legendRef={legendRef} onEnter={onEnterRow} onLeave={onLeave} onToggle={onToggle} />
     </div>
   );
@@ -131,8 +133,8 @@ export function YearWheel({ items, year, colors, selectedId = null, onOpen, onCo
 
 interface Layout { y: YearSpan; bands: Band[]; rMax: number; size: number; todayAngle: number | null; today: string; laneH: number; lanePad: number; roomy: boolean }
 
-const WheelSvg = memo(function WheelSvg({ layout, year, size, onEnter, onLeave, onToggle }: {
-  layout: Layout; year: number; size: number; onEnter: (id: string) => void; onLeave: () => void; onToggle: (id: string) => void;
+const WheelSvg = memo(function WheelSvg({ layout, year, size, statuses, onEnter, onLeave, onToggle }: {
+  layout: Layout; year: number; size: number; statuses?: StatusDef[]; onEnter: (id: string) => void; onLeave: () => void; onToggle: (id: string) => void;
 }) {
   const { y, bands, rMax, todayAngle, today, laneH, lanePad, roomy } = layout;
   const c = size / 2;
@@ -169,7 +171,8 @@ const WheelSvg = memo(function WheelSvg({ layout, year, size, onEnter, onLeave, 
         const status = p.item.status as Status;
         const overdue = isOverdue(p.item, today);
         const tip = `${p.item.title}\n${p.item.start} till ${p.item.end}\n${sv.status[status]}${overdue ? `, ${sv.overdue}` : ""}`;
-        const common = { "data-id": id, "data-status": status, onPointerEnter: () => onEnter(id), onPointerLeave: onLeave, onClick: () => onToggle(id) } as const;
+        const sc = ((d) => (d ? colorOf(d) : null))(defOf(p.item, statuses ?? defaultStatusDefs()));
+        const common = { "data-id": id, "data-status": status, "data-sc": sc ?? undefined, onPointerEnter: () => onEnter(id), onPointerLeave: onLeave, onClick: () => onToggle(id) } as const;
         if (p.item.type === "milestone") {
           const pt = polar(c, c, midR, midA), s = Math.max(3, Math.min(9, laneH / 2 - 1));
           return (
