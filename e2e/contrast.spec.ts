@@ -6,7 +6,7 @@ import { openApp } from "./helpers";
 // i vyerna, panelen, inställningarna, dialogerna, menyn och paletten. Kontrollerar text och ifyllda fält, inte bilder.
 
 const AUDIT = () => {
-  const parse = (c: string) => { const m = c.match(/rgba?\(([^)]+)\)/); if (!m) return null; const p = m[1].split(/[ ,\/]+/).filter(Boolean).map(Number); return { r: p[0], g: p[1], b: p[2], a: p.length > 3 ? p[3] : 1 }; };
+  const parse = (c: string) => { const cm = c.match(/color\(srgb ([^)]+)\)/); if (cm) { const q = cm[1].split(/[ \/]+/).filter(Boolean).map(Number); return { r: q[0] * 255, g: q[1] * 255, b: q[2] * 255, a: q.length > 3 ? q[3] : 1 }; } const m = c.match(/rgba?\(([^)]+)\)/); if (!m) return null; const p = m[1].split(/[ ,\/]+/).filter(Boolean).map(Number); return { r: p[0], g: p[1], b: p[2], a: p.length > 3 ? p[3] : 1 }; };
   const lum = (c: { r: number; g: number; b: number }) => { const f = (v: number) => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); }; return 0.2126 * f(c.r) + 0.7152 * f(c.g) + 0.0722 * f(c.b); };
   const blend = (top: any, bot: any) => ({ r: top.r * top.a + bot.r * (1 - top.a), g: top.g * top.a + bot.g * (1 - top.a), b: top.b * top.a + bot.b * (1 - top.a), a: 1 });
   const bgOf = (el: Element) => { const stack: any[] = []; for (let e: Element | null = el; e; e = e.parentElement) { const c = parse(getComputedStyle(e).backgroundColor); if (c && c.a > 0) { stack.push(c); if (c.a >= 1) break; } } let base: any = { r: 255, g: 255, b: 255, a: 1 }; for (const c of stack.reverse()) base = blend(c, base); return base; };
@@ -20,6 +20,16 @@ const AUDIT = () => {
       const bg0 = bgOf(el), f0 = parse(cs.color)!, ff = blend(f0, bg0), rr = (Math.max(lum(ff), lum(bg0)) + 0.05) / (Math.min(lum(ff), lum(bg0)) + 0.05);
       const k0 = `ctl ${el.tagName}.${(el as HTMLElement).className}|${(el as HTMLInputElement).name ?? ""}`;
       if (rr < 3.2 && !seen.has(k0)) { seen.add(k0); out.push(`${rr.toFixed(2)} ${cs.color} on rgb(${Math.round(bg0.r)},${Math.round(bg0.g)},${Math.round(bg0.b)}) <${el.tagName.toLowerCase()} name="${(el as HTMLInputElement).name}" class="${String((el as HTMLElement).className).slice(0, 30)}"> (kontroll)`); }
+    }
+    // Platshållartext i fält som är tomma, och inaktiva knappar (webbläsarens egna färger är ljusa och går inte att läsa i Standard-temat)
+    if (/^(INPUT|TEXTAREA)$/.test(el.tagName) && (el as HTMLInputElement).placeholder && !(el as HTMLInputElement).value) {
+      const bg0 = bgOf(el), pc = parse(getComputedStyle(el, "::placeholder").color);
+      if (pc) { const ff = blend(pc, bg0), rr = (Math.max(lum(ff), lum(bg0)) + 0.05) / (Math.min(lum(ff), lum(bg0)) + 0.05); const k1 = `ph ${(el as HTMLInputElement).name}|${(el as HTMLElement).className}`; if (rr < 3.2 && !seen.has(k1)) { seen.add(k1); out.push(`${rr.toFixed(2)} platshållare i <${el.tagName.toLowerCase()} name="${(el as HTMLInputElement).name}" class="${String((el as HTMLElement).className).slice(0, 30)}">`); } }
+    }
+    if (el.tagName === "BUTTON" && (el as HTMLButtonElement).disabled && (el.textContent ?? "").trim()) {
+      const bg0 = bgOf(el), f0 = parse(cs.color)!, ff = blend({ ...f0, a: f0.a * Number(cs.opacity) }, bg0), rr = (Math.max(lum(ff), lum(bg0)) + 0.05) / (Math.min(lum(ff), lum(bg0)) + 0.05);
+      const k2 = `dis ${(el.textContent ?? "").trim().slice(0, 14)}|${(el as HTMLElement).className}`;
+      if (rr < 3.2 && !seen.has(k2)) { seen.add(k2); out.push(`${rr.toFixed(2)} inaktiv knapp "${(el.textContent ?? "").trim().slice(0, 20)}" class="${String((el as HTMLElement).className).slice(0, 30)}"`); }
     }
     const own = [...el.childNodes].filter((n) => n.nodeType === 3 && (n.textContent ?? "").trim()).map((n) => (n.textContent ?? "").trim()).join(" ");
     if (!own) continue;

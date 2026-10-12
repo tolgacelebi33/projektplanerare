@@ -4,7 +4,7 @@ import { LIBS, SEL, shotPath } from "./helpers";
 const THEMES = [
   { id: "standard", name: "Standard", bg: "--sv-aluminiumgra", outline: "--sv-svart" },
   { id: "ljust", name: "Ljust", bg: "--sv-vit", outline: "--sv-svart" },
-  { id: "morkt", name: "Mörkt", bg: "--sv-svart", outline: "--sv-vit" },
+  { id: "morkt", name: "Mörkt", bg: "--svart-ren", outline: "--sv-vit" },
 ] as const;
 
 /** Löser en token till en beräknad färg via ett provelement. */

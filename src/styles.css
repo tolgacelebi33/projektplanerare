@@ -205,7 +205,7 @@ html, body, #root { height: 100%; margin: 0; }
 .project-select, .project-input { font: inherit; font-size: 13px; color: var(--text); background: var(--surface-alt); border: var(--line-width) solid var(--line); border-radius: 6px; padding: 4px 8px; min-width: 180px; }
 .project-input:focus-visible, .project-select:focus-visible, .mini:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .mini { font: inherit; font-size: 12px; font-weight: var(--weight-strong); background: transparent; color: var(--text); border: var(--line-width) solid var(--line); border-radius: var(--radius-pill); padding: 3px 12px; cursor: pointer; }
-.mini[disabled] { opacity: 0.45; cursor: default; }
+.mini[disabled], .mini-primary[disabled] { opacity: 1; cursor: default; }
 .mini-danger { background: var(--status-blocked-bg); color: var(--status-blocked-fg); border-color: var(--bar-outline-color); }
 .project-confirm { font-size: 13px; }
 .project-error { font-size: 12px; padding: 2px 8px; border: var(--line-width) solid var(--status-blocked-bg); border-left-width: 4px; border-radius: 4px; }
@@ -224,7 +224,7 @@ html, body, #root { height: 100%; margin: 0; }
 .ctx-menu { position: fixed; z-index: 20000; min-width: 220px; max-width: 320px; padding: 4px; background: var(--surface); color: var(--text); border: var(--line-width) solid var(--line); border-radius: 8px; box-shadow: 0 8px 28px color-mix(in srgb, var(--sv-svart) 35%, transparent); font-family: var(--font-body); }
 .ctx-item { display: block; width: 100%; text-align: left; font: inherit; font-size: 13px; color: var(--text); background: transparent; border: 0; border-radius: 4px; padding: 6px 10px; cursor: pointer; }
 .ctx-item:hover:not([disabled]), .ctx-item:focus-visible { background: var(--row-select); outline: none; }
-.ctx-item[disabled] { opacity: 0.45; cursor: default; }
+.ctx-item[disabled] { opacity: 1; cursor: default; }
 .ctx-danger { text-decoration: underline; text-underline-offset: 2px; }
 .ctx-confirm { padding: 8px 10px; }
 .ctx-confirm p { margin: 0 0 4px; font-size: 13px; }
@@ -784,3 +784,8 @@ span.health-chip { cursor: default; }
 
 /* Datumetikett vid dragning av en stapel */
 .drag-label { position: fixed; z-index: 90; pointer-events: none; padding: 5px 10px; background: var(--text); color: var(--surface); border-radius: var(--radius-pill); font-size: var(--fs-md); font-weight: var(--weight-strong); white-space: nowrap; box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3); font-variant-numeric: tabular-nums; }
+
+/* Inaktiva knappar och platshållartext: egna färger (webbläsarens är nästan vita och går inte att läsa i Standard-temat) */
+button:disabled, .mini[disabled], .mini-primary[disabled], .ctx-item[disabled], .btn[disabled] { opacity: 1; background: transparent; color: var(--text-muted); border-color: var(--text-muted); border-style: dashed; cursor: default; }
+.ctx-item[disabled] { border-style: none; }
+input::placeholder, textarea::placeholder { color: var(--placeholder); opacity: 1; }

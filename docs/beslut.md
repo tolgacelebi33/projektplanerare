@@ -535,3 +535,9 @@ Användaren: förstora och förminska staplar snappar inte rätt. Mätning (e2e,
 
 - En etikett följer pekaren när en stapel dras eller ändras och visar start, slut och antal dagar (milstolpe: bara datumet). Den visar samma värde som sparas, och försvinner vid släpp eller Esc. Test SN-label.
 - Användaren såg rutor med vit text i Standard-temat. En automatisk kontrollkörning (alla synliga texter och ifyllda fält i vyer, panel, inställningar, dialoger, meny, palett, flerval och tooltip) hittade ingen text med kontrast under 3,2 utanför Gantt-staplarna, så den exakta rutan är inte identifierad. Kontrollen finns kvar som test CT1. Overifierat: vilken ruta användaren menar (ber om en bild).
+
+## 2026-10-12: Svart tema, läsbara inaktiva knappar och platshållare
+
+- Mörkt är nu ren svart (beslut efter jämförelse mellan det varmbruna och ett svartare förslag): bakgrund #000000 (`--svart-ren`), mycket mörkgrå ytor, text vit 83 % mot svart (#D4D4D4, nära användarens tidigare val #D5D4D3). Statusfärger och staplars vita text oförändrade. Ordet "Mörkt" i temaväljaren är kvar.
+- Vit text i Standard-temat (användaren visade): platshållartexten i fält i inställningar och dialoger (webbläsarens ljusa standard, kontrast 1,9) och inaktiva knappar som Ångra, Gör om, Lägg till (kontrast 2,1). Nu: platshållare via `--placeholder` överallt, och inaktiva knappar med dämpad textfärg och streckad ram i stället för halv genomskinlighet.
+- Min tidigare kontrollkörning missade detta av två skäl: den räknade bara vanlig text (inte platshållare eller inaktiva knappar), och den hoppade över färger angivna som `color-mix` (webbläsaren ger dem i ett annat format som mitt mätskript inte läste). Båda är rättade i kontrasttestet CT1, som nu även mäter platshållare och inaktiva knappar.
