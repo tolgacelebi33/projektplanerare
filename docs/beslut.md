@@ -511,3 +511,9 @@ Fel: när tillfället byttes med pilarna i panelen låg bibliotekets egen marker
 ## 2026-10-12: Ett klick på seriens egen stapel släpper markerad romb
 
 Fel: markerades en romb (ring) och man sedan klickade på radens egen stapel (den som är ett riktigt tillfälle), låg ringen kvar på romben medan panelen visade stapelns tillfälle, så två såg valda ut. Nu släpps markerade rombers val vid ett vanligt klick på en stapel, och en romb ritas som vald också när den är öppen i panelen. Test SD6.
+
+## 2026-10-12: Alla tillfällen får samma markering, och kalendern i dialogen syns
+
+Fel (återskapat av användaren, flera gånger): med en serie på fyra tillfällen blev alltid ett av dem inte markerat. Det var seriens egen stapel (nästa tillfälle, ett riktigt Gantt-objekt): romberna fick en ram när de valdes, men stapeln fick bara radens markering, och när man bläddrade till den med pilarna i panelen låg den ofta utanför bild (tidslinjen rullade bara till romber). Nu: den öppna posten får samma ram vare sig det är en romb eller seriens egen stapel (klassen `open-item`), tidslinjen rullar till tillfället när man bläddrar med pilarna (`navToken`, så att vanliga klick inte flyttar vyn), och det finns aldrig två ramar samtidigt. Test SD7 (alla fyra tillfällen fram och tillbaka, ram på exakt ett, i bild).
+
+Kalendern i datumfältet i Återkommande-dialogen låg delvis utanför dialogen på låga fönster. Dialogerna är nu högre (mindre marginal upptill) och kalendern rullas in i bild när den öppnas. Test DP600/700/900 (föll på 600 före rättningen).

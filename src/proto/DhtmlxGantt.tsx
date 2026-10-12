@@ -50,7 +50,7 @@ function treeOrder(items: Item[]): string[] {
 
 export interface ContextArgs { id: string | null; x: number; y: number; date: ISODate | null }
 
-export function DhtmlxGantt({ store, items, deps, zoom, onError, onPersisted, revealId, onNotice, onCreateAt, onRename, onContext, onToggleDone, onMoveRow, onAddInGroup, onEditField, onSelect, selected, touchMode, fieldDefs, gridWidth, columns, users, collapse, colors, todayToken, seriesMarks, openId, onOpenItem, baseline, columnWidths, onResizeColumn, statuses, critical }: {
+export function DhtmlxGantt({ store, items, deps, zoom, onError, onPersisted, revealId, onNotice, onCreateAt, onRename, onContext, onToggleDone, onMoveRow, onAddInGroup, onEditField, onSelect, selected, touchMode, fieldDefs, gridWidth, columns, users, collapse, colors, todayToken, seriesMarks, openId, navToken, onOpenItem, baseline, columnWidths, onResizeColumn, statuses, critical }: {
   /** Kritisk linje: poster och länkar som markeras (null: ingen markering). */
   critical?: CriticalResult | null;
   /** Projektets statusar (egna eller grundstatusarna), för statuskolumnen och verktygstipsen. */
@@ -64,6 +64,8 @@ export function DhtmlxGantt({ store, items, deps, zoom, onError, onPersisted, re
   seriesMarks?: ReadonlyMap<string, Item[]>;
   /** Posten som är öppen i panelen (en romb ritas som vald också när den är öppnad utan att vara markerad). */
   openId?: string | null;
+  /** Räknas upp när ett tillfälle i en serie öppnas med pilarna i panelen: då rullas tidslinjen till det om det ligger utanför bild. */
+  navToken?: number;
   /** Klick på en romb: öppna det tillfället. */
   onOpenItem?: (id: string) => void;
   /** Markerade rader (flerval). Klick med Ctrl/Cmd växlar, Shift markerar en följd, ett vanligt klick avmarkerar. */
@@ -191,7 +193,7 @@ export function DhtmlxGantt({ store, items, deps, zoom, onError, onPersisted, re
     gantt.locale.date.month_full = [...sv.dates.monthsFull] as typeof gantt.locale.date.month_full;
     gantt.locale.date.month_short = [...sv.dates.monthsShort] as typeof gantt.locale.date.month_short;
     gantt.templates.link_class = (link) => (criticalRef.current?.links.has(String(link.id)) ? "critical-link" : "");
-    gantt.templates.task_class = (_s, _e, t) => `st-${(t as unknown as { status: Status }).status}${(t as unknown as { kind: string }).kind === "epic" ? " epic" : ""}${(t as unknown as TaskRow).und ? " undated" : ""}${(t as unknown as TaskRow).cr ? " critical" : ""}`;
+    gantt.templates.task_class = (_s, _e, t) => `st-${(t as unknown as { status: Status }).status}${(t as unknown as { kind: string }).kind === "epic" ? " epic" : ""}${(t as unknown as TaskRow).und ? " undated" : ""}${(t as unknown as TaskRow).cr ? " critical" : ""}${openIdRef.current === String(t.id) ? " open-item" : ""}`;
     gantt.templates.grid_row_class = (_s, _e, t) => `${(t as unknown as { kind: string }).kind === "epic" ? "epic-row" : ""} grp-${(t as unknown as TaskRow).color}${(t as unknown as TaskRow).rec ? " has-series" : ""}${(t as unknown as TaskRow).und ? " undated-row" : ""}${(t as unknown as TaskRow).od ? " overdue-row" : ""}${selectedRef.current.has(String(t.id)) ? " sel-row" : ""}`;
     gantt.templates.task_row_class = (_s, _e, t) => `${(t as unknown as { kind: string }).kind === "epic" ? "epic-row" : ""}${selectedRef.current.has(String(t.id)) ? " sel-row" : ""}`;
     gantt.templates.task_row_class = (_s, _e, t) => ((t as unknown as { kind: string }).kind === "epic" ? "epic-row" : "");
@@ -631,7 +633,30 @@ export function DhtmlxGantt({ store, items, deps, zoom, onError, onPersisted, re
     gantt.render();
   }, [critical]);
   useEffect(() => { const id = requestAnimationFrame(() => { drawMarksRef.current?.(); drawResizersRef.current?.(); }); return () => cancelAnimationFrame(id); }, [mapped, seriesMarks, baseline, gridWidth, columns, columnWidths]);
-  useEffect(() => { drawMarksRef.current?.(); }, [openId]); // en romb som öppnas eller släpps (en annan post öppnas) ritas om direkt
+  // Den öppna posten ritas med samma ram som en vald romb, så att valet ser likadant ut vare sig det är en romb eller seriens egen stapel
+  // Öppnas en stapel som ligger utanför bild (till exempel seriens egen stapel med pilarna i panelen) rullar tidslinjen dit. Bara när den öppna posten byts, inte vid varje ändring.
+  useEffect(() => {
+    if (!navToken || !openId || !gantt.isTaskExists(openId)) return;
+    const t = gantt.getTask(openId), st = gantt.getScrollState() as { x: number; inner_width?: number }, x = gantt.posFromDate(t.start_date as Date), w = st.inner_width ?? 0;
+    if (w > 0 && (x < st.x + 20 || x > st.x + w - 40)) gantt.scrollTo(Math.max(0, x - w / 2), null);
+  }, [navToken]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    // Klassen sätts direkt på staplarna (inte med refreshTask: en omritning släppte radens markering när klicket precis gjorts)
+    const apply = () => {
+      const host = (gantt as unknown as { $task_data?: HTMLElement }).$task_data;
+      host?.querySelectorAll(".gantt_task_line.open-item").forEach((e) => e.classList.remove("open-item"));
+      if (openId) host?.querySelector(`.gantt_task_line[data-task-id="${CSS.escape(openId)}"]`)?.classList.add("open-item");
+    };
+    apply();
+    const id = requestAnimationFrame(apply);
+    drawMarksRef.current?.();
+    // Biblioteket ritar om en stapel när dess markering ändras: klassen sätts då på den nya
+    const host = (gantt as unknown as { $task_data?: HTMLElement }).$task_data;
+    let pending = 0;
+    const mo = new MutationObserver(() => { if (!pending) pending = requestAnimationFrame(() => { pending = 0; apply(); }); });
+    if (host) mo.observe(host, { childList: true, subtree: true });
+    return () => { cancelAnimationFrame(id); if (pending) cancelAnimationFrame(pending); mo.disconnect(); };
+  }, [openId, mapped]); // en romb som öppnas eller släpps (en annan post öppnas) ritas om direkt
 
   useEffect(() => {
     gantt.config.scales = ZOOM[zoom].scales as never;

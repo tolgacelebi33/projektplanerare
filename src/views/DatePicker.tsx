@@ -29,6 +29,8 @@ export function DatePicker({ name, value, onValue, onCommit }: {
     document.addEventListener("pointerdown", away, true);
     return () => document.removeEventListener("pointerdown", away, true);
   }, [open]);
+  // Kalendern ska synas utan att man rullar: ligger den delvis utanför (i en dialog som rullar) rullas den in i bild när den öppnas
+  useEffect(() => { if (open) root.current?.querySelector<HTMLElement>(".datepick-pop")?.scrollIntoView({ block: "nearest" }); }, [open]);
   // Fokus på den markerade dagen när kalendern öppnas eller man flyttar med tangentbordet
   useEffect(() => { if (open) grid.current?.querySelector<HTMLElement>('[tabindex="0"]')?.focus({ preventScroll: true }); }, [open, focus]);
 

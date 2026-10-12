@@ -152,3 +152,30 @@ test("SD6 ett klick på seriens egen stapel flyttar markeringen från en romb (i
   await expect(page.locator(".series-mark.sel")).toHaveCount(1);
   await expect(page.locator("aside.panel .occ-pos")).toContainText("3 av 6");
 });
+
+test("SD7 varje tillfälle får samma ram när det är öppet: också seriens egen stapel, och aldrig två samtidigt", async ({ page }) => {
+  await page.setViewportSize({ width: 1472, height: 900 });
+  await page.clock.setFixedTime(new Date("2026-10-11T10:00:00"));
+  await openApp(page, "dhtmlx", { seriesRow: true });
+  await page.getByRole("button", { name: "+ Återkommande milstolpe..." }).click();
+  const d = page.getByRole("dialog", { name: "Återkommande milstolpe" });
+  await d.getByLabel("Titel").fill("M3 Styrgrupp"); const f = d.locator('input[name="first"]'); await f.fill("2026-09-10"); await f.blur();
+  await d.getByLabel("Återkommer").selectOption("quarterly"); await d.getByLabel("Antal tillfällen").fill("4");
+  await d.getByRole("button", { name: "Skapa" }).click();
+  await page.getByRole("button", { name: "Dölj klara" }).click();
+  const rep = await page.evaluate(() => (window as any).__store.listItems("proj_1").then((l: any[]) => l.find((i) => i.title === "M3 Styrgrupp" && i.start === "2026-12-10").id));
+  await page.evaluate((id) => (window as any).__dhx.showTask(id), rep);
+  await page.locator(".gantt_row", { hasText: "M3 Styrgrupp" }).locator(".grid-title").click();
+  const framed = () => page.evaluate(() => document.querySelectorAll(".series-mark.sel, .gantt_task_line.open-item").length);
+  const nav = page.getByRole("group", { name: "Tillfällen i serien" }).first();
+  // fyra tillfällen, bläddra fram och tillbaka: exakt en ram varje gång, och den sitter på rätt tillfälle
+  for (const n of [1, 2, 3, 4, 3, 2, 1]) {
+    for (let i = 0; i < 6; i++) { const t = await nav.innerText(); if (t.includes(`${n} av 4`)) break; await nav.getByRole("button", { name: Number(t.match(/(\d) av/)![1]) < n ? "Nästa tillfälle" : "Föregående tillfälle" }).click(); }
+    await expect(nav).toContainText(`${n} av 4`);
+    await expect.poll(framed).toBe(1);
+    await expect.poll(async () => {
+      const b = await page.locator(".series-mark.sel, .gantt_task_line.open-item").first().boundingBox(), a = await page.locator(".gantt_task").first().boundingBox();
+      return !!b && !!a && b.x >= a.x - 2 && b.x <= a.x + a.width; // och ligger i bild
+    }).toBe(true);
+  }
+});

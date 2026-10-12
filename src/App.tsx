@@ -131,6 +131,7 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
   const firstYear = state.kind === "ready" && state.items.length ? Number(state.items.map((i) => i.start).sort()[0].slice(0, 4)) : new Date().getFullYear();
   const effectiveYear = year ?? firstYear;
   const [editId, setEditId] = useState<string | null>(null);
+  const [navToken, setNavToken] = useState(0);
   // Aktiv grupp: den grupp man senast valde eller skapade (eller vars post man valde). Nya poster hamnar där när inget är valt, som i monday och Asana.
   const [activeGroup, setActiveGroup] = useState<string | null>(null);
   const [panelFocus, setPanelFocus] = useState<"placement" | "pred" | "succ" | null>(null);
@@ -899,7 +900,7 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
         {state.kind === "ready" && projects.projectId && view === "gantt" && (
           <div className="gantt-wrap">
           <div className="gantt-main">
-          <DhtmlxGantt openId={editId} critical={view === "gantt" ? critical : null} statuses={statusList} fieldDefs={fieldDefs} key={`${theme}-${settings.touch}`} touchMode={settings.touch} selected={selected} onSelect={selectRow} colors={colors} collapse={collapse} gridWidth={gridWidth} columns={columns} columnWidths={colWidths} onResizeColumn={resizeColumn} users={users} onEditField={editField} revealId={reveal} todayToken={todayToken} onPersisted={() => void refresh()}
+          <DhtmlxGantt navToken={navToken} openId={editId} critical={view === "gantt" ? critical : null} statuses={statusList} fieldDefs={fieldDefs} key={`${theme}-${settings.touch}`} touchMode={settings.touch} selected={selected} onSelect={selectRow} colors={colors} collapse={collapse} gridWidth={gridWidth} columns={columns} columnWidths={colWidths} onResizeColumn={resizeColumn} users={users} onEditField={editField} revealId={reveal} todayToken={todayToken} onPersisted={() => void refresh()}
             onNotice={setWriteError}
             onCreateAt={({ rowId, date }) => void addItem("task", { anchorId: rowId, start: date }).catch(() => undefined)}
             onRename={(id) => { setJustCreated(id); setEditId(id); }}
@@ -915,7 +916,7 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
       </main>
       {editId && (
         <ItemPanel key="panel" critical={critical} me={settings.me} onMe={(id) => setSettings({ ...settingsRef.current, me: id })} baseline={project?.baseline ?? null} fieldDefs={fieldDefs} onDuplicate={(id) => void doDuplicateItem(id)} onNewSeries={(it, n) => { if (it.recur) { setRecurInit({ title: it.title, kind: it.recur, count: n }); setRecurOpen(true); } }} nextDate={state.kind === "ready" ? (() => { const cur = state.items.find((i) => i.id === editId); if (!cur?.series) return null; const nx = nextOccurrenceIds(state.items, todayISO()); return state.items.find((i) => i.series === cur.series && nx.has(i.id))?.start ?? null; })() : null} features={settings.features} checklistProgress={settings.checklistProgress} store={store} projectId={projects.projectId!} itemId={editId} dataVersion={state.kind === "ready" ? state.items : undefined} autoSelectTitle={editId === justCreated} focusField={panelFocus} onFocusDone={() => setPanelFocus(null)}
-          onClose={() => setEditId(null)} onChanged={() => void refresh()} onAddChild={(pid) => void addItem("task", { anchorId: pid, parentId: pid }).catch(() => undefined)} onOpen={(id) => { if (state.kind === "ready" && state.items.find((i) => i.id === id)?.series) { selAnchor.current = id; setSelected(new Set([id])); } setEditId(id); }} />
+          onClose={() => setEditId(null)} onChanged={() => void refresh()} onAddChild={(pid) => void addItem("task", { anchorId: pid, parentId: pid }).catch(() => undefined)} onOpen={(id) => { if (state.kind === "ready" && state.items.find((i) => i.id === id)?.series) { selAnchor.current = id; setSelected(new Set([id])); setNavToken((n) => n + 1); } setEditId(id); }} />
       )}
       </div>
       {fieldsOpen && project && <FieldsDialog fields={fieldDefs} onSave={(f) => projects.setFields(project.id, f)} onRemove={async (id) => { await removeFieldDef(store, project, id); await projects.reload(project.id); await refresh(); }} onClose={() => setFieldsOpen(false)} />}
