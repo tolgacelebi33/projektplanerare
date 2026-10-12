@@ -804,3 +804,7 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); opacity: 
 .rule-badge { font-size: var(--fs-sm); font-weight: var(--weight-strong); padding: 1px 8px; border: var(--line-width) solid var(--text); border-radius: var(--radius-pill); margin-left: auto; margin-right: 8px; }
 .rule-form.editing { padding: 10px 12px; border: 2px solid var(--text); border-radius: 6px; background: var(--surface-alt); }
 .rule-editing { grid-column: 1 / -1; margin: 0; font-weight: var(--weight-strong); }
+
+/* Projektraden högst upp: svart rad, svarta knappar, text och ramar i sidans bakgrundsfärg (tokens --project-row-*) */
+.project-row { background: var(--project-row-bg); color: var(--project-row-fg); --text: var(--project-row-fg); --line: var(--project-row-fg); --surface: var(--project-row-bg); --surface-alt: var(--project-row-bg); --text-muted: color-mix(in srgb, var(--project-row-fg) 75%, var(--project-row-bg)); --placeholder: color-mix(in srgb, var(--project-row-fg) 75%, var(--project-row-bg)); }
+.project-row select { background: var(--project-row-bg); color: var(--project-row-fg); }
