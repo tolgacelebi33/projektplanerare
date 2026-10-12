@@ -99,3 +99,13 @@ export { expect };
 export async function setDepMode(page: Page, mode: "shift" | "none", project = "proj_1") {
   await page.evaluate(([p, m]) => (window as any).__store.updateProject(p, { dependency_mode: m }), [project, mode]);
 }
+
+/** Byter tema via Inställningar, Start och tema (temaväljaren ligger inte längre i sidhuvudet). */
+export async function chooseTheme(page: Page, name: "Standard" | "Ljust" | "Mörkt" | "Light" | "Dark") {
+  await page.getByRole("button", { name: /^(Inställningar|Settings)$/ }).click();
+  const d = page.getByRole("dialog", { name: /^(Inställningar|Settings)$/ });
+  await d.getByRole("tab", { name: /^(Start och tema|Start and theme)$/ }).click();
+  await d.getByRole("radio", { name }).click();
+  await page.keyboard.press("Escape");
+  await expect(d).toHaveCount(0);
+}

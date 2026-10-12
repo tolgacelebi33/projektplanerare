@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { SEL, dayWidth, dragBar, item, items, openApp, setZoom } from "./helpers";
+import { SEL, dayWidth, dragBar, item, items, openApp, setZoom , chooseTheme } from "./helpers";
 
 const panel = (page: Page) => page.locator("aside.panel");
 const menu = (page: Page) => page.getByRole("menu", { name: "Åtgärder" });
@@ -66,7 +66,7 @@ test.describe("lager och tillstånd", () => {
     await open(); await page.getByRole("button", { name: "Dag", exact: true }).click(); await expect(menu(page)).toHaveCount(0);
     await open(); await page.getByRole("button", { name: "Årshjul", exact: true }).click(); await expect(menu(page)).toHaveCount(0);
     await page.getByRole("button", { name: "Gantt", exact: true }).click(); await page.waitForSelector(".gantt_task_line");
-    await open(); await page.getByRole("radio", { name: "Mörkt" }).click(); await expect(menu(page)).toHaveCount(0);
+    await open(); await chooseTheme(page, "Mörkt"); await expect(menu(page)).toHaveCount(0);
     await open(); await page.setViewportSize({ width: 1400, height: 800 }); await expect(menu(page)).toHaveCount(0);
   });
 

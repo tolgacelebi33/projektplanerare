@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { items, openApp, setZoom } from "./helpers";
+import { items, openApp, setZoom , chooseTheme } from "./helpers";
 
 const langGroup = (page: Page, name: string) => page.getByRole("group", { name });
 const scrollX = (page: Page) => page.evaluate(() => (window as any).__dhx.getScrollState().x as number);
@@ -24,7 +24,7 @@ test("L2 byte till engelska ändrar alla texter, behåller data och val av tema,
   await openApp(page, "dhtmlx");
   const before = await titles(page);
   const n = (await items(page)).length;
-  await page.getByRole("radio", { name: "Mörkt" }).click();
+  await chooseTheme(page, "Mörkt");
   await langGroup(page, "Språk").getByRole("button", { name: "English" }).click();
   await expect(langGroup(page, "Language")).toBeVisible();
   for (const name of ["Undo", "Redo", "Copy", "Import...", "Hide done"]) await expect(page.getByRole("button", { name }).first()).toBeVisible();
@@ -38,7 +38,7 @@ test("L2 byte till engelska ändrar alla texter, behåller data och val av tema,
   expect(await titles(page)).toEqual(before); // posternas egna titlar är användarens text och översätts inte
   await page.reload();
   await expect(langGroup(page, "Language")).toBeVisible();
-  await page.getByRole("radio", { name: "Light" }).click(); // temanamn är också översatta
+  await chooseTheme(page, "Light"); // temanamn är också översatta
   await langGroup(page, "Language").getByRole("button", { name: "Svenska" }).click();
   await expect(page.getByRole("button", { name: "Ångra" })).toBeVisible();
   await expect(page.locator(".gantt_scale_cell").first()).toContainText(/^(januari|februari|mars|april|maj|juni|juli|augusti|september|oktober|november|december) 2026/);
@@ -74,7 +74,7 @@ test("L5 scrollpositionen bevaras vid temabyte och vid språkbyte (vyn hoppar in
   const x0 = await scrollX(page); const y0 = await page.evaluate(() => (window as any).__dhx.getScrollState().y as number);
   expect(x0).toBeGreaterThan(1000);
   for (const t of ["Ljust", "Mörkt", "Standard"]) {
-    await page.getByRole("radio", { name: t }).click();
+    await chooseTheme(page, t as "Ljust" | "Mörkt" | "Standard");
     await page.waitForTimeout(400);
     expect(Math.abs((await scrollX(page)) - x0), `x efter tema ${t}`).toBeLessThanOrEqual(3);
     expect(Math.abs((await page.evaluate(() => (window as any).__dhx.getScrollState().y as number)) - y0), `y efter tema ${t}`).toBeLessThanOrEqual(3);
@@ -84,17 +84,16 @@ test("L5 scrollpositionen bevaras vid temabyte och vid språkbyte (vyn hoppar in
   expect(Math.abs((await scrollX(page)) - x0), "x efter språkbyte").toBeLessThanOrEqual(3);
 });
 
-test("L6 språkväxlaren ligger över temaväljaren, och inget i sidhuvudet flyttar sig vid språkbyte", async ({ page }) => {
+test("L6 sidhuvudet har ingen temaväljare (den ligger under Inställningar), och inget i sidhuvudet flyttar sig vid språkbyte", async ({ page }) => {
   await openApp(page, "dhtmlx");
+  await expect(page.locator(".app-header .swatch")).toHaveCount(0);
   const pos = () => page.evaluate(() => {
     const r = (s: string) => { const b = document.querySelector(s)!.getBoundingClientRect(); return [Math.round(b.left), Math.round(b.top), Math.round(b.width), Math.round(b.height)]; };
-    return { swatch: r('[data-theme-swatch="standard"]'), lang: r(".lang-switch"), header: r(".app-header"), title: r(".app-title") };
+    return { lang: r(".lang-switch"), header: r(".app-header"), title: r(".app-title") };
   });
   const sv = await pos();
-  expect(sv.lang[1]).toBeLessThan(sv.swatch[1]); // över temaväljaren
   await page.getByRole("button", { name: "English" }).click();
   const en = await pos();
-  expect(en.swatch).toEqual(sv.swatch); // färgprickarna står kvar
   expect(en.header).toEqual(sv.header);
   expect(en.title).toEqual(sv.title);
   expect(en.lang[1]).toBe(sv.lang[1]);

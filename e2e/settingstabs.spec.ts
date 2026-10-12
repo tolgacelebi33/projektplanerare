@@ -11,7 +11,7 @@ test.beforeEach(async ({ page }) => {
 });
 
 test("TB1 flikarna står till vänster i rätt ordning, och varje flik visar bara sina inställningar", async ({ page }) => {
-  await expect(tabs(page).getByRole("tab")).toHaveText(["Listvy", "Boardvy", "Fler vyer", "Posten", "Regler", "Påminnelser", "Personer", "Start", "Pekskärm", "Säkerhetskopia", "Information och hjälp"]);
+  await expect(tabs(page).getByRole("tab")).toHaveText(["Listvy", "Boardvy", "Fler vyer", "Posten", "Regler", "Påminnelser", "Personer", "Start och tema", "Pekskärm", "Säkerhetskopia", "Information och hjälp"]);
   const box = await tabs(page).boundingBox(), panel = await dlg(page).getByRole("tabpanel").boundingBox();
   expect(box!.x + box!.width).toBeLessThanOrEqual(panel!.x + 1); // fliklisten ligger till vänster om innehållet
   const labels = async () => (await dlg(page).getByRole("tabpanel").locator("label").allInnerTexts()).join("|");
@@ -25,7 +25,7 @@ test("TB1 flikarna står till vänster i rätt ordning, och varje flik visar bar
   await dlg(page).getByRole("tab", { name: "Posten" }).click();
   await expect(dlg(page).getByLabel("Checklistan styr framsteget")).toBeVisible();
   await expect(dlg(page).getByLabel("Dölj passerade tillfällen i serier")).toBeVisible();
-  await dlg(page).getByRole("tab", { name: "Start" }).click();
+  await dlg(page).getByRole("tab", { name: "Start och tema" }).click();
   await expect(dlg(page).locator('select[name="set-view"]')).toBeVisible();
   await dlg(page).getByRole("tab", { name: "Pekskärm" }).click();
   await expect(dlg(page).locator('select[name="set-touch"]')).toBeVisible();

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { DEFAULT_SETTINGS, MORE_VIEWS, type Settings } from "../settings";
 import type { FieldDef, User } from "../data/types";
 import { sv } from "../i18n/sv";
+import { THEMES, type Theme } from "../theme";
 import { RuleBuilder } from "./RuleBuilder";
 
 /** Inställningar: ändras direkt och sparas i webbläsaren. Esc, Stäng eller klick utanför stänger. */
@@ -14,7 +15,7 @@ export interface InstallApi { available: boolean; installed: boolean; onInstall:
 export interface BackupApi { lastSaved: string | null; onSave: () => Promise<string>; onRestoreFile: (file: File) => Promise<void> }
 export interface PeopleApi { users: User[]; onCapacity: (id: string, hours: number | null) => Promise<void>; onAdd: (name: string) => Promise<void>; onRename: (id: string, name: string) => Promise<void>; onRemove: (id: string) => Promise<number> }
 
-export function SettingsDialog({ fieldDefs = [], settings, people, projects = [], projectId = null, backup, install, onChange, onClose }: { projects?: { id: string; name: string }[]; projectId?: string | null; fieldDefs?: FieldDef[]; settings: Settings; people?: PeopleApi; backup?: BackupApi; install?: InstallApi; onChange: (s: Settings) => void; onClose: () => void }) {
+export function SettingsDialog({ theme, onTheme, fieldDefs = [], settings, people, projects = [], projectId = null, backup, install, onChange, onClose }: { theme?: Theme; onTheme?: (t: Theme) => void; projects?: { id: string; name: string }[]; projectId?: string | null; fieldDefs?: FieldDef[]; settings: Settings; people?: PeopleApi; backup?: BackupApi; install?: InstallApi; onChange: (s: Settings) => void; onClose: () => void }) {
   const root = useRef<HTMLDivElement>(null);
   const [tab, setTab] = useState<Tab>(() => { try { const v = sessionStorage.getItem(TAB0_KEY); return (TABS as readonly string[]).includes(v ?? "") ? (v as Tab) : "list"; } catch { return "list"; } });
   const pick = (t: Tab) => { setTab(t); try { sessionStorage.setItem(TAB0_KEY, t); } catch { /* ignoreras */ } };
@@ -109,6 +110,15 @@ export function SettingsDialog({ fieldDefs = [], settings, people, projects = []
             {tab === "reminders" && <RemindersTab settings={settings} onChange={onChange} />}
             {tab === "people" && people && <PeopleTab api={people} />}
             {tab === "start" && (<section>
+              {theme && onTheme && (
+                <div className="theme-pick" role="radiogroup" aria-label={sv.theme.label}>
+                  <span className="theme-label" aria-hidden="true">{sv.theme.label}</span>
+                  {THEMES.map((th) => (
+                    <button key={th} type="button" role="radio" aria-checked={theme === th} aria-label={sv.theme[th]} title={sv.theme[th]} className="swatch" data-theme-swatch={th} onClick={() => onTheme(th)} />
+                  ))}
+                  <span className="panel-muted">{sv.theme[theme]}</span>
+                </div>
+              )}
               <div className="modal-row settings-row">
                 <label className="panel-field"><span>{t.startView}</span>
                   <select name="set-view" value={settings.startView} onChange={(e) => set("startView", e.target.value as Settings["startView"])}>

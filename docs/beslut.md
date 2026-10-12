@@ -571,3 +571,7 @@ Beslut (användaren): bocken i Gantt-listan går Ej startad -> Pågår -> Klar -
 ## 2026-10-12: Minimera verktygsraderna
 
 Användaren gillade tre varianter (hela området, varje rad för sig, kompakt läge) och kunde inte välja. Byggt: variant 1 med en kvarvarande smal remsa. Knappen − (blir +) längst till höger på projektraden, och tangenten H, minimerar verktygsraderna. Kvar: projektet (rullistan), Vy, Zoom och Idag, Ångra och Gör om. Dolt: projektets knappar (Nytt, Byt namn, Ta bort, Kopiera, Importera, Exportera, Beroenden), Visa idag, Nytt-raden, Filter och Lista. Valet sparas (`toolsMin`). Inte byggt: att fälla varje rad för sig (variant 2) och kompakt läge med mindre knappar (variant 3), så att användaren kan prova och välja. Dokumenterat i kortkommandona. Test TM1-TM4.
+
+## 2026-10-12: Temaväljaren flyttad, statustexten borttagen, minimera-knappen längst till höger
+
+Beslut (användaren): temaväljaren är borttagen ur sidhuvudet och ligger under Inställningar, fliken "Start och tema" (tidigare "Start"). Sidhuvudet blir en rad lägre, vilket ger tidslinjen mer plats. Texten "Sparas i den här webbläsaren" / "Provdata, sparas inte" är borttagen ur projektraden (användaren ville inte ha den), så minimera-knappen (− eller +) ligger längst till höger i båda lägena. Temafärgen för Mörkt-pricken är ren svart som temat. Testerna byter tema via en hjälpfunktion (`chooseTheme`) som går via Inställningar. Overifierat: hur användaren märker att datan inte sparas om lagringen skulle vara blockerad (varningar vid inläsning finns kvar som meddelanden).

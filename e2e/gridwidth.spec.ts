@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { items, openApp } from "./helpers";
+import { items, openApp , chooseTheme } from "./helpers";
 
 const grid = (page: Page) => page.evaluate(() => Math.round(document.querySelector(".gantt_grid")!.getBoundingClientRect().width));
 const handle = (page: Page) => page.getByRole("separator", { name: "Kolumnbredd" });
@@ -45,7 +45,7 @@ test("G3 valet sparas och finns kvar efter omladdning och vid byte av tema", asy
   await openApp(page, "dhtmlx");
   await dragHandle(page, 100);
   const w = await grid(page);
-  await page.getByRole("radio", { name: "Mörkt" }).click(); await page.waitForTimeout(500);
+  await chooseTheme(page, "Mörkt"); await page.waitForTimeout(500);
   expect(Math.abs((await grid(page)) - w)).toBeLessThanOrEqual(2);
   await page.reload(); await page.waitForSelector(".gantt_task_line");
   expect(Math.abs((await grid(page)) - w)).toBeLessThanOrEqual(2);

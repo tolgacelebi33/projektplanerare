@@ -735,13 +735,6 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
           ))}
         </div>
         </div>
-        <div className="theme-switch" role="radiogroup" aria-label={sv.theme.label}>
-          <span className="theme-label" aria-hidden="true">{sv.theme.label}</span>
-          {THEMES.map((t) => (
-            <button key={t} role="radio" aria-checked={theme === t} aria-label={sv.theme[t]} title={sv.theme[t]}
-              className="swatch" data-theme-swatch={t} onClick={() => { rememberScroll(); applyTheme(t); setTheme(t); }} />
-          ))}
-        </div>
         </div>
       </header>
       <div className="toolbar project-row">
@@ -751,7 +744,6 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
             onDuplicate={doDuplicate} onExport={doExport} onImport={doImport} />
         )}
         <button type="button" className="mini tools-toggle" aria-expanded={!settings.toolsMin} aria-label={settings.toolsMin ? sv.tools.show : sv.tools.hide} title={`${settings.toolsMin ? sv.tools.show : sv.tools.hide} (H)`} onClick={() => setSettings({ ...settings, toolsMin: !settings.toolsMin })}>{settings.toolsMin ? "+" : "\u2212"}</button>
-        <span className="lib-tag" title={persistent?.persistGranted === true ? sv.project.persistYes : persistent?.persistGranted === false ? sv.project.persistNo : undefined}>{app.persistent ? sv.project.persisted : sv.project.demo}</span>
       </div>
       <div className="toolbar">
         <span className="toolbar-label keep-narrow">{sv.view.label}</span>
@@ -937,7 +929,7 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
       {statusOpen && project && <StatusDialog project={project} updates={statusUpdates} onClose={() => setStatusOpen(false)} onPublish={async (h, t) => { await store.addStatusUpdate({ project_id: project.id, health: h, text: t }); }} />}
       {paletteOpen && <CommandPalette data={paletteData ?? []} loading={paletteData === null} commands={paletteCommands} onClose={() => setPaletteOpen(false)}
         onOpenItem={(pid, iid) => { openInProject(pid, iid); }} onOpenProject={(pid) => { focusMedianOnNextProject(); projects.select(pid); }} />}
-      {settingsOpen && <SettingsDialog projects={(projects.projects ?? []).map((p) => ({ id: p.id, name: p.name }))} projectId={projects.projectId} fieldDefs={fieldDefs} settings={settings} install={{ available: !!installEvt, installed, onInstall: () => { const e = installEvt; if (!e) return; void e.prompt().then(() => e.userChoice).finally(() => setInstallEvt(null)); } }} backup={{ lastSaved: lastBackup, onSave: saveBackupFile, onRestoreFile: pickBackup }} people={{ users, onCapacity: async (id, h) => { await store.setUserCapacity(id, h); await reloadUsers(); }, onAdd: async (n) => { await store.addUser(n); await reloadUsers(); }, onRename: async (id, n) => { await store.renameUser(id, n); await reloadUsers(); await refresh(); }, onRemove: async (id) => { const n = await store.removeUser(id); await reloadUsers(); await refresh(); setAttrFilter((f) => ({ ...f, assignees: f.assignees.filter((x) => x !== id) })); return n; } }} onChange={setSettings} onClose={() => setSettingsOpen(false)} />}
+      {settingsOpen && <SettingsDialog theme={theme} onTheme={(t) => { rememberScroll(); applyTheme(t); setTheme(t); }} projects={(projects.projects ?? []).map((p) => ({ id: p.id, name: p.name }))} projectId={projects.projectId} fieldDefs={fieldDefs} settings={settings} install={{ available: !!installEvt, installed, onInstall: () => { const e = installEvt; if (!e) return; void e.prompt().then(() => e.userChoice).finally(() => setInstallEvt(null)); } }} backup={{ lastSaved: lastBackup, onSave: saveBackupFile, onRestoreFile: pickBackup }} people={{ users, onCapacity: async (id, h) => { await store.setUserCapacity(id, h); await reloadUsers(); }, onAdd: async (n) => { await store.addUser(n); await reloadUsers(); }, onRename: async (id, n) => { await store.renameUser(id, n); await reloadUsers(); await refresh(); }, onRemove: async (id) => { const n = await store.removeUser(id); await reloadUsers(); await refresh(); setAttrFilter((f) => ({ ...f, assignees: f.assignees.filter((x) => x !== id) })); return n; } }} onChange={setSettings} onClose={() => setSettingsOpen(false)} />}
       {backupPreview && <BackupRestore fileName={backupPreview.file} summary={backupPreview.summary} onCancel={() => setBackupPreview(null)} onConfirm={() => void confirmRestore()} />}
       {recurOpen && <RecurringDialog key={recurInit ? "from" : "new"} today={todayISO()} initial={recurInit ?? undefined} onCreate={(a) => void addSeries(a)} onClose={() => setRecurOpen(false)} />}
       {menu && <ContextMenu x={menu.x} y={menu.y} items={menuItems} confirm={confirmRemove} onPick={(id) => void pickMenu(id)} onClose={() => setMenu(null)} />}

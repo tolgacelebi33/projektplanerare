@@ -202,7 +202,6 @@ test.describe("sparande i webbläsaren (utan ?fixture)", () => {
   const url = "/?latency=0";
   test("U11 exempelprojektet finns första gången, och ändringar, nya poster och projekt överlever omladdning", async ({ page }) => {
     await page.goto(url); await page.waitForSelector(".gantt_task_line");
-    await expect(page.locator(".lib-tag")).toHaveText("Sparas i den här webbläsaren");
     await expect.poll(() => page.evaluate(() => { let n = 0; (window as any).__dhx?.eachTask(() => { n++; }); return n; })).toBe(20); // bibliotekets modell: DOM har bara de rader som ryms i fönstret
     await page.locator(SEL.dhtmlx.bar("i7")).click();
     await panel(page).locator('select[name="status"]').selectOption("done");
@@ -250,7 +249,7 @@ test.describe("sparande i webbläsaren (utan ?fixture)", () => {
 
   test("U14 demoläget (?fixture) sparar inte något", async ({ page }) => {
     await openApp(page, "dhtmlx");
-    await expect(page.locator(".lib-tag")).toHaveText("Provdata, sparas inte");
+    await expect(page.locator(".lib-tag")).toHaveCount(0); // ingen statustext i verktygsraden
     await page.locator(SEL.dhtmlx.bar("i7")).click();
     await panel(page).locator('select[name="status"]').selectOption("done");
     await expect.poll(async () => (await all(page)).length).toBe(20);

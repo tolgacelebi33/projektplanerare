@@ -85,7 +85,8 @@ html, body, #root { height: 100%; margin: 0; }
 .swatch:focus-visible, .seg button:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
 .swatch[data-theme-swatch="standard"] { background: var(--sv-aluminiumgra); }
 .swatch[data-theme-swatch="ljust"] { background: var(--sv-vit); }
-.swatch[data-theme-swatch="morkt"] { background: var(--sv-svart); }
+.swatch[data-theme-swatch="morkt"] { background: var(--svart-ren); }
+.theme-pick { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
 
 .toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 8px 16px; border-bottom: var(--line-width) solid var(--line); background: var(--surface); }
 .toolbar-label { font-family: var(--font-title); font-size: 13px; }

@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { LIBS, SEL, shotPath } from "./helpers";
+import { LIBS, SEL, shotPath , chooseTheme } from "./helpers";
 
 const THEMES = [
   { id: "standard", name: "Standard", bg: "--sv-aluminiumgra", outline: "--sv-svart" },
@@ -28,10 +28,9 @@ for (const lib of LIBS) {
     // Grundläge är Standard
     expect(await page.evaluate(() => document.documentElement.dataset.theme)).toBe("standard");
     for (const t of THEMES) {
-      await page.getByRole("radio", { name: t.name }).click();
+      await chooseTheme(page, t.name as "Standard" | "Ljust" | "Mörkt");
       await page.waitForTimeout(300);
       expect(await page.evaluate(() => document.documentElement.dataset.theme)).toBe(t.id);
-      await expect(page.getByRole("radio", { name: t.name })).toHaveAttribute("aria-checked", "true");
       // Sidans bakgrund följer temat
       const bodyBg = await page.evaluate(() => getComputedStyle(document.body).backgroundColor);
       expect(bodyBg, `${t.id} bakgrund`).toBe(await resolve(page, t.bg));
@@ -95,7 +94,13 @@ test("T2 zoomkontrollen är en segmentkontroll skild från temaväljaren", async
   await page.waitForSelector(SEL.dhtmlx.ready);
   await expect(page.locator('.toolbar .seg[aria-label="Zoom"] button')).toHaveCount(3);
   await expect(page.locator('.toolbar .seg[aria-label="Vy"] button')).toHaveCount(3);
-  await expect(page.locator(".app-header .theme-switch .swatch")).toHaveCount(3);
+  await expect(page.locator(".app-header .swatch")).toHaveCount(0); // temaväljaren ligger under Inställningar, Start och tema
+  await page.getByRole("button", { name: "Inställningar" }).click();
+  const dd = page.getByRole("dialog", { name: "Inställningar" });
+  await dd.getByRole("tab", { name: "Start och tema" }).click();
+  await expect(dd.getByRole("radiogroup", { name: "Tema" }).getByRole("radio")).toHaveCount(3);
+  await expect(dd.getByRole("radio", { name: "Standard" })).toHaveAttribute("aria-checked", "true");
+  await page.keyboard.press("Escape");
   await expect(page.locator(".app-header .seg")).toHaveCount(0);
 });
 
