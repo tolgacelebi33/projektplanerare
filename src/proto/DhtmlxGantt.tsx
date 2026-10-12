@@ -23,6 +23,28 @@ const TYPE: Record<Item["type"], string> = { epic: "task", milestone: "milestone
 /** Närmaste hela dag (lokal midnatt): från klockan 12 rundas uppåt. */
 const nearestDay = (d: Date): Date => { const f = new Date(d.getFullYear(), d.getMonth(), d.getDate()); return d.getTime() - f.getTime() >= 12 * 3600_000 ? new Date(f.getFullYear(), f.getMonth(), f.getDate() + 1) : f; };
 
+/** Datumetikett som följer pekaren medan en stapel dras eller ändras: start och slut (och antal dagar), så att man ser var man hamnar. */
+const dragLabel = (() => {
+  let el: HTMLDivElement | null = null;
+  let x = 0, y = 0;
+  const place = () => { if (el) { el.style.left = `${x + 14}px`; el.style.top = `${y - 34}px`; } };
+  const move = (e: PointerEvent) => { x = e.clientX; y = e.clientY; place(); };
+  const hide = () => { el?.remove(); el = null; document.removeEventListener("pointermove", move, true); document.removeEventListener("pointerup", hide, true); document.removeEventListener("keydown", onKey, true); };
+  const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") hide(); };
+  return {
+    show(text: string) {
+      if (!el) {
+        el = document.createElement("div"); el.className = "drag-label"; el.setAttribute("role", "status"); el.setAttribute("aria-live", "off");
+        document.body.appendChild(el);
+        document.addEventListener("pointermove", move, true); document.addEventListener("pointerup", hide, true); document.addEventListener("keydown", onKey, true);
+      }
+      el.textContent = text; place();
+    },
+    hide,
+  };
+})();
+const isoLocal = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+
 const ZOOM = {
   day: { scales: [{ unit: "month", step: 1, format: "%F %Y" }, { unit: "day", step: 1, format: "%j" }], min: 28 },
   week: { scales: [{ unit: "month", step: 1, format: "%F %Y" }, { unit: "week", step: 1, format: "%j" }], min: 50 },
@@ -435,8 +457,14 @@ export function DhtmlxGantt({ store, items, deps, zoom, onError, onPersisted, re
           const s = task.start_date as Date, e = task.end_date as Date;
           if (e.getTime() <= s.getTime()) { if (startMoved) task.start_date = new Date(e.getFullYear(), e.getMonth(), e.getDate() - 1); else task.end_date = new Date(s.getFullYear(), s.getMonth(), s.getDate() + 1); }
         }
+        if (mode === "move" || mode === "resize") {
+          const s = task.start_date as Date, e = new Date((task.end_date as Date).getFullYear(), (task.end_date as Date).getMonth(), (task.end_date as Date).getDate() - 1);
+          const milestone = (gantt.getTask(_id) as unknown as { type: string }).type === "milestone";
+          dragLabel.show(milestone ? sv.dragLabel.day(isoLocal(s)) : sv.dragLabel.range(isoLocal(s), isoLocal(e), Math.round(diffDays(isoLocal(s), isoLocal(e))) + 1));
+        }
       }, {}),
       gantt.attachEvent("onAfterTaskDrag", (id) => {
+        dragLabel.hide();
         const t = gantt.getTask(id);
         const patch = datePatch(known.current, String(id), t.start_date, t.end_date);
         // Efter sparning hämtas data om: biblioteket räknar själv om epics datum (och tappar milstolpens dag), lagret har rätt värden

@@ -141,6 +141,7 @@ export const svDict = {
     blocked: "Blockerad",
   } satisfies Record<Status, string>,
   theme: { label: "Tema", standard: "Standard", ljust: "Ljust", morkt: "Mörkt" },
+  dragLabel: { range: (s: string, e: string, n: number) => `${s} – ${e} (${n} ${n === 1 ? "dag" : "dagar"})`, day: (d: string) => d },
   link: {
     unsupported: "Beroendet kunde inte skapas: typen är okänd.",
   },

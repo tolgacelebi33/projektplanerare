@@ -136,6 +136,7 @@ export const enDict: Dict = {
   zoom: { label: "Zoom", day: "Day", week: "Week", month: "Month" },
   status: { not_started: "Not started", in_progress: "In progress", done: "Done", blocked: "Blocked" },
   theme: { label: "Theme", standard: "Standard", ljust: "Light", morkt: "Dark" },
+  dragLabel: { range: (s: string, e: string, n: number) => `${s} – ${e} (${n} ${n === 1 ? "day" : "days"})`, day: (d: string) => d },
   link: {
     unsupported: "The dependency could not be created: unknown type.",
   },

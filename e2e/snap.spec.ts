@@ -61,3 +61,33 @@ for (const [zoom, label] of [["day", "Dag"], ["week", "Vecka"], ["month", "Måna
     }
   });
 }
+
+test("SN-label datumetiketten följer dragningen, visar det som sparas, och försvinner när man släpper (eller trycker Esc)", async ({ page }) => {
+  await page.getByRole("button", { name: "Vecka", exact: true }).click();
+  await page.waitForTimeout(300);
+  const ppd = await pxPerDay(page);
+  await reset(page);
+  const bar = page.locator('.gantt_task_line[data-task-id="i14"]');
+  await bar.hover(); await page.waitForTimeout(150);
+  const b = (await bar.boundingBox())!;
+  const x0 = b.x + b.width - 0.5, y = b.y + b.height / 2;
+  await page.mouse.move(x0, y); await page.mouse.down(); await page.waitForTimeout(120);
+  for (let i = 1; i <= 10; i++) { await page.mouse.move(x0 + (3 * ppd * i) / 10, y); await page.waitForTimeout(45); }
+  await page.waitForTimeout(80);
+  const label = page.locator(".drag-label");
+  await expect(label).toBeVisible();
+  await expect(label).toHaveText("2026-04-13 – 2026-04-27 (15 dagar)");
+  await page.mouse.up();
+  await expect(label).toHaveCount(0);
+  expect(await get(page)).toEqual(["2026-04-13", "2026-04-27"]); // etiketten visade det som sparades
+  // Esc släpper etiketten
+  await reset(page);
+  const b2 = (await bar.boundingBox())!;
+  const x1 = b2.x + b2.width - 0.5;
+  await page.mouse.move(x1, y); await page.mouse.down(); await page.waitForTimeout(120);
+  for (let i = 1; i <= 10; i++) { await page.mouse.move(x1 + (2 * ppd * i) / 10, y); await page.waitForTimeout(45); }
+  await expect(page.locator(".drag-label")).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.locator(".drag-label")).toHaveCount(0);
+  await page.mouse.up();
+});

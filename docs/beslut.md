@@ -530,3 +530,8 @@ Testat: tests/persist.test.ts (2 nya), e2e SD8.
 ## 2026-10-12: Dragning snappar till närmaste hela dag i alla zoomlägen
 
 Användaren: förstora och förminska staplar snappar inte rätt. Mätning (e2e, pekaren flyttad i kvartsdagssteg): bibliotekets egen avrundning gick efter skalans enhet. I månadsvyn gjorde vänsterkanten ingenting alls inom fem dagars dragning, i vecko- och månadsvyn hoppade högerkanten flera dagar åt gången, och i dagvyn rundades det nedåt. Beslut: `round_dnd_dates` är av och avrundningen görs i `onTaskDrag` till närmaste hela dag (från klockan 12 uppåt), för högerkant, vänsterkant och flytt (längden bevaras, minst en dag). Datumen i verktyget är hela dagar, så en finare snap behövs inte. Testat: e2e/snap.spec.ts i alla tre zoomlägen (föll på månadsvyn före rättningen), övriga dragtester (41) går igenom. Obs: bibliotekets egna regel att en dragning startar först efter 50 ms eller 20 px syns bara i tester med låst klocka (Date.now står still); snap-testet kör därför med riktig klocka. Overifierat: känslan i din egen webbläsare (Safari); testat i Chromium.
+
+## 2026-10-12: Datumetikett vid dragning, och kontrastkontroll
+
+- En etikett följer pekaren när en stapel dras eller ändras och visar start, slut och antal dagar (milstolpe: bara datumet). Den visar samma värde som sparas, och försvinner vid släpp eller Esc. Test SN-label.
+- Användaren såg rutor med vit text i Standard-temat. En automatisk kontrollkörning (alla synliga texter och ifyllda fält i vyer, panel, inställningar, dialoger, meny, palett, flerval och tooltip) hittade ingen text med kontrast under 3,2 utanför Gantt-staplarna, så den exakta rutan är inte identifierad. Kontrollen finns kvar som test CT1. Overifierat: vilken ruta användaren menar (ber om en bild).

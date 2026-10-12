@@ -780,3 +780,6 @@ span.health-chip { cursor: default; }
 /* En grupps datum räknas ur innehållet: stapeln går inte att dra eller ändra, och ser inte ut som att den går det */
 .dhx-host .gantt_task_line.epic { cursor: default; }
 .dhx-host .gantt_task_line.epic .gantt_task_drag { display: none; }
+
+/* Datumetikett vid dragning av en stapel */
+.drag-label { position: fixed; z-index: 90; pointer-events: none; padding: 5px 10px; background: var(--text); color: var(--surface); border-radius: var(--radius-pill); font-size: var(--fs-md); font-weight: var(--weight-strong); white-space: nowrap; box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3); font-variant-numeric: tabular-nums; }
