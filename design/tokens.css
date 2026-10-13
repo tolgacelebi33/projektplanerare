@@ -69,6 +69,9 @@
   --sc-bla-bg: var(--sv-glasbla); --sc-bla-fg: var(--sv-svart);
   --sc-guld-bg: var(--sv-guld); --sc-guld-fg: var(--sv-svart);
   --sc-svart-bg: var(--sv-svart); --sc-svart-fg: var(--sv-vit);
+  /* Rullister: svart skjutare (Standard och Ljust) på en genomskinlig bana, så att banan har samma färg som ytan bakom. I Mörkt en ljus skjutare, eftersom svart inte syns mot svart. */
+  --scroll-thumb: var(--sv-svart);
+  --scroll-track: transparent;
 
   --line-width: 1px;
   --bar-outline: var(--line-width) solid var(--bar-outline-color);
@@ -177,5 +180,6 @@ body {
   --link-color: color-mix(in srgb, var(--sv-vit) 66%, transparent);
   --accent: var(--sv-guld);
   --bar-outline-color: var(--sv-vit);
+  --scroll-thumb: color-mix(in srgb, var(--sv-vit) 55%, var(--svart-ren));
   --grid-line-solid: #333333; /* vit 14 % över ytan */
 }
