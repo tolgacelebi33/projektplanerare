@@ -176,6 +176,8 @@ const WheelSvg = memo(function WheelSvg({ animate, layout, year, size, statuses,
   animate: boolean; layout: Layout; year: number; size: number; statuses?: StatusDef[]; onEnter: (id: string) => void; onLeave: () => void; onToggle: (id: string) => void; onZoomIn: (m: number) => void; onZoomBack: () => void;
 }) {
   const { y, bands, rMax, todayAngle, today, laneH, lanePad, roomy, ticks, zoom } = layout;
+  // Hela året: ett klick på en månad zoomar till dess kvartal, så det kvartalet markeras (alla tre månaderna) när man pekar eller fokuserar en månad
+  const [hq, setHq] = useState<number | null>(null);
   const c = size / 2;
   // Träffyta: hela körfältets höjd (så att grannfält aldrig täcker varandra) och några dagar extra i sidled, där körfältet har luft
   const hitPath = (p: Placed) => { const da = angleOf(Math.max(0.25, Math.min(3, y.days / 120)), y); return sectorPath(c, c, p.rIn - lanePad / 2, p.rOut + lanePad / 2, p.a0 - da, p.a1 + da); };
@@ -195,17 +197,23 @@ const WheelSvg = memo(function WheelSvg({ animate, layout, year, size, statuses,
             <line className="wheel-grid" x1={p0.x} y1={p0.y} x2={p1.x} y2={p1.y} />
             {canZoom && (
               <path className="wheel-tick-hit" d={sectorPath(c, c, R0 - 34, R0, a0, a1)} role="button" tabIndex={0} aria-label={sv.wheel.zoomIn(zoom.kind === "year" ? `${sv.wheel.quarter(Math.floor(t.m! / 3) + 1)}, ${sv.wheel.monthsLong[t.m!]}` : sv.wheel.monthsLong[t.m!])}
+                onPointerEnter={() => zoom.kind === "year" && setHq(Math.floor(t.m! / 3))} onPointerLeave={() => setHq(null)} onFocus={() => zoom.kind === "year" && setHq(Math.floor(t.m! / 3))} onBlur={() => setHq(null)}
                 onClick={() => onZoomIn(t.m!)} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onZoomIn(t.m!); } }} />
             )}
             <text className="wheel-month" x={mid.x} y={mid.y} textAnchor="middle" dominantBaseline="middle" pointerEvents="none">{label}</text>
           </g>
         );
       })}
+      {zoom.kind === "year" && hq !== null && (() => {
+        const first = ticks[hq * 3], last = ticks[hq * 3 + 2];
+        return <path className="wheel-quarter-hl" data-quarter={hq + 1} pointerEvents="none" d={sectorPath(c, c, R0 - 34, rMax, angleOf(first.s, y), angleOf(last.e, y))} />;
+      })()}
       <circle className="wheel-grid" cx={c} cy={c} r={R0 - 34} fill="none" />
       {zoom.kind !== "year" && <circle className="wheel-center-hit" cx={c} cy={c} r={R0 - 36} role="button" tabIndex={0} aria-label={sv.wheel.back} onClick={onZoomBack} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onZoomBack(); } }} />}
       {bands.map((b, bi) => <circle key={`o${bi}`} className={`wheel-grid${b.color ? " wheel-band-ring" : ""}`} style={b.color ? ({ stroke: `var(--grp-${b.color})` }) : undefined} cx={c} cy={c} r={b.rOut} fill="none" />)}
       <text className="wheel-year" x={c} y={c} textAnchor="middle" dominantBaseline="middle" pointerEvents="none">{zoom.kind === "year" ? year : zoom.kind === "quarter" ? sv.wheel.quarter(zoom.q + 1) : sv.wheel.months[zoom.m]}</text>
       {zoom.kind !== "year" && <text className="wheel-year-sub" x={c} y={c + 24} textAnchor="middle" dominantBaseline="middle" pointerEvents="none">{year}</text>}
+      {zoom.kind === "year" && hq !== null && <text className="wheel-year-sub" x={c} y={c + 24} textAnchor="middle" dominantBaseline="middle" pointerEvents="none">{sv.wheel.quarter(hq + 1)}</text>}
 
       {bands.map((b) => b.placed.map((p) => {
         const id = p.item.id;

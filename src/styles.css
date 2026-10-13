@@ -958,3 +958,6 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); opacity: 
 @keyframes wheel-zoom { from { opacity: 0; transform: scale(0.94); } to { opacity: 1; transform: scale(1); } }
 .wheel-anim { animation: wheel-zoom 0.2s ease-out; transform-origin: center; }
 @media (prefers-reduced-motion: reduce) { .wheel-anim { animation: none; } }
+
+/* Hela året: kvartalet som ett klick på en månad zoomar till markeras (alla tre månaderna, genom alla ringar) */
+.wheel-quarter-hl { fill: color-mix(in srgb, var(--text) 9%, transparent); stroke: var(--text); stroke-width: 1.5; stroke-dasharray: 5 4; pointer-events: none; }

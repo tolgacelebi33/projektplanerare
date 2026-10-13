@@ -111,3 +111,31 @@ test("WZ6 posterna går att peka på och öppna när hjulet är inzoomat, och en
   await expect(page.getByRole("status").filter({ hasText: "Inga poster under Kv 4 2026." })).toBeVisible();
   await expect(nav(page).getByRole("button", { name: "Zooma ut" })).toBeVisible(); // går att komma tillbaka även från en tom period
 });
+
+test("WZ7 i helårsläget markeras hela kvartalet när man pekar eller fokuserar en månad, eftersom ett klick zoomar till kvartalet", async ({ page }) => {
+  const hl = page.locator(".wheel-quarter-hl");
+  await expect(hl).toHaveCount(0);
+  const b = (await page.locator('g:has(> .wheel-tick-hit[aria-label="Zooma in på Kv 2, maj"]) > text.wheel-month').boundingBox())!;
+  await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2); // maj, mittenmånaden i Kv 2
+  await expect(hl).toHaveCount(1);
+  await expect(hl).toHaveAttribute("data-quarter", "2");
+  // markeringen täcker hela kvartalet: tre månader, alltså ungefär en fjärdedels varv, och sträcker sig genom ringarna
+  const span = await hl.evaluate((e) => { const bb = (e as SVGGraphicsElement).getBBox(); return { w: bb.width, h: bb.height }; });
+  const ring = await page.locator(".wheel-svg").evaluate((e) => (e as SVGSVGElement).viewBox.baseVal.width);
+  expect(span.w).toBeGreaterThan(ring * 0.25); // en kvadrant är minst en fjärdedels bredd av hjulet
+  await expect(page.locator(".wheel-year-sub")).toHaveText("Kv 2"); // och namnet visas i mitten
+  await page.mouse.move(5, 5);
+  await expect(hl).toHaveCount(0);
+  // samma vid tangentbordsfokus, och på en annan månad i ett annat kvartal
+  await page.locator('.wheel-tick-hit[aria-label="Zooma in på Kv 4, november"]').focus();
+  await expect(hl).toHaveAttribute("data-quarter", "4");
+  await page.locator('.wheel-tick-hit[aria-label="Zooma in på Kv 4, november"]').blur();
+  await expect(hl).toHaveCount(0);
+  // inzoomat finns ingen kvartalsmarkering (där zoomar ett klick till månaden)
+  await page.locator('.wheel-tick-hit[aria-label="Zooma in på Kv 2, april"]').focus();
+  await page.keyboard.press("Enter");
+  await expect(hl).toHaveCount(0);
+  const m = (await page.locator('g:has(> .wheel-tick-hit[aria-label="Zooma in på maj"]) > text.wheel-month').boundingBox())!;
+  await page.mouse.move(m.x + m.width / 2, m.y + m.height / 2);
+  await expect(hl).toHaveCount(0);
+});
