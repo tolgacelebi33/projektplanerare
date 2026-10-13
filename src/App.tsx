@@ -745,6 +745,56 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
         )}
         <button type="button" className="mini tools-toggle" aria-expanded={!settings.toolsMin} aria-label={settings.toolsMin ? sv.tools.show : sv.tools.hide} title={`${settings.toolsMin ? sv.tools.show : sv.tools.hide} (H)`} onClick={() => setSettings({ ...settings, toolsMin: !settings.toolsMin })}>{settings.toolsMin ? "+" : "\u2212"}</button>
       </div>
+      <div className="toolbar list-row">
+        <div className="list-tools" role="group" aria-label={sv.filter.listLabel}>
+          <span className="toolbar-label">{sv.filter.listLabel}</span>
+          <ColumnPicker columns={columns} fieldDefs={fieldDefs} onToggle={toggleColumn} />
+          <button type="button" className="mini" disabled={!project} onClick={() => setFieldsOpen(true)}>{sv.fields.button}</button>
+          <button type="button" className="mini" disabled={!project} onClick={() => setStatusesOpen(true)}>{sv.statuses.button}</button>
+          {project && <SavedViews views={savedViews} current={currentView()} onApply={applyView} onSave={saveView} onRemove={removeView} />}
+          {(view === "gantt" || view === "board") && project && state.kind === "ready" && (
+            <button type="button" className="mini" aria-pressed={settings.collapseSeries} title={sv.recur.collapseHint} onClick={() => setSettings({ ...settings, collapseSeries: !settings.collapseSeries })}>{sv.recur.collapseButton}</button>
+          )}
+          {view === "gantt" && project && state.kind === "ready" && (
+            <button type="button" className="mini" aria-pressed={settings.showCritical} title={sv.critical.hint} onClick={() => setSettings({ ...settings, showCritical: !settings.showCritical })}>{sv.critical.button}</button>
+          )}
+          {view === "gantt" && project && state.kind === "ready" && (
+            <BaselineBar baseline={project.baseline} count={state.items.length} onSave={saveBaseline} onRemove={async () => { await projects.setBaseline(project.id, null); }} />
+          )}
+          {view === "gantt" && (<>
+            <button type="button" className="mini" onClick={() => setCollapse((c) => ({ n: c.n + 1, open: false }))}>{sv.filter.collapseAll}</button>
+            <button type="button" className="mini" onClick={() => setCollapse((c) => ({ n: c.n + 1, open: true }))}>{sv.filter.expandAll}</button>
+          </>)}
+        </div>
+      </div>
+      <div className="toolbar filter-row">
+        <div className={`filter-band${filtering ? " active" : ""}`} role="group" aria-label={sv.filter.label}>
+          <span className="filter-title">{sv.filter.label}{activeFilterCount > 0 && <span className="filter-badge" aria-label={sv.filter.activeCount(activeFilterCount)}>{activeFilterCount}</span>}</span>
+          <input type="search" className="search" aria-label={sv.filter.search} placeholder={sv.filter.placeholder} value={query}
+            onChange={(e) => setQuery(e.target.value)} onKeyDown={(e) => { if (e.key === "Escape") setQuery(""); }} />
+          <button type="button" className="mini" aria-pressed={hideDone} onClick={() => setHideDone((v) => !v)}>{sv.filter.hideDone}</button>
+          <FilterPicker filter={attrFilter} users={users} labels={labelList} fieldDefs={fieldDefs} onChange={setAttrFilter} />
+          {settings.quickFilters && (
+            <div className="quick-filters" role="group" aria-label={sv.qf.label}>
+              {(["overdue", "thisWeek", "noAssignee", "undated"] as const).map((k) => (
+                <button key={k} type="button" className="mini" aria-pressed={quick[k]} onClick={() => setQuick((q) => ({ ...q, [k]: !q[k] }))}>{sv.qf[k]}</button>
+              ))}
+            </div>
+          )}
+          {filterChips.length > 0 && (
+            <ul className="chips filter-chips" aria-label={sv.filter.activeLabel}>
+              {filterChips.map((c) => (
+                <li key={c.key} className="chip">
+                  <span>{c.label}</span>
+                  <button type="button" className="chip-x" aria-label={sv.filter.removeOf(c.label)} onClick={c.remove}>×</button>
+                </li>
+              ))}
+            </ul>
+          )}
+          {filtering && state.kind === "ready" && <span className="toolbar-label" role="status">{sv.filter.count(shown.items.length, state.items.length)}</span>}
+          {filtering && <button type="button" className="mini filter-clear" onClick={clearAllFilters}>{sv.filter.clearAll}</button>}
+        </div>
+      </div>
       <div className="toolbar">
         <span className="toolbar-label keep-narrow">{sv.view.label}</span>
         <div className="seg keep-narrow" role="group" aria-label={sv.view.label}>
@@ -804,54 +854,6 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
         <div className="add-group" role="group" aria-label={sv.history.label}>
           <button type="button" className="mini" disabled={!hist.undo} title={sv.history.undoHint} onClick={() => void travel("undo")}>{sv.history.undo}</button>
           <button type="button" className="mini" disabled={!hist.redo} title={sv.history.redoHint} onClick={() => void travel("redo")}>{sv.history.redo}</button>
-        </div>
-      </div>
-      <div className="toolbar filter-row">
-        <div className={`filter-band${filtering ? " active" : ""}`} role="group" aria-label={sv.filter.label}>
-          <span className="filter-title">{sv.filter.label}{activeFilterCount > 0 && <span className="filter-badge" aria-label={sv.filter.activeCount(activeFilterCount)}>{activeFilterCount}</span>}</span>
-          <input type="search" className="search" aria-label={sv.filter.search} placeholder={sv.filter.placeholder} value={query}
-            onChange={(e) => setQuery(e.target.value)} onKeyDown={(e) => { if (e.key === "Escape") setQuery(""); }} />
-          <button type="button" className="mini" aria-pressed={hideDone} onClick={() => setHideDone((v) => !v)}>{sv.filter.hideDone}</button>
-          <FilterPicker filter={attrFilter} users={users} labels={labelList} fieldDefs={fieldDefs} onChange={setAttrFilter} />
-          {settings.quickFilters && (
-            <div className="quick-filters" role="group" aria-label={sv.qf.label}>
-              {(["overdue", "thisWeek", "noAssignee", "undated"] as const).map((k) => (
-                <button key={k} type="button" className="mini" aria-pressed={quick[k]} onClick={() => setQuick((q) => ({ ...q, [k]: !q[k] }))}>{sv.qf[k]}</button>
-              ))}
-            </div>
-          )}
-          {filterChips.length > 0 && (
-            <ul className="chips filter-chips" aria-label={sv.filter.activeLabel}>
-              {filterChips.map((c) => (
-                <li key={c.key} className="chip">
-                  <span>{c.label}</span>
-                  <button type="button" className="chip-x" aria-label={sv.filter.removeOf(c.label)} onClick={c.remove}>×</button>
-                </li>
-              ))}
-            </ul>
-          )}
-          {filtering && state.kind === "ready" && <span className="toolbar-label" role="status">{sv.filter.count(shown.items.length, state.items.length)}</span>}
-          {filtering && <button type="button" className="mini filter-clear" onClick={clearAllFilters}>{sv.filter.clearAll}</button>}
-        </div>
-        <div className="list-tools" role="group" aria-label={sv.filter.listLabel}>
-          <span className="toolbar-label">{sv.filter.listLabel}</span>
-          <ColumnPicker columns={columns} fieldDefs={fieldDefs} onToggle={toggleColumn} />
-          <button type="button" className="mini" disabled={!project} onClick={() => setFieldsOpen(true)}>{sv.fields.button}</button>
-          <button type="button" className="mini" disabled={!project} onClick={() => setStatusesOpen(true)}>{sv.statuses.button}</button>
-          {project && <SavedViews views={savedViews} current={currentView()} onApply={applyView} onSave={saveView} onRemove={removeView} />}
-          {(view === "gantt" || view === "board") && project && state.kind === "ready" && (
-            <button type="button" className="mini" aria-pressed={settings.collapseSeries} title={sv.recur.collapseHint} onClick={() => setSettings({ ...settings, collapseSeries: !settings.collapseSeries })}>{sv.recur.collapseButton}</button>
-          )}
-          {view === "gantt" && project && state.kind === "ready" && (
-            <button type="button" className="mini" aria-pressed={settings.showCritical} title={sv.critical.hint} onClick={() => setSettings({ ...settings, showCritical: !settings.showCritical })}>{sv.critical.button}</button>
-          )}
-          {view === "gantt" && project && state.kind === "ready" && (
-            <BaselineBar baseline={project.baseline} count={state.items.length} onSave={saveBaseline} onRemove={async () => { await projects.setBaseline(project.id, null); }} />
-          )}
-          {view === "gantt" && (<>
-            <button type="button" className="mini" onClick={() => setCollapse((c) => ({ n: c.n + 1, open: false }))}>{sv.filter.collapseAll}</button>
-            <button type="button" className="mini" onClick={() => setCollapse((c) => ({ n: c.n + 1, open: true }))}>{sv.filter.expandAll}</button>
-          </>)}
         </div>
       </div>
       {(view === "gantt" || view === "board") && selected.size > 0 && state.kind === "ready" && (

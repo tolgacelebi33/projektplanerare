@@ -573,6 +573,7 @@ input[type="checkbox"]:disabled, input[type="radio"]:disabled { border-style: da
 
 /* Filterraden: ett eget, tydligt avgränsat band med rubriken Filter (som Asana och monday visar aktiva filter som chips med "rensa alla") */
 .filter-row { align-items: flex-start; background: var(--surface-alt); }
+.list-row { background: var(--surface-alt); } /* Lista ligger i en egen rad (ordning uppifrån: Projekt, Lista, Filter, Vy), vyraden närmast Gantt */
 .filter-band { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; padding: 5px 12px 5px 14px; background: var(--surface); border: var(--line-width) solid var(--line); border-radius: 10px; box-shadow: inset 4px 0 0 var(--line); }
 .filter-band { border-color: var(--grid-line); }
 .filter-band.active { border-color: var(--text); background: color-mix(in srgb, var(--text) 9%, var(--surface)); box-shadow: inset 5px 0 0 var(--text); }
@@ -582,7 +583,7 @@ input[type="checkbox"]:disabled, input[type="radio"]:disabled { border-style: da
 .filter-chips .chip { background: var(--surface-alt); box-shadow: none; padding-left: 8px; }
 .list-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; padding: 5px 0; }
 .filter-clear { border-style: dashed; }
-@media (max-width: 700px), (max-height: 520px) { .filter-row { display: none; } .tools-open .filter-row { display: flex; } }
+@media (max-width: 700px), (max-height: 520px) { .filter-row, .list-row { display: none; } .tools-open .filter-row, .tools-open .list-row { display: flex; } }
 
 .people-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
 .people-list li, .people-add { display: flex; gap: 8px; align-items: center; }
@@ -939,5 +940,5 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); opacity: 
 @media (max-width: 700px), (max-height: 520px) { .tools-toggle { display: none !important; } }
 @media (min-width: 701px) and (min-height: 521px) {
   .tools-min .project-bar > *:not(.toolbar-label):not(select.project-select:not(.project-select-sm)) { display: none; }
-  .tools-min .filter-row, .tools-min .min-hide { display: none; }
+  .tools-min .filter-row, .tools-min .list-row, .tools-min .min-hide { display: none; }
 }

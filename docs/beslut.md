@@ -579,3 +579,7 @@ Beslut (användaren): temaväljaren är borttagen ur sidhuvudet och ligger under
 ## 2026-10-13: Tunnare sidhuvud
 
 Användaren: toppen är för tjock. Sidhuvudet är nu 37 px högt (var cirka 72): luften över och under 6 px (var 12), den tomma logotypplatsen 24 px hög (var 48, ingen logotyp påverkas), titeln 18 px (var 22). Länkraden (Hjälp, Sök, Inställningar, SV, EN) bestämmer höjden. Kontrollpunkt: hela sviten kördes efter flytten av temaväljaren (442 gick igenom, 6 föll under en mycket långsam körning på 1,2 timmar och gick igenom när de kördes om för sig).
+
+## 2026-10-13: Ordning på verktygsraderna
+
+Beslut (användaren): vyraden (Vy, Zoom, Nytt, Ångra, Gör om) ligger längst ner, närmast Gantt, och Lista (Kolumner, Egna fält, Statusar, Vyer, Serier som en rad, Kritisk linje, Baslinje) ligger där vyraden låg. Ordning uppifrån: Projekt, Lista, Filter, Vy. Lista är nu en egen rad (`list-row`), tidigare låg den i samma rad som Filter. Minimerat läge döljer Lista och Filter och låter Projekt och Vy vara kvar. Nummer 1 på användarens lista över layoutönskemål.

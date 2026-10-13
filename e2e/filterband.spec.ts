@@ -10,11 +10,13 @@ test.beforeEach(async ({ page }) => {
   await openApp(page, "dhtmlx");
 });
 
-test("FB1 filterraden är ett eget, märkt band under vyraden, avgränsat från listverktygen", async ({ page }) => {
+test("FB1 filterraden är ett eget, märkt band över vyraden (närmast Gantt), under listverktygen och avgränsat från dem", async ({ page }) => {
   await expect(band(page).locator(".filter-title")).toHaveText("Filter");
   const b = (await band(page).boundingBox())!;
   const viewRow = (await page.getByRole("group", { name: "Vy" }).boundingBox())!;
-  expect(b.y).toBeGreaterThan(viewRow.y + viewRow.height - 4); // egen rad under vyraden
+  expect(b.y + b.height).toBeLessThanOrEqual(viewRow.y + 4); // egen rad över vyraden: ordningen uppifrån är Projekt, Lista, Filter, Vy
+  const listRow = (await page.locator(".list-row").boundingBox())!;
+  expect(listRow.y + listRow.height).toBeLessThanOrEqual(b.y + 4); // Lista ligger ovanför Filter
   const st = await band(page).evaluate((e) => { const c = getComputedStyle(e); return { bg: c.backgroundColor, border: c.borderTopWidth, radius: c.borderTopLeftRadius }; });
   expect(st.border).not.toBe("0px"); expect(st.radius).not.toBe("0px"); expect(st.bg).not.toBe("rgba(0, 0, 0, 0)");
   // sök, snabbfilter och Filtrera ligger i bandet, Kolumner med flera ligger utanför, under rubriken Lista

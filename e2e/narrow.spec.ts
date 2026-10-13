@@ -17,7 +17,7 @@ test("N1 sidan rullar inte i sidled och verktygsfälten är hopfällda: bara vy,
   await expect(page.getByRole("group", { name: "Projekt" })).toBeHidden();
   await expect(page.getByRole("button", { name: "Kolumner" })).toBeHidden();
   const header = (await page.locator(".app-header").boundingBox())!;
-  const bars = (await page.locator(".toolbar:not(.project-row)").first().boundingBox())!;
+  const bars = (await page.locator(".toolbar").filter({ has: page.getByRole("group", { name: "Vy" }) }).boundingBox())!;
   const top = (await page.locator(".gantt_grid").boundingBox())!;
   expect(top.y).toBeLessThan(200); // listan börjar högt upp, inte under en halv skärm av verktyg
   expect(header.height + bars.height).toBeLessThan(160);
