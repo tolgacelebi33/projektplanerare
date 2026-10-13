@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { LIBS, SEL, clearWrites, dayWidth, dragBar, item, items, openApp, setZoom, writes, writesFor, type Lib , chooseTheme } from "./helpers";
+import { LIBS, SEL, clearWrites, dayWidth, dragBar, item, items, openApp, setZoom, writes, writesFor, type Lib , chooseTheme , wheelCalendarYear } from "./helpers";
 
 const panel = (page: Page) => page.locator("aside.panel");
 const rowOf = (lib: Lib, id: string) => (lib === "svar" ? `.wx-row[data-id=":${id}"] .wx-text` : `.gantt_row[data-task-id="${id}"] .grid-title`);
@@ -222,7 +222,7 @@ for (const lib of LIBS) {
 test("P11 årshjul: klick öppnar panelen, bågen förblir markerad, ändringar syns i hjulet direkt", async ({ page }) => {
   await page.setViewportSize({ width: 1500, height: 900 });
   await page.clock.setFixedTime(new Date("2026-10-09T10:00:00"));
-  await page.goto("/?view=wheel&fixture=small&latency=0");
+  await wheelCalendarYear(page); await page.goto("/?view=wheel&fixture=small&latency=0");
   await page.waitForSelector(".wheel-svg");
   await clearWrites(page);
   await page.locator('.wheel-legend li[data-id="i10"]').click(); // Prototyp

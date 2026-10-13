@@ -123,6 +123,7 @@ test("C5 sparade vyer: spara, ändra, tillämpa, skriva över med samma namn, oc
   await pop.getByLabel("Namn på vyn").fill("Försenat efter prioritet"); await pop.getByLabel("Namn på vyn").press("Enter");
   await expect.poll(async () => (await project(page)).views?.map((v) => v.name)).toEqual(["Försenat efter prioritet"]);
   await expect(page.getByRole("button", { name: "Vyer: Försenat efter prioritet" })).toBeVisible(); // aktuell vy markeras
+  await page.keyboard.press("Escape"); // listan över vyer ligger nu ovanför filterbandet och täcker det när den är öppen
   // ändra allt
   await page.getByLabel("Gruppera efter", { exact: true }).selectOption("status");
   await page.getByRole("group", { name: "Snabbfilter" }).getByRole("button", { name: "Försenade" }).click();

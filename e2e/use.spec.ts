@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { SEL, items, openApp, setZoom, writes } from "./helpers";
+import { SEL, items, openApp, setZoom, writes , wheelCalendarYear } from "./helpers";
 
 const panel = (page: Page) => page.locator("aside.panel");
 const rows = (page: Page) => page.locator(".gantt_row .grid-title").allTextContents().then((a) => a.map((t) => t.trim()));
@@ -75,7 +75,7 @@ test.describe("skapa", () => {
 
   test("U5 skapa från årshjulet fungerar, och posten syns i förklaringen", async ({ page }) => {
     await page.clock.setFixedTime(new Date("2026-10-09T10:00:00"));
-    await page.goto("/?view=wheel&fixture=small&latency=0"); await page.waitForSelector(".wheel-svg");
+    await wheelCalendarYear(page); await page.goto("/?view=wheel&fixture=small&latency=0"); await page.waitForSelector(".wheel-svg");
     await add(page, "Uppgift");
     await expect(panel(page)).toBeVisible();
     await page.keyboard.type("Från hjulet"); await page.keyboard.press("Enter");

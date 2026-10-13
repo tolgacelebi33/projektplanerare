@@ -373,11 +373,12 @@ export const svDict = {
   qf: { label: "Snabbfilter", overdue: "Försenade", thisWeek: "Denna vecka", noAssignee: "Utan ansvarig", undated: "Utan datum" },
   board: { groupBy: "Gruppera efter", noGroup: "Utan grupp", groups: { status: "Status", assignee: "Ansvarig", priority: "Prioritet", group: "Grupp" }, label: "Board, poster per status", empty: "Inga poster", dragHint: "Dra ett kort till en annan kolumn för att ändra status", cardStatus: (t: string) => `Status för ${t}` },
   year: { label: "År", prev: "Föregående år", next: "Nästa år" },
+  period: { label: "Period", year: "Kalenderår", rolling: "Rullande 12 månader", custom: "Eget", from: "Från", months: "Antal månader", monthsOption: (n: number) => `${n} ${n === 1 ? "månad" : "månader"}` },
   wheel: {
     months: ["jan", "feb", "mar", "apr", "maj", "jun", "jul", "aug", "sep", "okt", "nov", "dec"],
     navLabel: "Zooma i årshjulet", wholeYear: (y: number) => `Hela ${y}`, quarter: (n: number) => `Kv ${n}`,
     monthsLong: ["januari", "februari", "mars", "april", "maj", "juni", "juli", "augusti", "september", "oktober", "november", "december"],
-    stepLabel: "Byt period", prevPeriod: "Föregående period", nextPeriod: "Nästa period", back: "Zooma ut", weekShort: (n: number) => `v${n}`, zoomIn: (label: string) => `Zooma in på ${label}`,
+    noItemsShort: "Inga poster", stepLabel: "Byt period", prevPeriod: "Föregående period", nextPeriod: "Nästa period", back: "Zooma ut", weekShort: (n: number) => `v${n}`, zoomIn: (label: string) => `Zooma in på ${label}`,
     empty: (y: string | number) => `Inga poster under ${y}.`,
     aria: (y: string | number) => `Årshjul för ${y}. Hovra eller fokusera en post i förklaringen för att peka ut den.`,
     legend: "Förklaring",

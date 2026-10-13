@@ -368,11 +368,12 @@ export const enDict: Dict = {
   qf: { label: "Quick filters", overdue: "Overdue", thisWeek: "This week", noAssignee: "No assignee", undated: "No date" },
   board: { groupBy: "Group by", noGroup: "No group", groups: { status: "Status", assignee: "Assignee", priority: "Priority", group: "Group" }, label: "Board, items by status", empty: "No items", dragHint: "Drag a card to another column to change its status", cardStatus: (t: string) => `Status of ${t}` },
   year: { label: "Year", prev: "Previous year", next: "Next year" },
+  period: { label: "Period", year: "Calendar year", rolling: "Rolling 12 months", custom: "Custom", from: "From", months: "Number of months", monthsOption: (n: number) => `${n} ${n === 1 ? "month" : "months"}` },
   wheel: {
     months: ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"],
     navLabel: "Zoom the year wheel", wholeYear: (y: number) => `All of ${y}`, quarter: (n: number) => `Q${n}`,
     monthsLong: ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"],
-    stepLabel: "Change period", prevPeriod: "Previous period", nextPeriod: "Next period", back: "Zoom out", weekShort: (n: number) => `w${n}`, zoomIn: (label: string) => `Zoom in on ${label}`,
+    noItemsShort: "No items", stepLabel: "Change period", prevPeriod: "Previous period", nextPeriod: "Next period", back: "Zoom out", weekShort: (n: number) => `w${n}`, zoomIn: (label: string) => `Zoom in on ${label}`,
     empty: (y: string | number) => `No items in ${y}.`,
     aria: (y: string | number) => `Year wheel for ${y}. Hover or focus an item in the legend to point it out.`,
     legend: "Legend",

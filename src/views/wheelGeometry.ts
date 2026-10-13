@@ -89,44 +89,88 @@ export function textWidth(text: string, fontPx: number): number {
   return text.length * fontPx * 0.56;
 }
 
-/** Inzoomning i årshjulet: hela året, ett kvartal (0 till 3) eller en månad (0 till 11). Perioden fyller då hela hjulet. */
-export type WheelZoom = { kind: "year" } | { kind: "quarter"; q: number } | { kind: "month"; m: number };
+/**
+ * Årshjulets tidsfönster: en startmånad och en längd (1 till 12 månader). Fönstret fyller hela hjulet. Ett kalenderår är fönstret januari, 12 månader,
+ * och "rullande 12 månader" är kvartalet vi är i plus de tre efter.
+ */
+export interface WheelWindow { sy: number; sm: number; months: number }
+export const MAX_WINDOW_MONTHS = 12;
+
+/** Inzoomning inom fönstret: hela fönstret, ett kalenderkvartal (klippt till fönstret) eller en månad. */
+export type WheelZoom = { kind: "year" } | { kind: "quarter"; y: number; q: number } | { kind: "month"; y: number; m: number };
 export const YEAR_ZOOM: WheelZoom = { kind: "year" };
 
 const pad = (n: number) => String(n).padStart(2, "0");
 const isoOf = (y: number, m: number, d: number): ISODate => `${y}-${pad(m + 1)}-${pad(d)}`;
 const lastDay = (y: number, m: number) => new Date(Date.UTC(y, m + 1, 0)).getUTCDate();
+/** Månadsnummer (y*12+m) så att månader går att räkna med över årsgränser. */
+const mi = (y: number, m: number) => y * 12 + m;
+const fromMi = (n: number) => ({ y: Math.floor(n / 12), m: ((n % 12) + 12) % 12 });
+
+export const calendarYearWindow = (year: number): WheelWindow => ({ sy: year, sm: 0, months: 12 });
+/** Rullande 12 månader: kvartalet idag ligger i, och de tre efter. */
+export function rollingWindow(today: ISODate): WheelWindow {
+  const y = Number(today.slice(0, 4)), m = Number(today.slice(5, 7)) - 1;
+  return { sy: y, sm: Math.floor(m / 3) * 3, months: 12 };
+}
+export const isCalendarYear = (w: WheelWindow): boolean => w.sm === 0 && w.months === 12;
+/** Fönstrets sista månad. */
+export const windowEnd = (w: WheelWindow): { y: number; m: number } => fromMi(mi(w.sy, w.sm) + w.months - 1);
+/** Alla månader i fönstret, i ordning. */
+export const windowMonths = (w: WheelWindow): { y: number; m: number }[] => Array.from({ length: w.months }, (_, k) => fromMi(mi(w.sy, w.sm) + k));
+export const shiftWindow = (w: WheelWindow, months: number): WheelWindow => { const n = fromMi(mi(w.sy, w.sm) + months); return { sy: n.y, sm: n.m, months: w.months }; };
+export const sameWindow = (a: WheelWindow, b: WheelWindow): boolean => a.sy === b.sy && a.sm === b.sm && a.months === b.months;
+/** Pilarna i verktygsraden flyttar ett år för ett kalenderår, annars ett kvartal (eller hela fönstret om det är kortare än sex månader). */
+export const windowStep = (w: WheelWindow): number => (isCalendarYear(w) ? 12 : w.months >= 6 ? 3 : w.months);
 
 export interface WheelPeriod { start: ISODate; end: ISODate; span: YearSpan }
 
-/** Perioden (första och sista dag, och spannet som vinklarna räknas på) för en inzoomning. */
-export function periodOf(year: number, z: WheelZoom): WheelPeriod {
-  const [m0, m1] = z.kind === "year" ? [0, 11] : z.kind === "quarter" ? [z.q * 3, z.q * 3 + 2] : [z.m, z.m];
-  const start = isoOf(year, m0, 1), end = isoOf(year, m1, lastDay(year, m1));
+/** Perioden (första och sista dag, och spannet som vinklarna räknas på) för en inzoomning inom ett fönster. Ett kvartal eller en månad klipps till fönstret. */
+export function periodOf(win: WheelWindow, z: WheelZoom): WheelPeriod {
+  const e = windowEnd(win);
+  let a = mi(win.sy, win.sm), b = mi(e.y, e.m);
+  if (z.kind === "quarter") { a = Math.max(a, mi(z.y, z.q * 3)); b = Math.min(b, mi(z.y, z.q * 3 + 2)); }
+  else if (z.kind === "month") { a = Math.max(a, mi(z.y, z.m)); b = Math.min(b, mi(z.y, z.m)); }
+  if (b < a) b = a;
+  const s = fromMi(a), t = fromMi(b);
+  const start = isoOf(s.y, s.m, 1), end = isoOf(t.y, t.m, lastDay(t.y, t.m));
   const startDay = dayNumber(start);
-  return { start, end, span: { year, days: dayNumber(end) - startDay + 1, startDay } };
+  return { start, end, span: { year: s.y, days: dayNumber(end) - startDay + 1, startDay } };
 }
 
-/** Steget in: från hela året till kvartalet som månaden ligger i, därifrån till månaden. I en månad finns inget mer att zooma in på (null). */
-export function zoomInto(z: WheelZoom, m: number): WheelZoom | null {
-  if (z.kind === "year") return { kind: "quarter", q: Math.floor(m / 3) };
-  if (z.kind === "quarter") return { kind: "month", m };
+/** Steget in: från hela fönstret till kalenderkvartalet som månaden ligger i, därifrån till månaden. I en månad finns inget mer att zooma in på (null). */
+export function zoomInto(z: WheelZoom, y: number, m: number): WheelZoom | null {
+  if (z.kind === "year") return { kind: "quarter", y, q: Math.floor(m / 3) };
+  if (z.kind === "quarter") return { kind: "month", y, m };
   return null;
 }
 
-/** Steget ut: från månaden till dess kvartal, därifrån till hela året. */
+/** Steget ut: från månaden till dess kvartal, därifrån till hela fönstret. */
 export function zoomOut(z: WheelZoom): WheelZoom | null {
-  if (z.kind === "month") return { kind: "quarter", q: Math.floor(z.m / 3) };
+  if (z.kind === "month") return { kind: "quarter", y: z.y, q: Math.floor(z.m / 3) };
   if (z.kind === "quarter") return YEAR_ZOOM;
   return null;
 }
 
-/** Nästa eller föregående period på samma nivå, över årsgränsen (kvartal 4 följs av kvartal 1 nästa år). Hela året byter bara år. */
-export function stepZoom(year: number, z: WheelZoom, dir: 1 | -1): { year: number; zoom: WheelZoom } {
-  if (z.kind === "year") return { year: year + dir, zoom: z };
-  if (z.kind === "quarter") { const n = z.q + dir; return n < 0 ? { year: year - 1, zoom: { kind: "quarter", q: 3 } } : n > 3 ? { year: year + 1, zoom: { kind: "quarter", q: 0 } } : { year, zoom: { kind: "quarter", q: n } }; }
-  const n = z.m + dir;
-  return n < 0 ? { year: year - 1, zoom: { kind: "month", m: 11 } } : n > 11 ? { year: year + 1, zoom: { kind: "month", m: 0 } } : { year, zoom: { kind: "month", m: n } };
+/**
+ * Nästa eller föregående period på samma nivå. Hela fönstret flyttas med `windowStep`. Ett kvartal eller en månad flyttas ett kvartal eller en månad, och
+ * ligger den nya perioden utanför fönstret flyttas fönstret (i steg) så att den ryms.
+ */
+export function stepZoom(win: WheelWindow, z: WheelZoom, dir: 1 | -1): { win: WheelWindow; zoom: WheelZoom } {
+  if (z.kind === "year") return { win: shiftWindow(win, dir * windowStep(win)), zoom: z };
+  const n = z.kind === "quarter" ? fromMi(mi(z.y, z.q * 3) + dir * 3) : fromMi(mi(z.y, z.m) + dir);
+  const zoom: WheelZoom = z.kind === "quarter" ? { kind: "quarter", y: n.y, q: Math.floor(n.m / 3) } : { kind: "month", y: n.y, m: n.m };
+  const step = windowStep(win);
+  const first = zoom.kind === "quarter" ? mi(zoom.y, zoom.q * 3) : mi((zoom as { y: number }).y, (zoom as { m: number }).m);
+  const last = zoom.kind === "quarter" ? first + 2 : first;
+  let w = win;
+  for (let guard = 0; guard < 600; guard++) {
+    const e = windowEnd(w);
+    if (first < mi(w.sy, w.sm)) w = shiftWindow(w, -step);
+    else if (last > mi(e.y, e.m)) w = shiftWindow(w, step);
+    else break;
+  }
+  return { win: w, zoom };
 }
 
 /** ISO-veckonummer (vecka 1 är veckan med årets första torsdag). */
@@ -137,17 +181,19 @@ export function isoWeek(s: ISODate): number {
   return 1 + Math.round(((d.getTime() - jan4.getTime()) / 86400000 - 3 + ((jan4.getUTCDay() + 6) % 7)) / 7);
 }
 
-/** Skalan runt hjulet: månader (hela året och kvartal) eller veckor (en månad). `s` och `e` är dagsoffset från periodens start, `e` exklusivt. */
-export interface WheelTick { kind: "month" | "week"; s: number; e: number; m?: number; week?: number }
+/** Skalan runt hjulet: månader (hela fönstret och kvartal) eller veckor (en månad). `s` och `e` är dagsoffset från periodens start, `e` exklusivt. */
+export interface WheelTick { kind: "month" | "week"; s: number; e: number; y?: number; m?: number; week?: number }
 
-export function ticksFor(year: number, z: WheelZoom): WheelTick[] {
-  const per = periodOf(year, z);
+export function ticksFor(win: WheelWindow, z: WheelZoom): WheelTick[] {
+  const per = periodOf(win, z);
   if (z.kind !== "month") {
-    const first = z.kind === "year" ? 0 : z.q * 3, n = z.kind === "year" ? 12 : 3;
-    return Array.from({ length: n }, (_, k) => {
-      const m = first + k;
-      return { kind: "month" as const, m, s: dayNumber(isoOf(year, m, 1)) - per.span.startDay, e: dayNumber(isoOf(year, m, lastDay(year, m))) - per.span.startDay + 1 };
-    });
+    const a = mi(Number(per.start.slice(0, 4)), Number(per.start.slice(5, 7)) - 1), b = mi(Number(per.end.slice(0, 4)), Number(per.end.slice(5, 7)) - 1);
+    const out: WheelTick[] = [];
+    for (let k = a; k <= b; k++) {
+      const { y, m } = fromMi(k);
+      out.push({ kind: "month", y, m, s: dayNumber(isoOf(y, m, 1)) - per.span.startDay, e: dayNumber(isoOf(y, m, lastDay(y, m))) - per.span.startDay + 1 });
+    }
+    return out;
   }
   const out: WheelTick[] = [];
   let s = 0;
@@ -159,4 +205,35 @@ export function ticksFor(year: number, z: WheelZoom): WheelTick[] {
     s = e;
   }
   return out;
+}
+
+/** Fönstrets namn: "2026" för ett kalenderår, annars "Kv 3 26 – Kv 2 27" när det börjar och slutar på kvartalsgränser, annars "jul 26 – jun 27". */
+export function windowLabel(w: WheelWindow, months: readonly string[], quarter: (n: number) => string): string {
+  if (isCalendarYear(w)) return String(w.sy);
+  const e = windowEnd(w), yy = (y: number) => String(y).slice(2);
+  if (w.sm % 3 === 0 && w.months % 3 === 0) return `${quarter(w.sm / 3 + 1)} ${yy(w.sy)} \u2013 ${quarter(Math.floor(e.m / 3) + 1)} ${yy(e.y)}`;
+  return w.months === 1 ? `${months[w.sm]} ${w.sy}` : `${months[w.sm]} ${yy(w.sy)} \u2013 ${months[e.m]} ${yy(e.y)}`;
+}
+
+/** Det som sparas om hjulets period (per projekt): kalenderår, rullande 12 månader från idag, eller ett eget fönster. */
+export interface WheelSetting { mode: "year" | "rolling" | "custom"; year?: number; sy?: number; sm?: number; months?: number }
+export const DEFAULT_WHEEL: WheelSetting = { mode: "rolling" };
+
+/** Fönstret som en sparad inställning ger idag. Ett kalenderår utan år börjar på `fallbackYear` (året med första posten). */
+export function resolveWheel(s: WheelSetting, today: ISODate, fallbackYear: number): WheelWindow {
+  if (s.mode === "rolling") return rollingWindow(today);
+  if (s.mode === "custom" && Number.isInteger(s.sy) && Number.isInteger(s.sm) && Number.isInteger(s.months)) return { sy: s.sy!, sm: s.sm!, months: s.months! };
+  return calendarYearWindow(s.year ?? fallbackYear);
+}
+
+/** Inställningen som motsvarar ett fönster man flyttat sig till för hand: ett kalenderår förblir ett kalenderår, annat blir ett eget fönster. */
+export const settingFor = (w: WheelWindow): WheelSetting => (isCalendarYear(w) ? { mode: "year", year: w.sy } : { mode: "custom", sy: w.sy, sm: w.sm, months: w.months });
+
+/** Rensar en sparad inställning: okända värden blir standard. */
+export function normalizeWheel(v: unknown): WheelSetting {
+  const o = (v && typeof v === "object" ? v : {}) as Record<string, unknown>;
+  const int = (x: unknown, lo: number, hi: number) => (typeof x === "number" && Number.isInteger(x) && x >= lo && x <= hi ? x : undefined);
+  if (o.mode === "year") return { mode: "year", ...(int(o.year, 1900, 2200) !== undefined ? { year: int(o.year, 1900, 2200) } : {}) };
+  if (o.mode === "custom") { const sy = int(o.sy, 1900, 2200), sm = int(o.sm, 0, 11), months = int(o.months, 1, MAX_WINDOW_MONTHS); return sy !== undefined && sm !== undefined && months !== undefined ? { mode: "custom", sy, sm, months } : DEFAULT_WHEEL; }
+  return DEFAULT_WHEEL;
 }

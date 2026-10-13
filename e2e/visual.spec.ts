@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { SEL, setZoom } from "./helpers";
+import { SEL, setZoom , wheelCalendarYear } from "./helpers";
 
 /**
  * Skärmbildstester för det godkända utseendet. Facit ligger i e2e/visual.spec.ts-snapshots/ och uppdateras BARA när utseendet medvetet ändras
@@ -13,6 +13,7 @@ test.beforeEach(async ({ page }) => {
 });
 const open = async (page: Page, theme: "standard" | "ljust" | "morkt" = "standard", view = "") => {
   await page.addInitScript((t) => localStorage.setItem("projektplanerare.theme", t), theme);
+  await wheelCalendarYear(page); // årshjulet visar kalenderåret 2026 i bildproven
   await page.goto(`/?fixture=small&latency=0${view}`);
   await page.waitForSelector(view ? ".wheel-svg" : ".gantt_task_line");
   await page.evaluate(() => document.fonts.ready);

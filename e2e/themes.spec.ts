@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { LIBS, SEL, shotPath , chooseTheme } from "./helpers";
+import { LIBS, SEL, shotPath , chooseTheme , wheelCalendarYear } from "./helpers";
 
 const THEMES = [
   { id: "standard", name: "Standard", bg: "--sv-aluminiumgra", outline: "--sv-svart" },
@@ -154,7 +154,7 @@ for (const lib of LIBS) {
 
 test("T4 Standard: årshjulets markerade rad och ringband är mörkare än ytan, statusfärger är naturfärger", async ({ page }) => {
   await page.clock.setFixedTime(new Date("2026-10-09T10:00:00"));
-  await page.goto("/?view=wheel&fixture=small&latency=0");
+  await wheelCalendarYear(page); await page.goto("/?view=wheel&fixture=small&latency=0");
   await page.waitForSelector(".wheel-svg");
   const surface = await resolveColor(page, "var(--surface)");
   const natural = new Set([await resolveColor(page, "var(--sv-marmorgron)"), await resolveColor(page, "color-mix(in srgb, var(--sv-guld) 55%, var(--sv-svart))"), await resolveColor(page, "var(--sv-rubinrod)"), await resolveColor(page, "var(--sv-bronsbrun)")]);

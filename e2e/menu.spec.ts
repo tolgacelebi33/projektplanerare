@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { SEL, items, openApp, setZoom } from "./helpers";
+import { SEL, items, openApp, setZoom , wheelCalendarYear } from "./helpers";
 
 const panel = (page: Page) => page.locator("aside.panel");
 const menu = (page: Page) => page.getByRole("menu", { name: "Åtgärder" });
@@ -187,7 +187,7 @@ test.describe("högerklick", () => {
   });
 
   test("M13 årshjul: högerklick på en förklaringsrad ger menyn (Öppna, Flytta, Ta bort...) och på en tom yta Ny uppgift", async ({ page }) => {
-    await page.goto("/?view=wheel&fixture=small&latency=0"); await page.waitForSelector(".wheel-svg");
+    await wheelCalendarYear(page); await page.goto("/?view=wheel&fixture=small&latency=0"); await page.waitForSelector(".wheel-svg");
     await page.locator('.wheel-legend li[data-id="i10"]').click({ button: "right" });
     expect(await texts(page)).toContain("Öppna"); expect(await texts(page)).toContain("Ta bort...");
     await menu(page).getByRole("menuitem", { name: "Öppna" }).click();

@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { openApp } from "./helpers";
+import { openApp , wheelCalendarYear } from "./helpers";
 const openTab = (page: Page, name: string) => page.getByRole("dialog", { name: "Inställningar" }).getByRole("tab", { name, exact: true }).click();
 
 const panel = (page: Page) => page.locator("aside.panel");
@@ -49,7 +49,7 @@ test("UX2 klick på en post, en knapp, skalan eller i verktygsfältet stänger i
 
 test("UX3 ett klick på tom yta stänger panelen också i årshjulet, och en drag gör det inte", async ({ page }) => {
   await page.clock.setFixedTime(new Date("2026-04-20T10:00:00"));
-  await page.goto("/?fixture=small&latency=0&view=wheel");
+  await wheelCalendarYear(page); await page.goto("/?fixture=small&latency=0&view=wheel");
   await page.waitForSelector(".wheel-svg");
   await page.locator(".wheel-legend li").first().click();
   await expect(panel(page)).toBeVisible();

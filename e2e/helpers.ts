@@ -12,7 +12,7 @@ export const SEL = {
 export async function openApp(page: Page, lib: Lib, opts: { fixture?: "small" | "large"; extra?: string; reminders?: boolean; seriesRow?: boolean } = {}) {
   // Förhandsgranskningen vid import är på som standard. De flesta tester importerar direkt, så den stängs av här (om inget annat sparats), och egna tester slår på den.
   // Påminnelseraden (alla poster i fixturen är försenade) stängs av av samma skäl: den skjuter ned innehållet. Påminnelsetesterna slår på den med { reminders: true }.
-  await page.addInitScript(([keepReminders, seriesRow]) => { try { const k = "projektplanerare.settings"; const o = JSON.parse(localStorage.getItem(k) ?? "{}") ?? {}; let changed = false; if (o.importPreview === undefined) { o.importPreview = false; changed = true; } if (!keepReminders && o.reminders === undefined) { o.reminders = { banner: false, os: false, scope: "all" }; changed = true; } if (!seriesRow && o.seriesRowV2 === undefined) { o.seriesRowV2 = true; o.collapseSeries = false; changed = true; } if (changed) localStorage.setItem(k, JSON.stringify(o)); } catch { /* ignoreras */ } }, [!!opts.reminders, !!opts.seriesRow] as const);
+  await page.addInitScript(([keepReminders, seriesRow]) => { try { const k = "projektplanerare.settings"; const o = JSON.parse(localStorage.getItem(k) ?? "{}") ?? {}; let changed = false; if (o.importPreview === undefined) { o.importPreview = false; changed = true; } if (!keepReminders && o.reminders === undefined) { o.reminders = { banner: false, os: false, scope: "all" }; changed = true; } if (!seriesRow && o.seriesRowV2 === undefined) { o.seriesRowV2 = true; o.collapseSeries = false; changed = true; } if (o.wheelDefault === undefined) { o.wheelDefault = { mode: "year" }; changed = true; } if (changed) localStorage.setItem(k, JSON.stringify(o)); } catch { /* ignoreras */ } }, [!!opts.reminders, !!opts.seriesRow] as const);
   await page.goto(`/?lib=${lib}&fixture=${opts.fixture ?? "small"}&latency=0${opts.extra ?? ""}`);
   await page.waitForSelector(SEL[lib].ready);
 }
@@ -108,4 +108,9 @@ export async function chooseTheme(page: Page, name: "Standard" | "Ljust" | "Mör
   await d.getByRole("radio", { name }).click();
   await page.keyboard.press("Escape");
   await expect(d).toHaveCount(0);
+}
+
+/** Årshjulet visar ett kalenderår i testerna (standard för användare är rullande 12 månader från idag, vilket beror på dagens datum). */
+export async function wheelCalendarYear(page: Page) {
+  await page.addInitScript(() => { try { const k = "projektplanerare.settings"; const o = JSON.parse(localStorage.getItem(k) ?? "{}") ?? {}; if (!o.wheelDefault) { o.wheelDefault = { mode: "year" }; localStorage.setItem(k, JSON.stringify(o)); } } catch { /* ignoreras */ } });
 }

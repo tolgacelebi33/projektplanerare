@@ -30,6 +30,7 @@ test("D1 kalendern visar månaden med poster på rätt dagar, och bläddrar", as
 });
 
 test("D2 kalendern: klick öppnar posten, dra till annan dag flyttar med bibehållen längd som ett ångra-steg", async ({ page }) => {
+  await page.setViewportSize({ width: 1500, height: 1100 }); // verktygsraderna tar plats: hela månaden ska rymmas så att dragmålet syns utan rullning
   await more(page, "Kalender");
   const cal = page.getByRole("group", { name: "Kalender" });
   await cal.locator('.cal-day[data-date="2026-03-23"] .cal-chip[data-id="i7"]').click();

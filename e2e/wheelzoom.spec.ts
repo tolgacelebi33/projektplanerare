@@ -127,9 +127,9 @@ test("WZ7 i helårsläget markeras hela kvartalet när man pekar eller fokuserar
   await page.mouse.move(5, 5);
   await expect(hl).toHaveCount(0);
   // samma vid tangentbordsfokus, och på en annan månad i ett annat kvartal
-  await page.locator('.wheel-tick-hit[aria-label="Zooma in på Kv 4, november"]').focus();
-  await expect(hl).toHaveAttribute("data-quarter", "4");
-  await page.locator('.wheel-tick-hit[aria-label="Zooma in på Kv 4, november"]').blur();
+  await page.locator('.wheel-tick-hit[aria-label="Zooma in på Kv 1, mars"]').focus();
+  await expect(hl).toHaveAttribute("data-quarter", "1");
+  await page.locator('.wheel-tick-hit[aria-label="Zooma in på Kv 1, mars"]').blur();
   await expect(hl).toHaveCount(0);
   // inzoomat finns ingen kvartalsmarkering (där zoomar ett klick till månaden)
   await page.locator('.wheel-tick-hit[aria-label="Zooma in på Kv 2, april"]').focus();
@@ -138,4 +138,16 @@ test("WZ7 i helårsläget markeras hela kvartalet när man pekar eller fokuserar
   const m = (await page.locator('g:has(> .wheel-tick-hit[aria-label="Zooma in på maj"]) > text.wheel-month').boundingBox())!;
   await page.mouse.move(m.x + m.width / 2, m.y + m.height / 2);
   await expect(hl).toHaveCount(0);
+});
+
+test("WZ8 tomma perioder går inte att zooma in på: segmentet är avstängt och förklarat, och ett klick på det gör ingenting", async ({ page }) => {
+  // Provdatan ligger i mars till maj: Kv 1 och Kv 2 har poster, Kv 3 och Kv 4 saknar
+  await expect(page.locator(".wheel-tick-hit:not(.wheel-tick-off)")).toHaveCount(6); // januari till juni
+  const off = await page.locator(".wheel-tick-off").evaluateAll((els) => els.map((e) => e.getAttribute("aria-label")));
+  expect(off).toHaveLength(6); // juli till december
+  for (const l of off) expect(l).toContain("Inga poster"); // förklaras för skärmläsare
+  expect(await page.locator(".wheel-tick-off").first().evaluate((e) => getComputedStyle(e).cursor)).toBe("not-allowed");
+  const b = (await page.locator(".wheel-tick-off").first().boundingBox())!;
+  await page.mouse.click(b.x + b.width / 2, b.y + b.height / 2);
+  await expect.poll(() => centerText(page)).toBe("2026"); // stod kvar
 });

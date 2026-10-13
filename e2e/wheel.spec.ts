@@ -1,8 +1,9 @@
 import { expect, test, type Page } from "@playwright/test";
-import { items, shotPath, writes , chooseTheme } from "./helpers";
+import { items, shotPath, writes , chooseTheme, wheelCalendarYear } from "./helpers";
 
 const open = async (page: Page, fixture: "small" | "large" = "small") => {
   await page.clock.setFixedTime(new Date("2026-10-09T10:00:00")); // "idag" är fast, så testet beror inte på kalendern
+  await wheelCalendarYear(page);
   await page.goto(`/?view=wheel&fixture=${fixture}&latency=0`);
   await page.waitForSelector(".wheel-svg");
 };

@@ -35,6 +35,8 @@ import { useProjectData } from "./proto/useProjectData";
 import type { Zoom } from "./proto/zoom";
 import { ItemPanel } from "./views/ItemPanel";
 import { YearWheel } from "./views/YearWheel";
+import { DatePicker } from "./views/DatePicker";
+import { MAX_WINDOW_MONTHS, isCalendarYear, resolveWheel, settingFor, shiftWindow, windowLabel, windowStep, type WheelSetting } from "./views/wheelGeometry";
 import { BoardView } from "./views/BoardView";
 import { ImportPreview } from "./views/ImportPreview";
 import { BaselineBar } from "./views/BaselineBar";
@@ -120,8 +122,7 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
   const nextIds = useMemo(() => (state.kind === "ready" ? nextOccurrenceIds(state.items, todayISO()) : new Set<string>()), [state]);
   const colors = useMemo(() => (state.kind === "ready" ? effectiveColors(state.items) : new Map<string, never>()), [state]);
   const [view, setView] = useState<ViewId>(uiCarry.view ?? (new URLSearchParams(window.location.search).get("view") ? VIEW0 : settings.startView));
-  const [year, setYear] = useState<number | null>(uiCarry.year ?? null);
-  uiCarry.zoom = zoom; uiCarry.view = view; uiCarry.year = year;
+  uiCarry.zoom = zoom; uiCarry.view = view;
   // "Visa serier som en rad": bara listan, tidslinjen och boarden. Kalendern och de andra vyerna visar alla tillfällen.
   const markIdsRef = useRef<ReadonlySet<string>>(new Set());
   const collapsed = useMemo(() => (settings.collapseSeries && (view === "gantt" || view === "board") ? collapseSeries(shown, todayISO()) : null), [settings.collapseSeries, view, shown]);
@@ -129,7 +130,11 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
   const listItems = collapsed?.items ?? shown.items, listDeps = collapsed?.deps ?? shown.deps;
   const [theme, setTheme] = useState<Theme>(getTheme);
   const firstYear = state.kind === "ready" && state.items.length ? Number(state.items.map((i) => i.start).sort()[0].slice(0, 4)) : new Date().getFullYear();
-  const effectiveYear = year ?? firstYear;
+  // Årshjulets period, per projekt (standard: rullande 12 månader från idag)
+  const wheelSetting = (projects.projectId ? settings.wheelByProject[projects.projectId] : undefined) ?? settings.wheelDefault;
+  const wheelWin = resolveWheel(wheelSetting, todayISO(), firstYear);
+  const setWheel = (s: WheelSetting) => { if (projects.projectId) setSettings({ ...settings, wheelByProject: { ...settings.wheelByProject, [projects.projectId]: s } }); };
+  const stepWheel = (dir: 1 | -1) => { const w = shiftWindow(wheelWin, dir * windowStep(wheelWin)); setWheel(wheelSetting.mode === "year" ? { mode: "year", year: w.sy } : settingFor(w)); };
   const [editId, setEditId] = useState<string | null>(null);
   const [navToken, setNavToken] = useState(0);
   // Aktiv grupp: den grupp man senast valde eller skapade (eller vars post man valde). Nya poster hamnar där när inget är valt, som i monday och Asana.
@@ -833,11 +838,25 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
         ) : view === "wheel" ? (
           <>
             <span className="toolbar-sep" aria-hidden="true" />
-            <span className="toolbar-label">{sv.year.label}</span>
-            <div className="stepper" role="group" aria-label={sv.year.label}>
-              <button aria-label={sv.year.prev} onClick={() => setYear((effectiveYear) - 1)}>{"\u2039"}</button>
-              <output aria-live="polite" data-testid="wheel-year">{effectiveYear}</output>
-              <button aria-label={sv.year.next} onClick={() => setYear((effectiveYear) + 1)}>{"\u203A"}</button>
+            <span className="toolbar-label">{sv.period.label}</span>
+            <select className="project-select project-select-sm" aria-label={sv.period.label} value={wheelSetting.mode}
+              onChange={(e) => { const m = e.target.value; setWheel(m === "rolling" ? { mode: "rolling" } : m === "year" ? { mode: "year", year: wheelWin.sy } : { mode: "custom", sy: wheelWin.sy, sm: wheelWin.sm, months: wheelWin.months }); }}>
+              <option value="year">{sv.period.year}</option><option value="rolling">{sv.period.rolling}</option><option value="custom">{sv.period.custom}</option>
+            </select>
+            {wheelSetting.mode === "custom" && (
+              <>
+                <span className="toolbar-label">{sv.period.from}</span>
+                <DatePicker name="wheel-from" value={`${wheelWin.sy}-${String(wheelWin.sm + 1).padStart(2, "0")}-01`} onValue={() => undefined}
+                  onCommit={(v) => { if (v) setWheel({ mode: "custom", sy: Number(v.slice(0, 4)), sm: Number(v.slice(5, 7)) - 1, months: wheelWin.months }); }} />
+                <select className="project-select project-select-sm" aria-label={sv.period.months} value={wheelWin.months} onChange={(e) => setWheel({ mode: "custom", sy: wheelWin.sy, sm: wheelWin.sm, months: Number(e.target.value) })}>
+                  {Array.from({ length: MAX_WINDOW_MONTHS }, (_, k) => k + 1).map((n) => <option key={n} value={n}>{sv.period.monthsOption(n)}</option>)}
+                </select>
+              </>
+            )}
+            <div className="stepper" role="group" aria-label={sv.period.label}>
+              <button aria-label={wheelSetting.mode === "year" ? sv.year.prev : sv.wheel.prevPeriod} onClick={() => stepWheel(-1)}>{"\u2039"}</button>
+              <output aria-live="polite" data-testid="wheel-year">{windowLabel(wheelWin, sv.wheel.months, sv.wheel.quarter)}</output>
+              <button aria-label={wheelSetting.mode === "year" ? sv.year.next : sv.wheel.nextPeriod} onClick={() => stepWheel(1)}>{"\u203A"}</button>
             </div>
           </>
         ) : null}
@@ -899,7 +918,7 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
         {state.kind === "ready" && projects.projectId && project && view === "report" && <ReportView project={project} items={state.items} users={users} latest={statusUpdates.filter((u) => u.project_id === project.id).at(-1) ?? null} today={todayISO()} onOpen={setEditId} />}
         {view === "week" && projects.projects && projects.projects.length > 0 && <MyWeekView groups={myWeekGroups(allData, todayISO())} users={users} multi={projects.projects.length > 1} onOpen={openInProject} />}
         {view === "portfolio" && projects.projects && projects.projects.length > 0 && <PortfolioView rows={portfolioRows(allData, todayISO(), statusUpdates)} currentId={projects.projectId} onOpen={(pid) => { focusMedianOnNextProject(); projects.select(pid); setView("gantt"); }} />}
-        {state.kind === "ready" && projects.projectId && view === "wheel" && <YearWheel onYear={setYear} statuses={statusList} items={shown.items} year={effectiveYear} colors={colors} selectedId={editId} onOpen={setEditId} onContext={openMenu} />}
+        {state.kind === "ready" && projects.projectId && view === "wheel" && <YearWheel onWindow={(w) => setWheel(wheelSetting.mode === "year" && isCalendarYear(w) ? { mode: "year", year: w.sy } : settingFor(w))} statuses={statusList} items={shown.items} win={wheelWin} colors={colors} selectedId={editId} onOpen={setEditId} onContext={openMenu} />}
         {state.kind === "ready" && projects.projectId && view === "gantt" && (
           <div className="gantt-wrap">
           <div className="gantt-main">

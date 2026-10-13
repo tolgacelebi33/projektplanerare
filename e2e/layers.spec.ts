@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { SEL, dayWidth, dragBar, item, items, openApp, setZoom , chooseTheme } from "./helpers";
+import { SEL, dayWidth, dragBar, item, items, openApp, setZoom , chooseTheme , wheelCalendarYear } from "./helpers";
 
 const panel = (page: Page) => page.locator("aside.panel");
 const menu = (page: Page) => page.getByRole("menu", { name: "Åtgärder" });
@@ -120,7 +120,7 @@ test.describe("lager och tillstånd", () => {
   });
 
   test("O9 hover-markering i årshjulet släpps när menyn öppnas och när pekaren lämnar", async ({ page }) => {
-    await page.goto("/?view=wheel&fixture=small&latency=0"); await page.waitForSelector(".wheel-svg");
+    await wheelCalendarYear(page); await page.goto("/?view=wheel&fixture=small&latency=0"); await page.waitForSelector(".wheel-svg");
     const li = page.locator('.wheel-legend li[data-id="i10"]');
     await li.hover();
     await expect(page.locator('[data-id="i10"][data-hl="1"]')).toHaveCount(2);
