@@ -600,3 +600,5 @@ Rättade tester som föll på GitHub: C5 (listan Vyer ligger nu ovanför filterb
 ## 2026-10-13: Rullister i temats färger
 
 Användaren såg de ljusa standardlisterna i Microsoft Edge (nere och till höger): svart skjutare på en genomskinlig bana (alltså samma färg som ytan bakom) i Standard och Ljust, en ljus skjutare i Mörkt (svart syns inte mot svart). `scrollbar-color` (Edge, Chrome, Firefox) och, där det saknas (äldre Safari), webkit-reglerna. Tokens `--scroll-thumb` och `--scroll-track`. Overifierat: utseendet i Edge (testat med Chromium, samma motor, och bara värdet på `scrollbar-color`, inte en bild), och i Safari (webkit-reglerna är inte provade).
+
+Tillägg (användaren): datumfältet för Eget-perioden i verktygsraden hade webbläsarens vita bakgrund. Nu har det temats ytfärg och textfärg och samma pillform som rullistorna bredvid (test SB-datum, i alla tre teman). Rullisterna gäller också Gantts egna (nere och till höger i tidslinjen): testet kontrollerar nu `.gantt_hor_scroll` och `.gantt_ver_scroll` särskilt (det förra testet kunde träffa ett element utan rullist).

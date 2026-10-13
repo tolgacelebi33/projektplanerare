@@ -8,9 +8,10 @@ for (const [name, id] of [["Standard", "standard"], ["Ljust", "ljust"], ["Mörkt
     await openApp(page, "dhtmlx");
     if (id !== "standard") await chooseTheme(page, name);
     const probe = (v: string) => page.evaluate((x) => { const d = document.createElement("div"); d.style.color = x; document.body.appendChild(d); const c = getComputedStyle(d).color; d.remove(); return c; }, v);
-    const sb = await page.evaluate(() => ({ html: getComputedStyle(document.documentElement).scrollbarColor, grid: getComputedStyle(document.querySelector(".gantt_hor_scroll, .gantt_ver_scroll, .gantt_grid_data")!).scrollbarColor }));
+    // sidan och Gantts egna rullister (nere och till höger i tidslinjen)
+    const sb = await page.evaluate(() => ({ html: getComputedStyle(document.documentElement).scrollbarColor, hor: getComputedStyle(document.querySelector(".gantt_hor_scroll")!).scrollbarColor, ver: getComputedStyle(document.querySelector(".gantt_ver_scroll")!).scrollbarColor }));
     const thumb = await probe("var(--scroll-thumb)");
-    for (const v of [sb.html, sb.grid]) {
+    for (const v of [sb.html, sb.hor, sb.ver]) {
       expect(v.startsWith(thumb), `${id}: ${v} ska börja med ${thumb}`).toBe(true);
       expect(v.endsWith("rgba(0, 0, 0, 0)"), `${id}: banan är genomskinlig (samma färg som ytan bakom)`).toBe(true);
     }
@@ -19,3 +20,20 @@ for (const [name, id] of [["Standard", "standard"], ["Ljust", "ljust"], ["Mörkt
     if (id === "morkt") expect(lum(thumb)).toBeGreaterThan(0.4); else expect(lum(thumb)).toBeLessThan(0.2);
   });
 }
+
+test("SB-datum datumfältet i verktygsraden (Period, Eget) har temats ytfärg och text, inte webbläsarens vita", async ({ page }) => {
+  await page.setViewportSize({ width: 1500, height: 900 });
+  await openApp(page, "dhtmlx");
+  await page.getByRole("group", { name: "Vy" }).getByRole("button", { name: "Årshjul" }).click();
+  await page.getByRole("combobox", { name: "Period", exact: true }).selectOption("custom");
+  for (const name of ["Standard", "Ljust", "Mörkt"] as const) {
+    if (name !== "Standard") await chooseTheme(page, name);
+    const r = await page.evaluate(() => {
+      const e = document.querySelector('.toolbar .datepick input[name="wheel-from"]') as HTMLElement, cs = getComputedStyle(e);
+      const probe = (v: string) => { const d = document.createElement("div"); d.style.background = v; document.body.appendChild(d); const c = getComputedStyle(d).backgroundColor; d.remove(); return c; };
+      return { bg: cs.backgroundColor, want: probe("var(--surface-alt)"), color: cs.color, text: (() => { const d = document.createElement("div"); d.style.color = "var(--text)"; document.body.appendChild(d); const c = getComputedStyle(d).color; d.remove(); return c; })() };
+    });
+    expect(r.bg, `${name}: bakgrund`).toBe(r.want);
+    expect(r.color, `${name}: text`).toBe(r.text);
+  }
+});

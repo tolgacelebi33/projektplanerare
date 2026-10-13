@@ -977,3 +977,8 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); opacity: 
   ::-webkit-scrollbar-thumb { background: var(--scroll-thumb); border-radius: 6px; border: 2px solid transparent; background-clip: padding-box; }
   ::-webkit-scrollbar-corner { background: var(--scroll-track); }
 }
+
+/* Datumfältet i verktygsraden (Period, Eget, Från): temats ytfärg och text, som rullistorna bredvid (webbläsarens egna fält är vita) */
+.toolbar .datepick input { font: inherit; font-size: 13px; color: var(--text); background: var(--surface-alt); border: var(--line-width) solid var(--line); border-radius: var(--radius-pill); padding: 4px 30px 4px 12px; width: 134px; box-sizing: border-box; }
+.toolbar .datepick input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.toolbar .datepick input::placeholder { color: var(--placeholder); opacity: 1; }
