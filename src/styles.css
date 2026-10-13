@@ -982,3 +982,7 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); opacity: 
 .toolbar .datepick input { font: inherit; font-size: 13px; color: var(--text); background: var(--surface-alt); border: var(--line-width) solid var(--line); border-radius: var(--radius-pill); padding: 4px 30px 4px 12px; width: 134px; box-sizing: border-box; }
 .toolbar .datepick input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .toolbar .datepick input::placeholder { color: var(--placeholder); opacity: 1; }
+/* Kalenderkortet: rullistorna för månad och år i temats färger överallt (inte bara i panel och dialog), och kalenderikonen i verktygsradens datumfält centrerad */
+.datepick-pop select { font: inherit; font-size: 13px; color: var(--text); background: var(--surface-alt); border: var(--line-width) solid var(--line); border-radius: 6px; }
+.toolbar .datepick-btn { top: 50%; right: 3px; width: 22px; height: 22px; transform: translateY(-50%); }
+.toolbar .datepick-btn svg { width: 13px; height: 13px; display: block; }
