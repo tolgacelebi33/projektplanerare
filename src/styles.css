@@ -113,7 +113,7 @@ html, body, #root { height: 100%; margin: 0; }
 .wheel-grid { stroke: var(--grid-line-solid); stroke-width: var(--line-width); fill: none; }
 .wheel-month { fill: var(--text); font-family: var(--font-title); font-size: 12px; }
 .wheel-year { fill: var(--text); font-family: var(--font-title); font-size: 28px; }
-.wheel-today { stroke: var(--text); stroke-width: 2; stroke-dasharray: 4 3; }
+.wheel-today { stroke: var(--text); stroke-width: 2; stroke-dasharray: 4 3; pointer-events: none; } /* ligger inte i vägen för klick på bågarna */
 .wheel-arc .wheel-shape, .wheel-ms .wheel-shape { stroke: var(--bar-outline-color); stroke-width: var(--line-width); }
 .wheel-arc[data-status="not_started"] .wheel-shape, .wheel-ms[data-status="not_started"] .wheel-shape { fill: var(--status-not-started-bg); }
 .wheel-arc[data-status="in_progress"] .wheel-shape, .wheel-ms[data-status="in_progress"] .wheel-shape { fill: var(--status-in-progress-bg); }
@@ -942,3 +942,19 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); opacity: 
   .tools-min .project-bar > *:not(.toolbar-label):not(select.project-select:not(.project-select-sm)) { display: none; }
   .tools-min .filter-row, .tools-min .list-row, .tools-min .min-hide { display: none; }
 }
+
+/* Inzoomning i årshjulet: brödsmula och stegknappar ovanför, klickbara månader och kvartal i ringen, ett klick i mitten går ut */
+.wheel-wrap { display: flex; flex-direction: column; min-height: 100%; background: var(--surface); }
+.wheel-nav { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 10px 24px 0; }
+.wheel-crumbs { display: flex; align-items: center; gap: 6px; list-style: none; margin: 0; padding: 0; }
+.wheel-crumbs li + li::before { content: "\203A"; margin-right: 6px; color: var(--text-muted); }
+.wheel-crumbs .mini[aria-current="true"] { background: var(--text); color: var(--surface); border-color: var(--text); }
+.wheel-step { display: inline-flex; gap: 6px; }
+.wheel-tick-hit { fill: transparent; cursor: zoom-in; }
+.wheel-tick-hit:hover, .wheel-tick-hit:focus-visible { fill: color-mix(in srgb, var(--text) 12%, transparent); outline: none; }
+.wheel-center-hit { fill: transparent; cursor: zoom-out; }
+.wheel-center-hit:hover, .wheel-center-hit:focus-visible { fill: color-mix(in srgb, var(--text) 8%, transparent); outline: none; }
+.wheel-year-sub { fill: var(--text-muted); font-family: var(--font-title); font-size: 13px; }
+@keyframes wheel-zoom { from { opacity: 0; transform: scale(0.94); } to { opacity: 1; transform: scale(1); } }
+.wheel-anim { animation: wheel-zoom 0.2s ease-out; transform-origin: center; }
+@media (prefers-reduced-motion: reduce) { .wheel-anim { animation: none; } }

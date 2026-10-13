@@ -1,13 +1,14 @@
 import { colorOf } from "../data/statusColors";
 import { defOf, defaultStatusDefs } from "../data/statuses";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { todayISO } from "../data/dates";
+import { dayNumber, todayISO } from "../data/dates";
 import { isOverdue } from "../data/rules";
 import type { GroupColor, Item, Status, StatusDef } from "../data/types";
 import { sv } from "../i18n/sv";
 import { STATUS_GLYPH } from "../proto/statusUi";
 import {
-  angleOf, arcLinePath, clipToYear, groupByTopEpic, isLowerHalf, packLanesFor, polar, sectorPath, textWidth, yearSpan, type YearSpan,
+  YEAR_ZOOM, angleOf, arcLinePath, clipToYear, groupByTopEpic, isLowerHalf, packLanesFor, periodOf, polar, sectorPath, stepZoom, textWidth, ticksFor, zoomInto, zoomOut,
+  type WheelPeriod, type WheelTick, type WheelZoom, type YearSpan,
 } from "./wheelGeometry";
 
 const R0 = 120; // innerradie (månadsnamn ligger innanför)
@@ -26,8 +27,23 @@ interface Placed {
 }
 interface Band { letter: string; color: GroupColor | null; epic: Item | null; rIn: number; rOut: number; placed: Placed[] }
 
-export function YearWheel({ items, year, colors, statuses, selectedId = null, onOpen, onContext }: { items: Item[]; year: number; statuses?: StatusDef[]; colors?: ReadonlyMap<string, GroupColor | "none">; selectedId?: string | null; onOpen?: (id: string) => void; onContext?: (a: { id: string | null; x: number; y: number }) => void }) {
+export function YearWheel({ items, year, colors, statuses, selectedId = null, onOpen, onContext, onYear }: { items: Item[]; year: number; onYear?: (y: number) => void; statuses?: StatusDef[]; colors?: ReadonlyMap<string, GroupColor | "none">; selectedId?: string | null; onOpen?: (id: string) => void; onContext?: (a: { id: string | null; x: number; y: number }) => void }) {
   const [hover, setHover] = useState<string | null>(null);
+  // Inzoomning: hela året, ett kvartal eller en månad. Byter året (pilarna i verktygsraden) går hjulet tillbaka till hela året.
+  const [zs, setZs] = useState<{ year: number; zoom: WheelZoom }>({ year, zoom: YEAR_ZOOM });
+  const [animate, setAnimate] = useState(false); // mjuk övergång bara när man själv zoomar, inte när hjulet ritas första gången
+  const zoom: WheelZoom = zs.year === year ? zs.zoom : YEAR_ZOOM;
+  const zoomIn = useCallback((m: number) => { const z = zoomInto(zoom, m); if (z) { setAnimate(true); setZs({ year, zoom: z }); } }, [zoom, year]);
+  const zoomBack = useCallback(() => { const z = zoomOut(zoom); if (z) { setAnimate(true); setZs({ year, zoom: z }); } }, [zoom, year]);
+  const zoomTo = useCallback((z: WheelZoom) => { setAnimate(true); setZs({ year, zoom: z }); }, [year]);
+  const step = useCallback((dir: 1 | -1) => { const n = stepZoom(year, zoom, dir); setAnimate(true); setZs(n); if (n.year !== year) onYear?.(n.year); }, [year, zoom, onYear]);
+  // Esc går ett steg ut, men bara om inget annat (dialog, meny, öppen post) är öppet: då stänger Esc det först
+  useEffect(() => {
+    if (zoom.kind === "year") return;
+    const key = (e: KeyboardEvent) => { if (e.key === "Escape" && !e.defaultPrevented && !document.querySelector('[role="dialog"], [role="menu"], aside.panel')) zoomBack(); };
+    document.addEventListener("keydown", key);
+    return () => document.removeEventListener("keydown", key);
+  }, [zoom, zoomBack]);
   const source = useRef<"shape" | "row">("row");
   const legendRef = useRef<HTMLElement>(null);
   const active = hover ?? selectedId; // den som redigeras förblir markerad
@@ -48,7 +64,8 @@ export function YearWheel({ items, year, colors, statuses, selectedId = null, on
   }, [active]);
 
   const layout = useMemo<Layout>(() => {
-    const y = yearSpan(year);
+    const per = periodOf(year, zoom), y = per.span;
+    const ticks = ticksFor(year, zoom);
     const today = todayISO();
     const groups = groupByTopEpic(items);
     // Pass 1: körfält per grupp. Pass 2: höjd per fält så att hjulet får fast storlek (annat än vid glest innehåll).
@@ -83,7 +100,7 @@ export function YearWheel({ items, year, colors, statuses, selectedId = null, on
         const inside = roomy && x.i.type !== "milestone" && arcLen >= textWidth(label, FONT) + 12;
         band.placed.push({
           item: x.i, s: x.c.s, e: x.c.e, rIn: li, rOut: li + laneH, a0, a1, inside, no: null,
-          clippedStart: x.c.s === 0 && x.i.start < `${year}-01-01`, clippedEnd: x.c.e === y.days && x.i.end > `${year}-12-31`,
+          clippedStart: x.c.s === 0 && x.i.start < per.start, clippedEnd: x.c.e === y.days && x.i.end > per.end,
         });
       });
       // Nummer till poster vars titel inte ryms på bågen (i läsordning: ring, sedan tid)
@@ -93,10 +110,10 @@ export function YearWheel({ items, year, colors, statuses, selectedId = null, on
       r = band.rOut;
     });
     const rMax = r + BAND_GAP;
-    const showToday = today >= `${year}-01-01` && today <= `${year}-12-31`;
-    const todayAngle = showToday ? angleOf(Math.round((new Date(today).getTime() - new Date(`${year}-01-01`).getTime()) / 86400000) + 0.5, y) : null;
-    return { y, bands, rMax, size: rMax * 2 + 24, todayAngle, today, laneH, lanePad, roomy };
-  }, [items, year, colors]);
+    const showToday = today >= per.start && today <= per.end;
+    const todayAngle = showToday ? angleOf(dayNumber(today) - y.startDay + 0.5, y) : null;
+    return { y, per, ticks, zoom, bands, rMax, size: rMax * 2 + 24, todayAngle, today, laneH, lanePad, roomy };
+  }, [items, year, zoom, colors]);
 
   const { bands, size } = layout;
   const count = bands.reduce((n, b) => n + b.placed.length, 0);
@@ -109,7 +126,7 @@ export function YearWheel({ items, year, colors, statuses, selectedId = null, on
     root.querySelectorAll("[data-hl]").forEach((e) => e.removeAttribute("data-hl"));
     if (active) root.querySelectorAll(`[data-id="${CSS.escape(active)}"]`).forEach((e) => e.setAttribute("data-hl", "1"));
     if (active) root.setAttribute("data-active", "1"); else root.removeAttribute("data-active");
-  }, [active, count, year, items]);
+  }, [active, count, year, items, zoom]);
 
   const onEnterShape = useCallback((id: string) => over(id, "shape"), []);
   const onEnterRow = useCallback((id: string) => over(id, "row"), []);
@@ -122,48 +139,73 @@ export function YearWheel({ items, year, colors, statuses, selectedId = null, on
     const id = (e.target as Element).closest("[data-id]")?.getAttribute("data-id") ?? null;
     onContext?.({ id, x: e.clientX, y: e.clientY });
   };
-  if (!count) return <p role="status" className="wheel-empty" onContextMenu={onContextMenu}>{sv.wheel.empty(year)}</p>;
+  const nav = (
+    <nav className="wheel-nav" aria-label={sv.wheel.navLabel}>
+      <ol className="wheel-crumbs">
+        <li><button type="button" className="mini" aria-current={zoom.kind === "year" ? "true" : undefined} onClick={() => zoomTo(YEAR_ZOOM)}>{sv.wheel.wholeYear(year)}</button></li>
+        {zoom.kind !== "year" && <li><button type="button" className="mini" aria-current={zoom.kind === "quarter" ? "true" : undefined} onClick={() => zoomTo({ kind: "quarter", q: zoom.kind === "quarter" ? zoom.q : Math.floor(zoom.m / 3) })}>{sv.wheel.quarter(zoom.kind === "quarter" ? zoom.q + 1 : Math.floor(zoom.m / 3) + 1)}</button></li>}
+        {zoom.kind === "month" && <li><button type="button" className="mini" aria-current="true">{sv.wheel.monthsLong[zoom.m]}</button></li>}
+      </ol>
+      {zoom.kind !== "year" && (
+        <span className="wheel-step" role="group" aria-label={sv.wheel.stepLabel}>
+          <button type="button" className="mini" aria-label={sv.wheel.prevPeriod} onClick={() => step(-1)}>{"\u2039"}</button>
+          <button type="button" className="mini" aria-label={sv.wheel.nextPeriod} onClick={() => step(1)}>{"\u203A"}</button>
+          <button type="button" className="mini" onClick={zoomBack}>{sv.wheel.back}</button>
+        </span>
+      )}
+    </nav>
+  );
+  if (!count) return <div className="wheel-wrap">{nav}<p role="status" className="wheel-empty" onContextMenu={onContextMenu}>{sv.wheel.empty(periodLabel(year, zoom))}</p></div>;
   return (
+    <div className="wheel-wrap">
+    {nav}
     <div className="wheel" ref={rootRef} onContextMenu={onContextMenu}>
-      <WheelSvg layout={layout} year={year} size={size} statuses={statuses} onEnter={onEnterShape} onLeave={onLeave} onToggle={onToggle} />
+      <WheelSvg animate={animate} layout={layout} year={year} size={size} statuses={statuses} onEnter={onEnterShape} onLeave={onLeave} onToggle={onToggle} onZoomIn={zoomIn} onZoomBack={zoomBack} />
       <WheelLegend bands={bands} legendRef={legendRef} onEnter={onEnterRow} onLeave={onLeave} onToggle={onToggle} />
+    </div>
     </div>
   );
 }
 
-interface Layout { y: YearSpan; bands: Band[]; rMax: number; size: number; todayAngle: number | null; today: string; laneH: number; lanePad: number; roomy: boolean }
+/** Periodens namn: "2026", "Kv 4 2026" eller "okt 2026". */
+const periodLabel = (year: number, z: WheelZoom): string => (z.kind === "year" ? String(year) : z.kind === "quarter" ? `${sv.wheel.quarter(z.q + 1)} ${year}` : `${sv.wheel.months[z.m]} ${year}`);
 
-const WheelSvg = memo(function WheelSvg({ layout, year, size, statuses, onEnter, onLeave, onToggle }: {
-  layout: Layout; year: number; size: number; statuses?: StatusDef[]; onEnter: (id: string) => void; onLeave: () => void; onToggle: (id: string) => void;
+interface Layout { y: YearSpan; per: WheelPeriod; ticks: WheelTick[]; zoom: WheelZoom; bands: Band[]; rMax: number; size: number; todayAngle: number | null; today: string; laneH: number; lanePad: number; roomy: boolean }
+
+const WheelSvg = memo(function WheelSvg({ animate, layout, year, size, statuses, onEnter, onLeave, onToggle, onZoomIn, onZoomBack }: {
+  animate: boolean; layout: Layout; year: number; size: number; statuses?: StatusDef[]; onEnter: (id: string) => void; onLeave: () => void; onToggle: (id: string) => void; onZoomIn: (m: number) => void; onZoomBack: () => void;
 }) {
-  const { y, bands, rMax, todayAngle, today, laneH, lanePad, roomy } = layout;
+  const { y, bands, rMax, todayAngle, today, laneH, lanePad, roomy, ticks, zoom } = layout;
   const c = size / 2;
   // Träffyta: hela körfältets höjd (så att grannfält aldrig täcker varandra) och några dagar extra i sidled, där körfältet har luft
-  const hitPath = (p: Placed) => { const da = angleOf(3, y); return sectorPath(c, c, p.rIn - lanePad / 2, p.rOut + lanePad / 2, p.a0 - da, p.a1 + da); };
-  const months = Array.from({ length: 12 }, (_, m) => {
-    const d0 = Math.round((Date.UTC(year, m, 1) - Date.UTC(year, 0, 1)) / 86400000);
-    const d1 = Math.round((Date.UTC(year, m + 1, 1) - Date.UTC(year, 0, 1)) / 86400000);
-    return { m, a0: angleOf(d0, y), a1: angleOf(d1, y) };
-  });
-
+  const hitPath = (p: Placed) => { const da = angleOf(Math.max(0.25, Math.min(3, y.days / 120)), y); return sectorPath(c, c, p.rIn - lanePad / 2, p.rOut + lanePad / 2, p.a0 - da, p.a1 + da); };
   return (
-    <svg className="wheel-svg" viewBox={`0 0 ${size} ${size}`} role="img" aria-label={sv.wheel.aria(year)}>
+    <svg className={`wheel-svg${animate ? " wheel-anim" : ""}`} key={`${zoom.kind}${zoom.kind === "quarter" ? zoom.q : zoom.kind === "month" ? zoom.m : ""}`} viewBox={`0 0 ${size} ${size}`} role="img" aria-label={sv.wheel.aria(periodLabel(year, zoom))}>
       {bands.map((b, bi) => (
         <path key={`bg${bi}`} className="wheel-band" data-alt={bi % 2} d={sectorPath(c, c, b.rIn, b.rOut, 0, 2 * Math.PI)} fillRule="evenodd" />
       ))}
-      {months.map(({ m, a0, a1 }) => {
+      {ticks.map((t) => {
+        const a0 = angleOf(t.s, y), a1 = angleOf(t.e, y);
         const p0 = polar(c, c, R0 - 34, a0), p1 = polar(c, c, rMax, a0);
         const mid = polar(c, c, R0 - 18, (a0 + a1) / 2);
+        const label = t.kind === "month" ? sv.wheel.months[t.m!] : sv.wheel.weekShort(t.week!);
+        const canZoom = t.kind === "month" && zoom.kind !== "month";
         return (
-          <g key={m}>
+          <g key={`${t.kind}${t.s}`}>
             <line className="wheel-grid" x1={p0.x} y1={p0.y} x2={p1.x} y2={p1.y} />
-            <text className="wheel-month" x={mid.x} y={mid.y} textAnchor="middle" dominantBaseline="middle">{sv.wheel.months[m]}</text>
+            {canZoom && (
+              <path className="wheel-tick-hit" d={sectorPath(c, c, R0 - 34, R0, a0, a1)} role="button" tabIndex={0} aria-label={sv.wheel.zoomIn(zoom.kind === "year" ? `${sv.wheel.quarter(Math.floor(t.m! / 3) + 1)}, ${sv.wheel.monthsLong[t.m!]}` : sv.wheel.monthsLong[t.m!])}
+                onClick={() => onZoomIn(t.m!)} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onZoomIn(t.m!); } }} />
+            )}
+            <text className="wheel-month" x={mid.x} y={mid.y} textAnchor="middle" dominantBaseline="middle" pointerEvents="none">{label}</text>
           </g>
         );
       })}
       <circle className="wheel-grid" cx={c} cy={c} r={R0 - 34} fill="none" />
+      {zoom.kind !== "year" && <circle className="wheel-center-hit" cx={c} cy={c} r={R0 - 36} role="button" tabIndex={0} aria-label={sv.wheel.back} onClick={onZoomBack} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onZoomBack(); } }} />}
       {bands.map((b, bi) => <circle key={`o${bi}`} className={`wheel-grid${b.color ? " wheel-band-ring" : ""}`} style={b.color ? ({ stroke: `var(--grp-${b.color})` }) : undefined} cx={c} cy={c} r={b.rOut} fill="none" />)}
-      <text className="wheel-year" x={c} y={c} textAnchor="middle" dominantBaseline="middle">{year}</text>
+      <text className="wheel-year" x={c} y={c} textAnchor="middle" dominantBaseline="middle" pointerEvents="none">{zoom.kind === "year" ? year : zoom.kind === "quarter" ? sv.wheel.quarter(zoom.q + 1) : sv.wheel.months[zoom.m]}</text>
+      {zoom.kind !== "year" && <text className="wheel-year-sub" x={c} y={c + 24} textAnchor="middle" dominantBaseline="middle" pointerEvents="none">{year}</text>}
 
       {bands.map((b) => b.placed.map((p) => {
         const id = p.item.id;

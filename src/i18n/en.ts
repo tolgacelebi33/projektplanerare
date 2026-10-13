@@ -370,8 +370,11 @@ export const enDict: Dict = {
   year: { label: "Year", prev: "Previous year", next: "Next year" },
   wheel: {
     months: ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"],
-    empty: (y: number) => `No items in ${y}.`,
-    aria: (y: number) => `Year wheel for ${y}. Hover or focus an item in the legend to point it out.`,
+    navLabel: "Zoom the year wheel", wholeYear: (y: number) => `All of ${y}`, quarter: (n: number) => `Q${n}`,
+    monthsLong: ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"],
+    stepLabel: "Change period", prevPeriod: "Previous period", nextPeriod: "Next period", back: "Zoom out", weekShort: (n: number) => `w${n}`, zoomIn: (label: string) => `Zoom in on ${label}`,
+    empty: (y: string | number) => `No items in ${y}.`,
+    aria: (y: string | number) => `Year wheel for ${y}. Hover or focus an item in the legend to point it out.`,
     legend: "Legend",
     noEpic: "No group",
     onArc: "the title is shown on the arc",

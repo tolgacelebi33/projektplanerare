@@ -1,4 +1,4 @@
-import { dayNumber } from "../data/dates";
+import { dayNumber, fromDayNumber, weekdayMon0 } from "../data/dates";
 import type { ISODate, Item } from "../data/types";
 
 export interface YearSpan { year: number; days: number; startDay: number }
@@ -87,4 +87,76 @@ export function groupByTopEpic(items: Item[]): WheelGroup[] {
 /** Ungefärlig textbredd i px. Används bara för att avgöra om en titel ryms på bågen. */
 export function textWidth(text: string, fontPx: number): number {
   return text.length * fontPx * 0.56;
+}
+
+/** Inzoomning i årshjulet: hela året, ett kvartal (0 till 3) eller en månad (0 till 11). Perioden fyller då hela hjulet. */
+export type WheelZoom = { kind: "year" } | { kind: "quarter"; q: number } | { kind: "month"; m: number };
+export const YEAR_ZOOM: WheelZoom = { kind: "year" };
+
+const pad = (n: number) => String(n).padStart(2, "0");
+const isoOf = (y: number, m: number, d: number): ISODate => `${y}-${pad(m + 1)}-${pad(d)}`;
+const lastDay = (y: number, m: number) => new Date(Date.UTC(y, m + 1, 0)).getUTCDate();
+
+export interface WheelPeriod { start: ISODate; end: ISODate; span: YearSpan }
+
+/** Perioden (första och sista dag, och spannet som vinklarna räknas på) för en inzoomning. */
+export function periodOf(year: number, z: WheelZoom): WheelPeriod {
+  const [m0, m1] = z.kind === "year" ? [0, 11] : z.kind === "quarter" ? [z.q * 3, z.q * 3 + 2] : [z.m, z.m];
+  const start = isoOf(year, m0, 1), end = isoOf(year, m1, lastDay(year, m1));
+  const startDay = dayNumber(start);
+  return { start, end, span: { year, days: dayNumber(end) - startDay + 1, startDay } };
+}
+
+/** Steget in: från hela året till kvartalet som månaden ligger i, därifrån till månaden. I en månad finns inget mer att zooma in på (null). */
+export function zoomInto(z: WheelZoom, m: number): WheelZoom | null {
+  if (z.kind === "year") return { kind: "quarter", q: Math.floor(m / 3) };
+  if (z.kind === "quarter") return { kind: "month", m };
+  return null;
+}
+
+/** Steget ut: från månaden till dess kvartal, därifrån till hela året. */
+export function zoomOut(z: WheelZoom): WheelZoom | null {
+  if (z.kind === "month") return { kind: "quarter", q: Math.floor(z.m / 3) };
+  if (z.kind === "quarter") return YEAR_ZOOM;
+  return null;
+}
+
+/** Nästa eller föregående period på samma nivå, över årsgränsen (kvartal 4 följs av kvartal 1 nästa år). Hela året byter bara år. */
+export function stepZoom(year: number, z: WheelZoom, dir: 1 | -1): { year: number; zoom: WheelZoom } {
+  if (z.kind === "year") return { year: year + dir, zoom: z };
+  if (z.kind === "quarter") { const n = z.q + dir; return n < 0 ? { year: year - 1, zoom: { kind: "quarter", q: 3 } } : n > 3 ? { year: year + 1, zoom: { kind: "quarter", q: 0 } } : { year, zoom: { kind: "quarter", q: n } }; }
+  const n = z.m + dir;
+  return n < 0 ? { year: year - 1, zoom: { kind: "month", m: 11 } } : n > 11 ? { year: year + 1, zoom: { kind: "month", m: 0 } } : { year, zoom: { kind: "month", m: n } };
+}
+
+/** ISO-veckonummer (vecka 1 är veckan med årets första torsdag). */
+export function isoWeek(s: ISODate): number {
+  const d = new Date(`${s}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() - ((d.getUTCDay() + 6) % 7) + 3); // torsdagen i veckan
+  const jan4 = new Date(Date.UTC(d.getUTCFullYear(), 0, 4));
+  return 1 + Math.round(((d.getTime() - jan4.getTime()) / 86400000 - 3 + ((jan4.getUTCDay() + 6) % 7)) / 7);
+}
+
+/** Skalan runt hjulet: månader (hela året och kvartal) eller veckor (en månad). `s` och `e` är dagsoffset från periodens start, `e` exklusivt. */
+export interface WheelTick { kind: "month" | "week"; s: number; e: number; m?: number; week?: number }
+
+export function ticksFor(year: number, z: WheelZoom): WheelTick[] {
+  const per = periodOf(year, z);
+  if (z.kind !== "month") {
+    const first = z.kind === "year" ? 0 : z.q * 3, n = z.kind === "year" ? 12 : 3;
+    return Array.from({ length: n }, (_, k) => {
+      const m = first + k;
+      return { kind: "month" as const, m, s: dayNumber(isoOf(year, m, 1)) - per.span.startDay, e: dayNumber(isoOf(year, m, lastDay(year, m))) - per.span.startDay + 1 };
+    });
+  }
+  const out: WheelTick[] = [];
+  let s = 0;
+  while (s < per.span.days) {
+    const date = fromDayNumber(per.span.startDay + s);
+    const toMonday = 7 - weekdayMon0(date); // dagar till nästa måndag
+    const e = Math.min(per.span.days, s + toMonday);
+    out.push({ kind: "week", s, e, week: isoWeek(date) });
+    s = e;
+  }
+  return out;
 }

@@ -375,8 +375,11 @@ export const svDict = {
   year: { label: "År", prev: "Föregående år", next: "Nästa år" },
   wheel: {
     months: ["jan", "feb", "mar", "apr", "maj", "jun", "jul", "aug", "sep", "okt", "nov", "dec"],
-    empty: (y: number) => `Inga poster under ${y}.`,
-    aria: (y: number) => `Årshjul för ${y}. Hovra eller fokusera en post i förklaringen för att peka ut den.`,
+    navLabel: "Zooma i årshjulet", wholeYear: (y: number) => `Hela ${y}`, quarter: (n: number) => `Kv ${n}`,
+    monthsLong: ["januari", "februari", "mars", "april", "maj", "juni", "juli", "augusti", "september", "oktober", "november", "december"],
+    stepLabel: "Byt period", prevPeriod: "Föregående period", nextPeriod: "Nästa period", back: "Zooma ut", weekShort: (n: number) => `v${n}`, zoomIn: (label: string) => `Zooma in på ${label}`,
+    empty: (y: string | number) => `Inga poster under ${y}.`,
+    aria: (y: string | number) => `Årshjul för ${y}. Hovra eller fokusera en post i förklaringen för att peka ut den.`,
     legend: "Förklaring",
     noEpic: "Utan grupp",
     onArc: "titeln syns på bågen",

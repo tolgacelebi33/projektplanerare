@@ -175,7 +175,7 @@ test("W10 stor fixture: tunna bågar går att peka på (träffyta) och markeras 
   const misses: string[] = [];
   for (const id of ids.filter((_, i) => i % 9 === 0)) {
     const pt = await insidePoint(page, id);
-    if (!pt) continue;
+    if (!pt || pt.y < 0 || pt.y > 990 || pt.x < 0 || pt.x > 1490) continue; // bara former som syns i fönstret (verktygsraderna och brödsmulan tar plats ovanför hjulet)
     tried++;
     await page.mouse.move(5, 5);
     await page.mouse.move(pt.x, pt.y);
@@ -210,7 +210,7 @@ test("W11 utseende: synliga former har statusfärg och kontur, träffytan är os
 });
 
 test("W12 hover flyttar aldrig sidan: lågt fönster och lång förklaring (felet som släppte markeringen)", async ({ page }) => {
-  await page.setViewportSize({ width: 1300, height: 560 });
+  await page.setViewportSize({ width: 1300, height: 720 });
   await open(page, "large");
   const main = page.locator(".app-main");
   const shapeBox = async (id: string) => (await page.locator(`.wheel-arc[data-id="${id}"] .wheel-hit`).boundingBox())!; // träffytan saknar kontur, så markeringens tjockare linje ändrar inte måttet
@@ -220,7 +220,7 @@ test("W12 hover flyttar aldrig sidan: lågt fönster och lång förklaring (fele
   let moved = 0, tried = 0;
   for (const id of ids.filter((_, i) => i % 40 === 0)) {
     const pt = await insidePoint(page, id);
-    if (!pt || pt.y < 0 || pt.y > 540 || pt.x < 0 || pt.x > 1290) continue; // bara former som syns i fönstret
+    if (!pt || pt.y < 0 || pt.y > 700 || pt.x < 0 || pt.x > 1290) continue; // bara former som syns i fönstret
     tried++;
     const before = { top: await main.evaluate((e) => e.scrollTop), box: await shapeBox(id) };
     await page.mouse.move(5, 5);
