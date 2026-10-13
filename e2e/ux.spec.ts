@@ -64,7 +64,7 @@ test("UX4 inställningar: dialogen öppnas från sidhuvudet, ändringar sparas o
   await openTab(page, "Listvy");
   await expect(dlg(page)).toBeVisible();
   await dlg(page).getByLabel("Klick på en tom yta stänger panelen").uncheck();
-  await openTab(page, "Start");
+  await openTab(page, "Start och tema");
   await dlg(page).locator('select[name="set-view"]').selectOption("board");
   await dlg(page).locator('select[name="set-zoom"]').selectOption("month");
   await page.keyboard.press("Escape");

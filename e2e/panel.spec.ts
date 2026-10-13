@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { LIBS, SEL, clearWrites, dayWidth, dragBar, item, items, openApp, setZoom, writes, writesFor, type Lib } from "./helpers";
+import { LIBS, SEL, clearWrites, dayWidth, dragBar, item, items, openApp, setZoom, writes, writesFor, type Lib , chooseTheme } from "./helpers";
 
 const panel = (page: Page) => page.locator("aside.panel");
 const rowOf = (lib: Lib, id: string) => (lib === "svar" ? `.wx-row[data-id=":${id}"] .wx-text` : `.gantt_row[data-task-id="${id}"] .grid-title`);
@@ -201,7 +201,7 @@ for (const lib of LIBS) {
       await openApp(page, lib);
       await page.locator(SEL[lib].bar("i7")).click();
       for (const [name, id] of [["Standard", "standard"], ["Ljust", "ljust"], ["Mörkt", "morkt"], ["Standard", "standard"]] as const) {
-        await page.getByRole("radio", { name }).click();
+        await chooseTheme(page, name);
         await page.waitForTimeout(300);
         await expect(panel(page)).toBeVisible(); // panelen överlever temabyte
         const css = await panel(page).evaluate((el) => {

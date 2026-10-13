@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { items, shotPath, writes } from "./helpers";
+import { items, shotPath, writes , chooseTheme } from "./helpers";
 
 const open = async (page: Page, fixture: "small" | "large" = "small") => {
   await page.clock.setFixedTime(new Date("2026-10-09T10:00:00")); // "idag" är fast, så testet beror inte på kalendern
@@ -78,7 +78,7 @@ test("W6 allt innehåll byter färg med temat (live-byte)", async ({ page }) => 
   const tok = (t: string, prop: "background" | "color") =>
     page.evaluate(([tk, pr]) => { const p = document.createElement("div"); (p.style as any)[pr] = `var(${tk})`; document.body.appendChild(p); const c = getComputedStyle(p)[pr === "background" ? "backgroundColor" : "color"]; p.remove(); return c; }, [t, prop] as const);
   for (const [name, id] of [["Standard", "standard"], ["Ljust", "ljust"], ["Mörkt", "morkt"], ["Standard", "standard"]] as const) {
-    await page.getByRole("radio", { name }).click();
+    await chooseTheme(page, name);
     await page.waitForTimeout(200);
     expect(await page.locator(".wheel").evaluate((e) => getComputedStyle(e).backgroundColor), `${id} yta`).toBe(await tok("--surface", "background"));
     expect(await page.locator(".wheel-legend h2").first().evaluate((e) => getComputedStyle(e).color), `${id} rubrik`).toBe(await tok("--text", "color"));

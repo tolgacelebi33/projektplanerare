@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { SEL, dayWidth, item, items, openApp, setDepMode, setZoom, writes } from "./helpers";
+import { SEL, dayWidth, item, items, openApp, setDepMode, setZoom, writes , chooseTheme } from "./helpers";
 import { inkMargins } from "./ink";
 
 const panel = (page: Page) => page.locator("aside.panel");
@@ -106,7 +106,7 @@ test.describe("text i staplar", () => {
   for (const th of ["Standard", "Ljust", "Mörkt"]) {
     test(`X text är lodrätt centrerad i staplarna (${th})`, async ({ page, browserName }) => {
       await openApp(page, "dhtmlx");
-      await page.getByRole("radio", { name: th }).click();
+      await chooseTheme(page, th as "Standard" | "Ljust" | "Mörkt");
       await setZoom(page, "Månad"); await setZoom(page, "Vecka"); // bredare staplar än i månadsvyn
       await page.mouse.move(5, 5); await page.waitForTimeout(400);
       // Ord utan nedhäng, så att bläckets mitt är textens mitt. Staplar med text inuti (breda nog).
@@ -170,7 +170,7 @@ test.describe("typografi: enhetlig färg, storlek och vikt, och läsbar kontrast
   for (const th of ["Standard", "Ljust", "Mörkt"]) {
     test(`Y all text i staplar har samma färg, storlek, vikt och typsnitt, och kontrasten räcker (${th})`, async ({ page }) => {
       await openApp(page, "dhtmlx");
-      await page.getByRole("radio", { name: th }).click();
+      await chooseTheme(page, th as "Standard" | "Ljust" | "Mörkt");
       await setZoom(page, "Dag"); await page.waitForTimeout(400);
       const bars = await page.locator(".gantt_task_line").evaluateAll((els) => els.map((b) => {
         const c = b.querySelector(".gantt_task_content") as HTMLElement, cs = getComputedStyle(c), bs = getComputedStyle(b);

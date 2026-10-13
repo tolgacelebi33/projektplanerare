@@ -575,3 +575,7 @@ Användaren gillade tre varianter (hela området, varje rad för sig, kompakt l�
 ## 2026-10-12: Temaväljaren flyttad, statustexten borttagen, minimera-knappen längst till höger
 
 Beslut (användaren): temaväljaren är borttagen ur sidhuvudet och ligger under Inställningar, fliken "Start och tema" (tidigare "Start"). Sidhuvudet blir en rad lägre, vilket ger tidslinjen mer plats. Texten "Sparas i den här webbläsaren" / "Provdata, sparas inte" är borttagen ur projektraden (användaren ville inte ha den), så minimera-knappen (− eller +) ligger längst till höger i båda lägena. Temafärgen för Mörkt-pricken är ren svart som temat. Testerna byter tema via en hjälpfunktion (`chooseTheme`) som går via Inställningar. Overifierat: hur användaren märker att datan inte sparas om lagringen skulle vara blockerad (varningar vid inläsning finns kvar som meddelanden).
+
+## 2026-10-13: Tunnare sidhuvud
+
+Användaren: toppen är för tjock. Sidhuvudet är nu 37 px högt (var cirka 72): luften över och under 6 px (var 12), den tomma logotypplatsen 24 px hög (var 48, ingen logotyp påverkas), titeln 18 px (var 22). Länkraden (Hjälp, Sök, Inställningar, SV, EN) bestämmer höjden. Kontrollpunkt: hela sviten kördes efter flytten av temaväljaren (442 gick igenom, 6 föll under en mycket långsam körning på 1,2 timmar och gick igenom när de kördes om för sig).
