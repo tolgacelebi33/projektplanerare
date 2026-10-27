@@ -63,7 +63,7 @@ export function useSync(store: SyncStore & { flush(): Promise<void> }, backup: (
     setCfg: (c) => patch({ clientId: c.clientId.trim(), tenantId: c.tenantId.trim() }),
     setAuto: (on) => patch({ auto: on }),
     login: () => { try { localStorage.setItem(LOGGED_IN_KEY, "1"); } catch { /* ignoreras */ } void login(cfg).catch((e) => setMsg({ kind: "error", text: String(e) })); },
-    logout: () => { try { localStorage.removeItem(LOGGED_IN_KEY); } catch { /* ignoreras */ } void logout(cfg).then(() => { setAccount(null); patch({ etag: undefined, hash: undefined, last: undefined, auto: false }); }); },
+    logout: () => { try { localStorage.removeItem(LOGGED_IN_KEY); } catch { /* ignoreras */ } void logout(cfg).then(() => { setAccount(null); patch({ etag: undefined, hash: undefined, last: undefined, auto: false }); location.reload(); }); },
     run,
   };
 }

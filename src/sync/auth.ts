@@ -32,7 +32,7 @@ export async function finishLogin(c: SyncConfig): Promise<boolean> {
   else if (!a.getActiveAccount() && a.getAllAccounts()[0]) a.setActiveAccount(a.getAllAccounts()[0]);
   return !!a.getActiveAccount();
 }
-export async function login(c: SyncConfig): Promise<void> { await (await client(c)).loginRedirect({ scopes: SCOPES }); }
+export async function login(c: SyncConfig): Promise<void> { await (await client(c)).loginRedirect({ scopes: SCOPES, prompt: "select_account" }); }
 export async function logout(c: SyncConfig): Promise<void> { const a = await client(c); const acc = a.getActiveAccount(); if (acc) await a.clearCache({ account: acc }); }
 export async function accountName(c: SyncConfig): Promise<string | null> { return (await client(c)).getActiveAccount()?.username ?? null; }
 /** Ger en giltig token, eller kastar så att användaren får logga in igen. */
