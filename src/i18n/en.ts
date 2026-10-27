@@ -202,6 +202,7 @@ export const enDict: Dict = {
     intro: "Keep your data in your own OneDrive to see the same projects on another computer. The file is Projektplanerare/data.json. Two people should not edit at the same time: whoever syncs last chooses.",
     clientId: "Application (client) ID", tenantId: "Directory (tenant) ID", login: "Sign in with Microsoft", logout: "Sign out", syncNow: "Sync now", auto: "Sync automatically every minute while the app is open",
     signedInAs: (n: string) => `Signed in as ${n}`, notSignedIn: "Not signed in.", last: (d: string) => `Last synced ${d}`, never: "Never synced here.",
+    pending: "Choose one of the options below first. Nothing is synced until you do.",
     none: "Everything is already in sync.", pushed: "Your data was uploaded to OneDrive.", pulled: "The data from OneDrive was downloaded.", working: "Syncing...",
     firstWhy: "OneDrive already has a file and this device has never been synced. Which one wins?", conflictWhy: "Both this device and OneDrive changed since the last sync. Which one wins?",
     useLocal: "Keep this device (overwrite OneDrive)", useRemote: "Take OneDrive (replaces this, a backup is saved first)",

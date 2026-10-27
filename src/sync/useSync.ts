@@ -9,26 +9,28 @@ export interface SyncUi {
 }
 
 /** `backup`: sparar en säkerhetskopia innan lokal data ersätts av molnets. Efter en hämtning laddas sidan om så att alla vyer visar det nya. */
-export function useSync(store: SyncStore & { flush(): Promise<void> }, backup: () => Promise<unknown>, texts: Record<"none" | "pushed" | "pulled", string>): SyncUi {
+export function useSync(store: SyncStore & { flush(): Promise<void> }, backup: () => Promise<unknown>, texts: Record<"none" | "pushed" | "pulled" | "pending", string>): SyncUi {
   const [state, setState] = useState<SyncState>(loadSync);
   const cfg = configOf(state);
   const [account, setAccount] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<SyncUi["msg"]>(null);
   const [choose, setChoose] = useState<SyncUi["choose"]>(null);
+  const pendingChoice = useRef(false);
   const live = useRef({ state, cfg }); live.current = { state, cfg };
   const patch = (p: Partial<SyncState>) => { const n = { ...live.current.state, ...p }; saveSync(n); setState(n); live.current.state = n; };
 
   const run = useCallback(async (choice?: "local" | "remote") => {
     const { state: s, cfg: c } = live.current;
+    if (!choice && pendingChoice.current) { setMsg({ kind: "info", text: texts.pending }); return; }
     setBusy(true); setMsg(null);
     try {
       if (choice === "remote") await backup();
       await store.flush();
       const o = await syncOnce(store, s.etag && s.hash ? { etag: s.etag, hash: s.hash } : null, realIo(() => token(c)), choice);
       const r: Result = o.result;
-      if (r.kind === "choose") { setChoose(r.why); return; }
-      setChoose(null);
+      if (r.kind === "choose") { pendingChoice.current = true; setChoose(r.why); return; }
+      pendingChoice.current = false; setChoose(null);
       patch({ etag: o.base?.etag, hash: o.base?.hash, last: new Date().toISOString().slice(0, 16).replace("T", " ") });
       setMsg({ kind: "info", text: texts[r.kind] });
       if (r.kind === "pulled") setTimeout(() => location.reload(), 600);

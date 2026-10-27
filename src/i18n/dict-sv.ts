@@ -207,6 +207,7 @@ export const svDict = {
     intro: "Lägg datan i din egen OneDrive så att du ser samma projekt på en annan dator. Filen heter Projektplanerare/data.json. Två personer ska inte redigera samtidigt: den som synkar sist får välja.",
     clientId: "Program-ID (klient)", tenantId: "Katalog-ID (hyresgäst)", login: "Logga in med Microsoft", logout: "Logga ut", syncNow: "Synka nu", auto: "Synka automatiskt varje minut medan appen är öppen",
     signedInAs: (n: string) => `Inloggad som ${n}`, notSignedIn: "Inte inloggad.", last: (d: string) => `Senast synkad ${d}`, never: "Aldrig synkad här.",
+    pending: "Välj först ett av alternativen här under. Ingenting synkas förrän du har valt.",
     none: "Allt är redan i synk.", pushed: "Din data är uppladdad till OneDrive.", pulled: "Datan från OneDrive hämtades.", working: "Synkar...",
     firstWhy: "OneDrive har redan en fil och den här enheten har aldrig synkats. Vilken ska gälla?", conflictWhy: "Både den här enheten och OneDrive har ändrats sedan senaste synk. Vilken ska gälla?",
     useLocal: "Behåll den här enheten (skriv över OneDrive)", useRemote: "Hämta från OneDrive (ersätter det här, en säkerhetskopia sparas först)",
