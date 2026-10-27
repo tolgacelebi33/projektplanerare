@@ -612,3 +612,5 @@ Tillägg (användaren): i kalenderkortet var månads- och årsrullistorna fortfa
 - Skäl: Supabase avvisades, Azure kräver prenumeration. OneDrive ingår redan i Microsoft 365.
 - Begränsningar: ingen samtidig redigering (bara konfliktval), ångra-historik och inställningar följer inte med, filer över 4 MB stöds inte än (kräver uppladdningssession), delning med fler = en delad mapp (ej byggt).
 - Overifierat: riktig inloggning och `If-Match` mot Graph har inte körts mot användarens tenant (bara mockad fetch i `tests/sync.test.ts`). Om MSAL 5 kräver en omdirigeringssida för redirect-flödet är oklart.
+
+Tillägg 2026-10-27: inloggningsspärr före appen (`src/sync/Gate.tsx`). På publicerad adress visas bara en inloggningssida tills kontot är inloggat (enkeltenant, så bara celebi.io). Ingen spärr på localhost eller med `?fixture=`. Begränsning: spärren ligger i webbläsaren, sidans filer är fortfarande publika och data som redan finns i en webbläsare påverkas inte. Offline efter inloggning är inte provat (MSAL läser kontot ur cachen, antagande). Test SY2 mot `app.localhost` med blockerat Microsoft-anrop; riktig inloggning med spärren är inte provad.

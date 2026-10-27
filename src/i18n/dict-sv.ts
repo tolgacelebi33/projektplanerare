@@ -202,6 +202,7 @@ export const svDict = {
     inPanel: "Baslinje", panelLine: (a: string, b: string, slip: number) => `${a} till ${b}. ${slip > 0 ? `Slutet har glidit ${slip} dagar.` : slip < 0 ? `Slutet är ${-slip} dagar före baslinjen.` : "Slutet är i tid."}`,
     show: "Visa baslinjen i tidslinjen", showHint: "En tunn stapel under varje post som fanns när baslinjen sparades. Röd kant betyder att slutet har glidit.", noEntry: "Posten fanns inte när baslinjen sparades.",
   },
+  gate: { checking: "Kontrollerar inloggning...", intro: "Logga in med ditt konto i organisationen för att använda Projektplanerare.", login: "Logga in med Microsoft" },
   sync: {
     intro: "Lägg datan i din egen OneDrive så att du ser samma projekt på en annan dator. Filen heter Projektplanerare/data.json. Två personer ska inte redigera samtidigt: den som synkar sist får välja.",
     clientId: "Program-ID (klient)", tenantId: "Katalog-ID (hyresgäst)", login: "Logga in med Microsoft", logout: "Logga ut", syncNow: "Synka nu", auto: "Synka automatiskt varje minut medan appen är öppen",

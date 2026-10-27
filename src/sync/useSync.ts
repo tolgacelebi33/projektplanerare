@@ -1,10 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { accountName, finishLogin, loadSync, login, logout, saveSync, token, type SyncConfig, type SyncState } from "./auth";
+import { LOGGED_IN_KEY, accountName, configOf, finishLogin, loadSync, login, logout, saveSync, token, type SyncConfig, type SyncState } from "./auth";
 import { realIo, syncOnce, type SyncStore, type Result } from "./run";
 import { SyncError } from "./onedrive";
-
-/** Program-ID och katalog-ID är inte hemliga (de syns i vilken inloggningsadress som helst); de ligger här så att ny enhet inte behöver skriva in dem. */
-export const DEFAULTS: SyncConfig = { clientId: "3d00acf1-28f5-4413-9ee9-977966512e3d", tenantId: "19c8ee62-a8e6-4d23-bb19-d5076555d8a2" };
 
 export interface SyncUi {
   cfg: SyncConfig; state: SyncState; account: string | null; busy: boolean; msg: { kind: "error" | "info"; text: string } | null; choose: "first" | "conflict" | null;
@@ -14,7 +11,7 @@ export interface SyncUi {
 /** `backup`: sparar en säkerhetskopia innan lokal data ersätts av molnets. Efter en hämtning laddas sidan om så att alla vyer visar det nya. */
 export function useSync(store: SyncStore & { flush(): Promise<void> }, backup: () => Promise<unknown>, texts: Record<"none" | "pushed" | "pulled", string>): SyncUi {
   const [state, setState] = useState<SyncState>(loadSync);
-  const cfg: SyncConfig = { clientId: state.clientId || DEFAULTS.clientId, tenantId: state.tenantId || DEFAULTS.tenantId };
+  const cfg = configOf(state);
   const [account, setAccount] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<SyncUi["msg"]>(null);
@@ -43,7 +40,7 @@ export function useSync(store: SyncStore & { flush(): Promise<void> }, backup: (
 
   // Vid start: ta emot svaret från inloggningen och synka en gång om kontot är kopplat.
   useEffect(() => {
-    if (!localStorage.getItem("projektplanerare.syncLoggedIn")) return;
+    if (!localStorage.getItem(LOGGED_IN_KEY)) return;
     let dead = false;
     void (async () => {
       try {
@@ -65,8 +62,8 @@ export function useSync(store: SyncStore & { flush(): Promise<void> }, backup: (
     cfg, state, account, busy, msg, choose,
     setCfg: (c) => patch({ clientId: c.clientId.trim(), tenantId: c.tenantId.trim() }),
     setAuto: (on) => patch({ auto: on }),
-    login: () => { try { localStorage.setItem("projektplanerare.syncLoggedIn", "1"); } catch { /* ignoreras */ } void login(cfg).catch((e) => setMsg({ kind: "error", text: String(e) })); },
-    logout: () => { try { localStorage.removeItem("projektplanerare.syncLoggedIn"); } catch { /* ignoreras */ } void logout(cfg).then(() => { setAccount(null); patch({ etag: undefined, hash: undefined, last: undefined, auto: false }); }); },
+    login: () => { try { localStorage.setItem(LOGGED_IN_KEY, "1"); } catch { /* ignoreras */ } void login(cfg).catch((e) => setMsg({ kind: "error", text: String(e) })); },
+    logout: () => { try { localStorage.removeItem(LOGGED_IN_KEY); } catch { /* ignoreras */ } void logout(cfg).then(() => { setAccount(null); patch({ etag: undefined, hash: undefined, last: undefined, auto: false }); }); },
     run,
   };
 }

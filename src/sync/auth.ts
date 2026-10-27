@@ -6,6 +6,11 @@ const KEY = "projektplanerare.sync";
 const SCOPES = ["Files.ReadWrite"];
 export interface SyncState extends Partial<SyncConfig> { etag?: string; hash?: string; last?: string; auto?: boolean }
 
+/** Program-ID och katalog-ID är inte hemliga (de syns i vilken inloggningsadress som helst); de ligger här så att ny enhet inte behöver skriva in dem. */
+export const DEFAULTS: SyncConfig = { clientId: "3d00acf1-28f5-4413-9ee9-977966512e3d", tenantId: "19c8ee62-a8e6-4d23-bb19-d5076555d8a2" };
+export const configOf = (s: SyncState): SyncConfig => ({ clientId: s.clientId || DEFAULTS.clientId, tenantId: s.tenantId || DEFAULTS.tenantId });
+export const LOGGED_IN_KEY = "projektplanerare.syncLoggedIn";
+
 export const loadSync = (): SyncState => { try { return JSON.parse(localStorage.getItem(KEY) ?? "{}") as SyncState; } catch { return {}; } };
 export const saveSync = (s: SyncState): void => { try { localStorage.setItem(KEY, JSON.stringify(s)); } catch { /* ignoreras: synken får då bara be om inställningarna igen */ } };
 

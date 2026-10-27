@@ -10,3 +10,15 @@ test("SY1 fliken Konto och synk visar förifyllda ID:n, inloggningsknappen och i
   await expect(dlg.getByRole("button", { name: "Logga in med Microsoft" })).toBeVisible();
   await expect(dlg.getByRole("button", { name: "Synka nu" })).toHaveCount(0);
 });
+
+test("SY2 på publicerad adress visas inloggning före appen och knappen skickar till Microsoft med rätt program och katalog", async ({ page }) => {
+  const ms: string[] = [];
+  await page.route("https://login.microsoftonline.com/**", (r) => { ms.push(r.request().url()); return r.abort(); });
+  await page.goto("http://app.localhost:5173/");
+  await expect(page.getByRole("heading", { name: "Projektplanerare" })).toBeVisible();
+  await expect(page.locator(".gantt_task_line")).toHaveCount(0);
+  await page.getByRole("button", { name: "Logga in med Microsoft" }).click();
+  await expect.poll(() => ms.length).toBeGreaterThan(0);
+  expect(ms[0]).toContain("19c8ee62-a8e6-4d23-bb19-d5076555d8a2");
+  expect(ms[0]).toContain("client_id=3d00acf1-28f5-4413-9ee9-977966512e3d");
+});

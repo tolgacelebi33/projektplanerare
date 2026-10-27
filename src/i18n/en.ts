@@ -197,6 +197,7 @@ export const enDict: Dict = {
     inPanel: "Baseline", panelLine: (a: string, b: string, slip: number) => `${a} to ${b}. ${slip > 0 ? `The end has slipped ${slip} days.` : slip < 0 ? `The end is ${-slip} days before the baseline.` : "The end is on time."}`,
     show: "Show the baseline in the timeline", showHint: "A thin bar under each item that existed when the baseline was saved. A red edge means the end has slipped.", noEntry: "The item did not exist when the baseline was saved.",
   },
+  gate: { checking: "Checking sign-in...", intro: "Sign in with your organization account to use Projektplanerare.", login: "Sign in with Microsoft" },
   sync: {
     intro: "Keep your data in your own OneDrive to see the same projects on another computer. The file is Projektplanerare/data.json. Two people should not edit at the same time: whoever syncs last chooses.",
     clientId: "Application (client) ID", tenantId: "Directory (tenant) ID", login: "Sign in with Microsoft", logout: "Sign out", syncNow: "Sync now", auto: "Sync automatically every minute while the app is open",

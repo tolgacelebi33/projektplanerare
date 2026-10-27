@@ -986,3 +986,7 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); opacity: 
 .datepick-pop select { font: inherit; font-size: 13px; color: var(--text); background: var(--surface-alt); border: var(--line-width) solid var(--line); border-radius: 6px; }
 .toolbar .datepick-btn { top: 50%; right: 3px; width: 22px; height: 22px; transform: translateY(-50%); }
 .toolbar .datepick-btn svg { width: 13px; height: 13px; display: block; }
+
+/* Inloggningsspärr före appen */
+.gate { max-width: 420px; margin: 18vh auto 0; padding: 0 16px; display: flex; flex-direction: column; gap: 12px; align-items: flex-start; color: var(--text); }
+.gate h1 { font-family: var(--font-title); font-weight: 400; margin: 0; }
