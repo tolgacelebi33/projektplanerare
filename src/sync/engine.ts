@@ -13,9 +13,9 @@ export function decide(base: Base | null, localHash: string, remoteEtag: string 
 export const hashOf = (s: string): string => { let h = 5381; for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0; return `${s.length}:${h}`; };
 
 export const FORMAT = "projektplanerare-sync";
-export const wrap = (snapshot: unknown): string => JSON.stringify({ format: FORMAT, version: 1, saved_at: new Date().toISOString(), snapshot });
-export function unwrap(text: string): unknown {
-  const o = JSON.parse(text) as { format?: string; snapshot?: unknown };
+export const wrap = (snapshot: unknown, customRules?: unknown): string => JSON.stringify({ format: FORMAT, version: 1, saved_at: new Date().toISOString(), snapshot, customRules });
+export function unwrap(text: string): { snapshot: unknown; customRules?: unknown } {
+  const o = JSON.parse(text) as { format?: string; snapshot?: unknown; customRules?: unknown };
   if (o.format !== FORMAT || !o.snapshot) throw new Error("Filen i OneDrive är inte en Projektplanerare-fil.");
-  return o.snapshot;
+  return { snapshot: o.snapshot, customRules: o.customRules };
 }

@@ -55,6 +55,30 @@ describe("syncOnce", () => {
   });
 });
 
+describe("egna regler", () => {
+  it("följer med filen vid uppladdning, hämtas vid pull och räknas som lokal ändring", async () => {
+    let rules: unknown = [{ id: "a" }];
+    const wrote: string[] = [];
+    const store: SyncStore = { snapshot: () => snap(1), replaceAll: async () => undefined, rules: { get: () => rules, set: (v) => { rules = v; } } };
+    const io = (remote: { etag: string; text: string } | null): Io => ({ token: async () => "t", read: async () => remote, write: async (_t, x) => { wrote.push(x); return "e9"; } });
+    const first = await syncOnce(store, null, io(null));
+    expect(JSON.parse(wrote[0]).customRules).toEqual([{ id: "a" }]);
+    rules = [{ id: "b" }];
+    const second = await syncOnce(store, first.base, io({ etag: "e9", text: "{}" }));
+    expect(second.result.kind).toBe("pushed");
+    const text = JSON.stringify({ format: "projektplanerare-sync", snapshot: snap(1), customRules: [{ id: "c" }] });
+    const pulled = await syncOnce(store, { etag: "e1", hash: second.base!.hash }, io({ etag: "e2", text }));
+    expect(pulled.result.kind).toBe("pulled"); expect(rules).toEqual([{ id: "c" }]);
+  });
+  it("en fil utan regler lämnar lokala regler orörda", async () => {
+    let rules: unknown = [{ id: "a" }];
+    const store: SyncStore = { snapshot: () => snap(1), replaceAll: async () => undefined, rules: { get: () => rules, set: (v) => { rules = v; } } };
+    const text = JSON.stringify({ format: "projektplanerare-sync", snapshot: snap(2) });
+    await syncOnce(store, { etag: "e1", hash: hashOf(JSON.stringify(snap(1)) + `|${JSON.stringify(rules)}`) }, { token: async () => "t", read: async () => ({ etag: "e2", text }), write: async () => "x" });
+    expect(rules).toEqual([{ id: "a" }]);
+  });
+});
+
 describe("Graph-anrop", () => {
   const res = (status: number, body: unknown = {}, text = "") => ({ status, ok: status < 300, json: async () => body, text: async () => text }) as Response;
   it("404 = ingen fil", async () => { expect(await readRemote("t", (async () => res(404)) as typeof fetch)).toBeNull(); });

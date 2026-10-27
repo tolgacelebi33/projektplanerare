@@ -55,6 +55,7 @@ import { WorkloadView } from "./views/WorkloadView";
 import { PortfolioView } from "./views/PortfolioView";
 import { ReportView } from "./views/ReportView";
 import { useSync } from "./sync/useSync";
+import { normalizeCustomRules } from "./data/customRules";
 import { myWeekGroups, portfolioRows, shiftPatch } from "./data/overviews";
 import { THEMES, applyTheme, getTheme, type Theme } from "./theme";
 
@@ -487,7 +488,15 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
   const [backupPreview, setBackupPreview] = useState<{ file: string; summary: BackupSummary } | null>(null);
   const [nagHidden, setNagHidden] = useState(false);
   const syncBackup = useCallback(async () => { const b = await buildBackup(store, new Date()); downloadText(b.filename, b.mime, b.text); }, [store]);
-  const sync = useSync(store as unknown as PersistentStore, syncBackup, sv.sync);
+  const syncStore = useMemo(() => {
+    const ps = store as unknown as PersistentStore;
+    return {
+      snapshot: () => ps.snapshot(), replaceAll: (x: Parameters<PersistentStore["replaceAll"]>[0]) => ps.replaceAll(x), flush: () => ps.flush(),
+      rules: { get: () => settingsRef.current.customRules, set: (v: unknown) => setSettings({ ...settingsRef.current, customRules: normalizeCustomRules(v) }) },
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [store]);
+  const sync = useSync(syncStore, syncBackup, sv.sync);
   const saveBackupFile = async (): Promise<string> => {
     const now = new Date();
     const b = await buildBackup(store, now);
