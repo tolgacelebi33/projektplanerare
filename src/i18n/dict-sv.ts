@@ -202,6 +202,14 @@ export const svDict = {
     inPanel: "Baslinje", panelLine: (a: string, b: string, slip: number) => `${a} till ${b}. ${slip > 0 ? `Slutet har glidit ${slip} dagar.` : slip < 0 ? `Slutet är ${-slip} dagar före baslinjen.` : "Slutet är i tid."}`,
     show: "Visa baslinjen i tidslinjen", showHint: "En tunn stapel under varje post som fanns när baslinjen sparades. Röd kant betyder att slutet har glidit.", noEntry: "Posten fanns inte när baslinjen sparades.",
   },
+  sync: {
+    intro: "Lägg datan i din egen OneDrive så att du ser samma projekt på en annan dator. Filen heter Projektplanerare/data.json. Två personer ska inte redigera samtidigt: den som synkar sist får välja.",
+    clientId: "Program-ID (klient)", tenantId: "Katalog-ID (hyresgäst)", login: "Logga in med Microsoft", logout: "Logga ut", syncNow: "Synka nu", auto: "Synka automatiskt varje minut medan appen är öppen",
+    signedInAs: (n: string) => `Inloggad som ${n}`, notSignedIn: "Inte inloggad.", last: (d: string) => `Senast synkad ${d}`, never: "Aldrig synkad här.",
+    none: "Allt är redan i synk.", pushed: "Din data är uppladdad till OneDrive.", pulled: "Datan från OneDrive hämtades.", working: "Synkar...",
+    firstWhy: "OneDrive har redan en fil och den här enheten har aldrig synkats. Vilken ska gälla?", conflictWhy: "Både den här enheten och OneDrive har ändrats sedan senaste synk. Vilken ska gälla?",
+    useLocal: "Behåll den här enheten (skriv över OneDrive)", useRemote: "Hämta från OneDrive (ersätter det här, en säkerhetskopia sparas först)",
+  },
   backup: {
     tab: "Säkerhetskopia", intro: "All din data ligger i den här webbläsaren. En säkerhetskopia är en fil med alla projekt, poster, beroenden, fält och personer som du kan spara var du vill.",
     save: "Spara säkerhetskopia", saved: (p: number, i: number) => `Sparade ${p} projekt med ${i} poster.`, lastSaved: (d: string) => `Senast sparad: ${d}`, never: "Du har inte sparat någon säkerhetskopia här än.",
@@ -267,7 +275,7 @@ export const svDict = {
   },
   settings: {
     button: "Inställningar", title: "Inställningar",
-    tabs: { label: "Inställningar, avsnitt", list: "Listvy", board: "Boardvy", views: "Fler vyer", item: "Posten", rules: "Regler", people: "Personer", reminders: "Påminnelser", backup: "Säkerhetskopia", start: "Start och tema", touch: "Pekskärm", info: "Information och hjälp" },
+    tabs: { label: "Inställningar, avsnitt", list: "Listvy", board: "Boardvy", views: "Fler vyer", item: "Posten", rules: "Regler", people: "Personer", reminders: "Påminnelser", backup: "Säkerhetskopia", sync: "Konto och synk", start: "Start och tema", touch: "Pekskärm", info: "Information och hjälp" },
     people: { capacityOf: (n: string) => `Timmar per vecka för ${n}`, capacityShort: "h/v", capacityUnit: "h/vecka", capacityHint: "Kapacitet i timmar per vecka. Används av belastningen i timmar. Tomt: ingen kapacitet satt.", intro: "Personerna du kan välja som ansvarig. Ett namn ändras direkt. Tas en person bort blir hens poster utan ansvarig i alla projekt.", nameOf: (n: string) => `Namn: ${n}`, newName: "Namn på ny person", add: "Lägg till", remove: "Ta bort", confirm: (n: string) => `Ta bort ${n}? Posterna blir utan ansvarig i alla projekt och ångra-historiken töms.`, confirmYes: "Ta bort", cancel: "Avbryt", none: "Inga personer än.", removed: (n: number) => `Personen togs bort. ${n} poster blev utan ansvarig.` },
     rulesIntro: "Några fasta regler som gäller alla poster. Alla är av som standard.",
     rules: { doneSetsProgress: "När status blir Klar, sätt framsteg till 100", doneSetsProgressHint: "Gäller uppgifter och milstolpar. Ändras framsteget i samma ändring (till exempel i panelen) står det värdet kvar.", seriesNext: "När ett tillfälle i en serie blir klart, skapa nästa efter det sista", seriesNextHint: "Serien fortsätter framåt av sig själv, med samma upprepning. En serie har högst 120 tillfällen." },

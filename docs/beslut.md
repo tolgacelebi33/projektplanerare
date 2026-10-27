@@ -604,3 +604,11 @@ Användaren såg de ljusa standardlisterna i Microsoft Edge (nere och till höge
 Tillägg (användaren): datumfältet för Eget-perioden i verktygsraden hade webbläsarens vita bakgrund. Nu har det temats ytfärg och textfärg och samma pillform som rullistorna bredvid (test SB-datum, i alla tre teman). Rullisterna gäller också Gantts egna (nere och till höger i tidslinjen): testet kontrollerar nu `.gantt_hor_scroll` och `.gantt_ver_scroll` särskilt (det förra testet kunde träffa ett element utan rullist).
 
 Tillägg (användaren): i kalenderkortet var månads- och årsrullistorna fortfarande vita (de var bara formade i panel och dialog), och kalenderikonen i verktygsradens datumfält hamnade för lågt (knappen var gjord för de högre fälten i panelen). Nu har rullistorna i kalenderkortet temats färger överallt, och ikonen är centrerad i höjd och ligger vid högerkanten i fältet. Test SB-kalender (alla tre teman).
+
+## 2026-10-27: Synk mellan enheter via OneDrive
+
+- Beslut: datan lagras som en JSON-fil (`Projektplanerare/data.json`) i användarens egen OneDrive via Microsoft Graph. Inloggning med MSAL.js (`@azure/msal-browser` 5.26.0, MIT), omdirigering (inte popup), enkeltenant-app i användarens Entra (celebi.io), delegerad behörighet `Files.ReadWrite`. Ingen backend, ingen Azure-prenumeration. Program-ID och katalog-ID ligger som standardvärden i `src/sync/useSync.ts` (de är inte hemliga) och kan ändras i Inställningar, Konto och synk.
+- Synkregel (`src/sync/engine.ts`): jämför lokal hash och molnets eTag mot läget vid senaste synk. Bara lokalt ändrat: ladda upp (`If-Match`). Bara molnet ändrat: hämta. Båda ändrade, eller enheten aldrig synkad och molnet har fil: användaren väljer, ingenting skrivs över av sig själv. Vid val "hämta" sparas en säkerhetskopia först. Efter hämtning laddas sidan om.
+- Skäl: Supabase avvisades, Azure kräver prenumeration. OneDrive ingår redan i Microsoft 365.
+- Begränsningar: ingen samtidig redigering (bara konfliktval), ångra-historik och inställningar följer inte med, filer över 4 MB stöds inte än (kräver uppladdningssession), delning med fler = en delad mapp (ej byggt).
+- Overifierat: riktig inloggning och `If-Match` mot Graph har inte körts mot användarens tenant (bara mockad fetch i `tests/sync.test.ts`). Om MSAL 5 kräver en omdirigeringssida för redirect-flödet är oklart.

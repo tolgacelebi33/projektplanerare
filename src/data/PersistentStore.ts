@@ -186,6 +186,15 @@ export class PersistentStore extends MemoryStore {
     this.backend.rescueSync?.(this.stored());
   }
 
+  /** Byter ut allt innehåll mot ett från molnet (synk). Kontrolleras först; ångra-historiken töms. Sparas som vanligt. */
+  async replaceAll(snap: Snapshot): Promise<void> {
+    PersistentStore.check(snap);
+    this.restore(snap);
+    this.clearHistory();
+    this.notify();
+    await this.flush();
+  }
+
   /** Väntar tills allt som ändrats är sparat. */
   flush(): Promise<void> {
     if (this.timer) { clearTimeout(this.timer); this.timer = null; this.startSave(); }

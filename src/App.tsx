@@ -1,4 +1,4 @@
-import { Suspense, lazy, useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { downloadText } from "./download";
 import { MAX_IMPORT_BYTES, ImportError, parseUpload, type ParsedProject } from "./data/exchange";
 import { duplicateProject, exportProject, importParsed, type ExportFormat, type ImportResult } from "./data/importExport";
@@ -54,6 +54,7 @@ import { MyWeekView } from "./views/MyWeekView";
 import { WorkloadView } from "./views/WorkloadView";
 import { PortfolioView } from "./views/PortfolioView";
 import { ReportView } from "./views/ReportView";
+import { useSync } from "./sync/useSync";
 import { myWeekGroups, portfolioRows, shiftPatch } from "./data/overviews";
 import { THEMES, applyTheme, getTheme, type Theme } from "./theme";
 
@@ -485,6 +486,8 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
   }, [store, projects.projectId]);
   const [backupPreview, setBackupPreview] = useState<{ file: string; summary: BackupSummary } | null>(null);
   const [nagHidden, setNagHidden] = useState(false);
+  const syncBackup = useCallback(async () => { const b = await buildBackup(store, new Date()); downloadText(b.filename, b.mime, b.text); }, [store]);
+  const sync = useSync(store as unknown as PersistentStore, syncBackup, sv.sync);
   const saveBackupFile = async (): Promise<string> => {
     const now = new Date();
     const b = await buildBackup(store, now);
@@ -950,7 +953,7 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
       {statusOpen && project && <StatusDialog project={project} updates={statusUpdates} onClose={() => setStatusOpen(false)} onPublish={async (h, t) => { await store.addStatusUpdate({ project_id: project.id, health: h, text: t }); }} />}
       {paletteOpen && <CommandPalette data={paletteData ?? []} loading={paletteData === null} commands={paletteCommands} onClose={() => setPaletteOpen(false)}
         onOpenItem={(pid, iid) => { openInProject(pid, iid); }} onOpenProject={(pid) => { focusMedianOnNextProject(); projects.select(pid); }} />}
-      {settingsOpen && <SettingsDialog theme={theme} onTheme={(t) => { rememberScroll(); applyTheme(t); setTheme(t); }} projects={(projects.projects ?? []).map((p) => ({ id: p.id, name: p.name }))} projectId={projects.projectId} fieldDefs={fieldDefs} settings={settings} install={{ available: !!installEvt, installed, onInstall: () => { const e = installEvt; if (!e) return; void e.prompt().then(() => e.userChoice).finally(() => setInstallEvt(null)); } }} backup={{ lastSaved: lastBackup, onSave: saveBackupFile, onRestoreFile: pickBackup }} people={{ users, onCapacity: async (id, h) => { await store.setUserCapacity(id, h); await reloadUsers(); }, onAdd: async (n) => { await store.addUser(n); await reloadUsers(); }, onRename: async (id, n) => { await store.renameUser(id, n); await reloadUsers(); await refresh(); }, onRemove: async (id) => { const n = await store.removeUser(id); await reloadUsers(); await refresh(); setAttrFilter((f) => ({ ...f, assignees: f.assignees.filter((x) => x !== id) })); return n; } }} onChange={setSettings} onClose={() => setSettingsOpen(false)} />}
+      {settingsOpen && <SettingsDialog theme={theme} onTheme={(t) => { rememberScroll(); applyTheme(t); setTheme(t); }} projects={(projects.projects ?? []).map((p) => ({ id: p.id, name: p.name }))} projectId={projects.projectId} fieldDefs={fieldDefs} settings={settings} install={{ available: !!installEvt, installed, onInstall: () => { const e = installEvt; if (!e) return; void e.prompt().then(() => e.userChoice).finally(() => setInstallEvt(null)); } }} sync={sync} backup={{ lastSaved: lastBackup, onSave: saveBackupFile, onRestoreFile: pickBackup }} people={{ users, onCapacity: async (id, h) => { await store.setUserCapacity(id, h); await reloadUsers(); }, onAdd: async (n) => { await store.addUser(n); await reloadUsers(); }, onRename: async (id, n) => { await store.renameUser(id, n); await reloadUsers(); await refresh(); }, onRemove: async (id) => { const n = await store.removeUser(id); await reloadUsers(); await refresh(); setAttrFilter((f) => ({ ...f, assignees: f.assignees.filter((x) => x !== id) })); return n; } }} onChange={setSettings} onClose={() => setSettingsOpen(false)} />}
       {backupPreview && <BackupRestore fileName={backupPreview.file} summary={backupPreview.summary} onCancel={() => setBackupPreview(null)} onConfirm={() => void confirmRestore()} />}
       {recurOpen && <RecurringDialog key={recurInit ? "from" : "new"} today={todayISO()} initial={recurInit ?? undefined} onCreate={(a) => void addSeries(a)} onClose={() => setRecurOpen(false)} />}
       {menu && <ContextMenu x={menu.x} y={menu.y} items={menuItems} confirm={confirmRemove} onPick={(id) => void pickMenu(id)} onClose={() => setMenu(null)} />}

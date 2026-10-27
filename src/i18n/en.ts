@@ -197,6 +197,14 @@ export const enDict: Dict = {
     inPanel: "Baseline", panelLine: (a: string, b: string, slip: number) => `${a} to ${b}. ${slip > 0 ? `The end has slipped ${slip} days.` : slip < 0 ? `The end is ${-slip} days before the baseline.` : "The end is on time."}`,
     show: "Show the baseline in the timeline", showHint: "A thin bar under each item that existed when the baseline was saved. A red edge means the end has slipped.", noEntry: "The item did not exist when the baseline was saved.",
   },
+  sync: {
+    intro: "Keep your data in your own OneDrive to see the same projects on another computer. The file is Projektplanerare/data.json. Two people should not edit at the same time: whoever syncs last chooses.",
+    clientId: "Application (client) ID", tenantId: "Directory (tenant) ID", login: "Sign in with Microsoft", logout: "Sign out", syncNow: "Sync now", auto: "Sync automatically every minute while the app is open",
+    signedInAs: (n: string) => `Signed in as ${n}`, notSignedIn: "Not signed in.", last: (d: string) => `Last synced ${d}`, never: "Never synced here.",
+    none: "Everything is already in sync.", pushed: "Your data was uploaded to OneDrive.", pulled: "The data from OneDrive was downloaded.", working: "Syncing...",
+    firstWhy: "OneDrive already has a file and this device has never been synced. Which one wins?", conflictWhy: "Both this device and OneDrive changed since the last sync. Which one wins?",
+    useLocal: "Keep this device (overwrite OneDrive)", useRemote: "Take OneDrive (replaces this, a backup is saved first)",
+  },
   backup: {
     tab: "Backup", intro: "All your data is in this browser. A backup is a file with all projects, items, dependencies, fields and people that you can save wherever you like.",
     save: "Save backup", saved: (p: number, i: number) => `Saved ${p} projects with ${i} items.`, lastSaved: (d: string) => `Last saved: ${d}`, never: "You have not saved a backup here yet.",
@@ -262,7 +270,7 @@ export const enDict: Dict = {
   },
   settings: {
     button: "Settings", title: "Settings",
-    tabs: { label: "Settings, sections", list: "List view", board: "Board view", views: "More views", item: "Item", rules: "Rules", people: "People", reminders: "Reminders", backup: "Backup", start: "Start and theme", touch: "Touch screen", info: "Information and help" },
+    tabs: { label: "Settings, sections", list: "List view", board: "Board view", views: "More views", item: "Item", rules: "Rules", people: "People", reminders: "Reminders", backup: "Backup", sync: "Account and sync", start: "Start and theme", touch: "Touch screen", info: "Information and help" },
     people: { capacityOf: (n: string) => `Hours per week for ${n}`, capacityShort: "h/w", capacityUnit: "h/week", capacityHint: "Capacity in hours per week. Used by the workload in hours. Empty: no capacity set.", intro: "The people you can choose as assignee. A name changes right away. If a person is removed, their items have no assignee in any project.", nameOf: (n: string) => `Name: ${n}`, newName: "Name of new person", add: "Add", remove: "Remove", confirm: (n: string) => `Remove ${n}? The items will have no assignee in any project and the undo history is cleared.`, confirmYes: "Remove", cancel: "Cancel", none: "No people yet.", removed: (n: number) => `The person was removed. ${n} items now have no assignee.` },
     rulesIntro: "A few fixed rules that apply to all items. All are off by default.",
     rules: { doneSetsProgress: "When status becomes Done, set progress to 100", doneSetsProgressHint: "Applies to tasks and milestones. If progress is changed in the same edit (for example in the panel) that value is kept.", seriesNext: "When an occurrence in a series is done, create the next one after the last", seriesNextHint: "The series keeps going on its own, with the same repetition. A series has at most 120 occurrences." },

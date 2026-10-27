@@ -4,9 +4,10 @@ import type { FieldDef, User } from "../data/types";
 import { sv } from "../i18n/sv";
 import { THEMES, type Theme } from "../theme";
 import { RuleBuilder } from "./RuleBuilder";
+import type { SyncUi } from "../sync/useSync";
 
 /** Inställningar: ändras direkt och sparas i webbläsaren. Esc, Stäng eller klick utanför stänger. */
-const TABS = ["list", "board", "views", "item", "rules", "reminders", "people", "start", "touch", "backup", "info"] as const;
+const TABS = ["list", "board", "views", "item", "rules", "reminders", "people", "start", "touch", "backup", "sync", "info"] as const;
 type Tab = (typeof TABS)[number];
 const KEYS = ["N", "M", "G", "/", "Cmd/Ctrl + K", "T", "1, 2, 3", "?", "Cmd/Ctrl + Z", "Cmd/Ctrl + Shift + Z, Cmd/Ctrl + Y", "Alt + ↑ / ↓", "H", "Esc"]; // samma på alla språk, texterna står i ordlistan i samma ordning
 const TAB0_KEY = "projektplanerare.settingsTab";
@@ -15,7 +16,7 @@ export interface InstallApi { available: boolean; installed: boolean; onInstall:
 export interface BackupApi { lastSaved: string | null; onSave: () => Promise<string>; onRestoreFile: (file: File) => Promise<void> }
 export interface PeopleApi { users: User[]; onCapacity: (id: string, hours: number | null) => Promise<void>; onAdd: (name: string) => Promise<void>; onRename: (id: string, name: string) => Promise<void>; onRemove: (id: string) => Promise<number> }
 
-export function SettingsDialog({ theme, onTheme, fieldDefs = [], settings, people, projects = [], projectId = null, backup, install, onChange, onClose }: { theme?: Theme; onTheme?: (t: Theme) => void; projects?: { id: string; name: string }[]; projectId?: string | null; fieldDefs?: FieldDef[]; settings: Settings; people?: PeopleApi; backup?: BackupApi; install?: InstallApi; onChange: (s: Settings) => void; onClose: () => void }) {
+export function SettingsDialog({ theme, onTheme, fieldDefs = [], settings, people, projects = [], projectId = null, backup, sync, install, onChange, onClose }: { theme?: Theme; onTheme?: (t: Theme) => void; projects?: { id: string; name: string }[]; projectId?: string | null; fieldDefs?: FieldDef[]; settings: Settings; people?: PeopleApi; backup?: BackupApi; sync?: SyncUi; install?: InstallApi; onChange: (s: Settings) => void; onClose: () => void }) {
   const root = useRef<HTMLDivElement>(null);
   const [tab, setTab] = useState<Tab>(() => { try { const v = sessionStorage.getItem(TAB0_KEY); return (TABS as readonly string[]).includes(v ?? "") ? (v as Tab) : "list"; } catch { return "list"; } });
   const pick = (t: Tab) => { setTab(t); try { sessionStorage.setItem(TAB0_KEY, t); } catch { /* ignoreras */ } };
@@ -138,6 +139,7 @@ export function SettingsDialog({ theme, onTheme, fieldDefs = [], settings, peopl
               <p className="panel-muted">{t.touchHint}</p>
             </section>)}
             {tab === "backup" && backup && <BackupTab api={backup} days={settings.backupReminderDays} onDays={(n) => set("backupReminderDays", n)} />}
+            {tab === "sync" && sync && <SyncTab ui={sync} />}
             {tab === "info" && (<section>
               <p>{t.infoStorage}</p>
               <p>{t.infoCodes}</p>
@@ -213,6 +215,38 @@ function PeopleTab({ api }: { api: PeopleApi }) {
         <button type="submit" className="mini" disabled={!adding.trim()}>{t.add}</button>
       </form>
       {msg && <p role={msg.kind === "error" ? "alert" : "status"} className={msg.kind === "error" ? "people-error" : "panel-muted"}>{msg.text}</p>}
+    </section>
+  );
+}
+
+function SyncTab({ ui }: { ui: SyncUi }) {
+  const t = sv.sync;
+  return (
+    <section>
+      <p>{t.intro}</p>
+      <label className="panel-field"><span>{t.clientId}</span><input name="sync-client" value={ui.cfg.clientId} onChange={(e) => ui.setCfg({ ...ui.cfg, clientId: e.target.value })} /></label>
+      <label className="panel-field"><span>{t.tenantId}</span><input name="sync-tenant" value={ui.cfg.tenantId} onChange={(e) => ui.setCfg({ ...ui.cfg, tenantId: e.target.value })} /></label>
+      <div className="panel-row">
+        {ui.account
+          ? <><span className="panel-muted" data-part="account">{t.signedInAs(ui.account)}</span><button type="button" className="mini" onClick={ui.logout}>{t.logout}</button></>
+          : <><span className="panel-muted">{t.notSignedIn}</span><button type="button" className="mini mini-primary" onClick={ui.login}>{t.login}</button></>}
+      </div>
+      {ui.account && (<>
+        <div className="panel-row">
+          <button type="button" className="mini mini-primary" disabled={ui.busy} onClick={() => void ui.run()}>{ui.busy ? t.working : t.syncNow}</button>
+          <span className="panel-muted" data-part="last">{ui.state.last ? t.last(ui.state.last) : t.never}</span>
+        </div>
+        <label className="panel-check"><input type="checkbox" name="sync-auto" checked={!!ui.state.auto} onChange={(e) => ui.setAuto(e.target.checked)} /> {t.auto}</label>
+      </>)}
+      {ui.choose && (
+        <div role="alert" className="panel-block">
+          <p>{ui.choose === "first" ? t.firstWhy : t.conflictWhy}</p>
+          <div className="panel-row">
+            <button type="button" className="mini" disabled={ui.busy} onClick={() => void ui.run("local")}>{t.useLocal}</button>
+            <button type="button" className="mini" disabled={ui.busy} onClick={() => void ui.run("remote")}>{t.useRemote}</button>
+          </div>
+        </div>)}
+      {ui.msg && <p role={ui.msg.kind === "error" ? "alert" : "status"} className={ui.msg.kind === "error" ? "people-error" : "panel-muted"}>{ui.msg.text}</p>}
     </section>
   );
 }
