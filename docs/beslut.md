@@ -628,3 +628,5 @@ Tillägg 2026-10-27: länkar i postpanelen är av som standard (`features.links`
 - Ångra: en ångrad borttagning döljs i listan (visas igen om Gör om tar bort posten på nytt). Importens egen rullning tillbaka lägger inget i papperskorgen (`noTrash`).
 - Återställning: poster kräver att projektet finns (annars felmeddelande, raden ligger kvar); saknas deras grupp hamnar de överst; beroenden återställs bara om båda ändar finns. Ett återställt projekt får tillbaka poster, beroenden, kommentarer, statusuppdateringar och räknare men inte loggen (historiken över ändringar togs bort med projektet).
 - Overifierat: storleken. Ett stort projekt i papperskorgen ökar synkfilen, och gränsen för enkel uppladdning är 4 MB.
+
+Tillägg 2026-10-27: alla bekräftelser vid borttagning (projekt, post eller grupp, markerade poster, serie) säger nu att det går att återställa under Inställningar, Papperskorg (ersätter "Det går inte att ångra" för projekt och grupp, vilket inte stämde med Ångra).
