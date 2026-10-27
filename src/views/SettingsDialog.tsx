@@ -5,18 +5,20 @@ import { sv } from "../i18n/sv";
 import { THEMES, type Theme } from "../theme";
 import { RuleBuilder } from "./RuleBuilder";
 import type { SyncUi } from "../sync/useSync";
+import type { TrashView } from "../data/trash";
 
 /** Inställningar: ändras direkt och sparas i webbläsaren. Esc, Stäng eller klick utanför stänger. */
-const TABS = ["list", "board", "views", "item", "rules", "reminders", "people", "start", "touch", "backup", "sync", "info"] as const;
+const TABS = ["list", "board", "views", "item", "rules", "reminders", "people", "start", "touch", "backup", "sync", "trash", "info"] as const;
 type Tab = (typeof TABS)[number];
 const KEYS = ["N", "M", "G", "/", "Cmd/Ctrl + K", "T", "1, 2, 3", "?", "Cmd/Ctrl + Z", "Cmd/Ctrl + Shift + Z, Cmd/Ctrl + Y", "Alt + ↑ / ↓", "H", "Esc"]; // samma på alla språk, texterna står i ordlistan i samma ordning
 const TAB0_KEY = "projektplanerare.settingsTab";
 
 export interface InstallApi { available: boolean; installed: boolean; onInstall: () => void }
+export interface TrashApi { list: () => Promise<TrashView[]>; restore: (id: string) => Promise<string>; remove: (id: string) => Promise<void>; empty: () => Promise<void> }
 export interface BackupApi { lastSaved: string | null; onSave: () => Promise<string>; onRestoreFile: (file: File) => Promise<void> }
 export interface PeopleApi { users: User[]; onCapacity: (id: string, hours: number | null) => Promise<void>; onAdd: (name: string) => Promise<void>; onRename: (id: string, name: string) => Promise<void>; onRemove: (id: string) => Promise<number> }
 
-export function SettingsDialog({ theme, onTheme, fieldDefs = [], settings, people, projects = [], projectId = null, backup, sync, install, onChange, onClose }: { theme?: Theme; onTheme?: (t: Theme) => void; projects?: { id: string; name: string }[]; projectId?: string | null; fieldDefs?: FieldDef[]; settings: Settings; people?: PeopleApi; backup?: BackupApi; sync?: SyncUi; install?: InstallApi; onChange: (s: Settings) => void; onClose: () => void }) {
+export function SettingsDialog({ theme, onTheme, fieldDefs = [], settings, people, projects = [], projectId = null, backup, sync, trash, install, onChange, onClose }: { theme?: Theme; onTheme?: (t: Theme) => void; projects?: { id: string; name: string }[]; projectId?: string | null; fieldDefs?: FieldDef[]; settings: Settings; people?: PeopleApi; backup?: BackupApi; sync?: SyncUi; trash?: TrashApi; install?: InstallApi; onChange: (s: Settings) => void; onClose: () => void }) {
   const root = useRef<HTMLDivElement>(null);
   const [tab, setTab] = useState<Tab>(() => { try { const v = sessionStorage.getItem(TAB0_KEY); return (TABS as readonly string[]).includes(v ?? "") ? (v as Tab) : "list"; } catch { return "list"; } });
   const pick = (t: Tab) => { setTab(t); try { sessionStorage.setItem(TAB0_KEY, t); } catch { /* ignoreras */ } };
@@ -140,6 +142,7 @@ export function SettingsDialog({ theme, onTheme, fieldDefs = [], settings, peopl
             </section>)}
             {tab === "backup" && backup && <BackupTab api={backup} days={settings.backupReminderDays} onDays={(n) => set("backupReminderDays", n)} />}
             {tab === "sync" && sync && <SyncTab ui={sync} />}
+            {tab === "trash" && trash && <TrashTab api={trash} />}
             {tab === "info" && (<section>
               <p>{t.infoStorage}</p>
               <p>{t.infoCodes}</p>
@@ -244,6 +247,38 @@ function StorageLine() {
         {info.persisted !== null && <p className="panel-muted">{info.persisted ? t.persisted : t.notPersisted}</p>}
       </>)}
     </div>
+  );
+}
+
+function TrashTab({ api }: { api: TrashApi }) {
+  const t = sv.trash;
+  const [rows, setRows] = useState<TrashView[] | null>(null);
+  const [msg, setMsg] = useState<{ kind: "error" | "info"; text: string } | null>(null);
+  const [confirmAll, setConfirmAll] = useState(false);
+  const load = () => api.list().then(setRows, (e) => setMsg({ kind: "error", text: errText(e) }));
+  useEffect(() => { void load(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  const run = async (fn: () => Promise<string | void>) => { try { const m = await fn(); setMsg(m ? { kind: "info", text: m } : null); } catch (e) { setMsg({ kind: "error", text: errText(e) }); } setConfirmAll(false); await load(); };
+  return (
+    <section>
+      <p>{t.intro}</p>
+      {rows && rows.length === 0 && <p className="panel-muted" data-part="empty">{t.empty}</p>}
+      {rows && rows.length > 0 && (<>
+        <ul className="trash-list">
+          {rows.map((r) => (
+            <li key={r.id} className="panel-row" data-trash={r.id}>
+              <span><strong>{r.label}</strong> <span className="panel-muted">{r.kind === "project" ? t.project(r.count) : t.items(r.count)}, {t.deleted(r.deleted_at.slice(0, 10))}</span></span>
+              <button type="button" className="mini mini-primary" onClick={() => void run(() => api.restore(r.id))}>{t.restore}</button>
+              <button type="button" className="mini" onClick={() => void run(() => api.remove(r.id))}>{t.forever}</button>
+            </li>))}
+        </ul>
+        {confirmAll
+          ? <div role="alert" className="panel-block"><p>{t.confirmAll(rows.length)}</p><div className="panel-row">
+              <button type="button" className="mini mini-primary" onClick={() => void run(() => api.empty())}>{t.confirmYes}</button>
+              <button type="button" className="mini" onClick={() => setConfirmAll(false)}>{t.cancel}</button></div></div>
+          : <div className="panel-row"><button type="button" className="mini" onClick={() => setConfirmAll(true)}>{t.emptyAll}</button></div>}
+      </>)}
+      {msg && <p role={msg.kind === "error" ? "alert" : "status"} className={msg.kind === "error" ? "people-error" : "panel-muted"}>{msg.text}</p>}
+    </section>
   );
 }
 

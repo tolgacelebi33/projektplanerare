@@ -10,11 +10,11 @@ export interface DataStore {
   createProject(p: Omit<Project, "id" | "created_at">): Promise<Project>;
   updateProject(id: string, patch: { name?: string; dependency_mode?: DependencyMode; fields?: FieldDef[]; views?: SavedView[]; baseline?: Baseline | null; statuses?: StatusDef[] | null }): Promise<Project>;
   /** Tar bort projektet med alla poster och beroenden. */
-  deleteProject(id: string): Promise<void>;
+  deleteProject(id: string, opts?: { noTrash?: boolean }): Promise<void>;
   listItems(projectId: string): Promise<Item[]>;
   createItem(item: Omit<Item, "id">): Promise<Item>;
   updateItem(id: string, patch: Partial<Omit<Item, "id" | "workspace_id" | "project_id">>): Promise<Item>;
-  deleteItem(id: string): Promise<void>;
+  deleteItem(id: string, opts?: { batch?: string; noTrash?: boolean }): Promise<void>;
   listDependencies(projectId: string): Promise<Dependency[]>;
   createDependency(dep: Omit<Dependency, "id">): Promise<Dependency>;
   /** Meddelar när något ändrats (valfritt: lagret i minnet och i webbläsaren har det). */

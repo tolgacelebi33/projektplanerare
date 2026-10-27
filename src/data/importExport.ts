@@ -144,9 +144,9 @@ export async function importParsed(store: MemoryStore, workspaceId: string, pars
     if (existing) {
       // Rulla tillbaka: de nya beroendena, sedan de nya posterna (barn före föräldrar), och projektets beroendeläge
       for (const id of createdDeps) await store.deleteDependency(id).catch(() => undefined);
-      for (const id of [...createdItems].reverse()) await store.deleteItem(id).catch(() => undefined);
+      for (const id of [...createdItems].reverse()) await store.deleteItem(id, { noTrash: true }).catch(() => undefined);
       await store.updateProject(project.id, { dependency_mode: originalMode, fields: originalFields ?? [] }).catch(() => undefined);
-    } else await store.deleteProject(project.id).catch(() => undefined);
+    } else await store.deleteProject(project.id, { noTrash: true }).catch(() => undefined);
     throw e;
   } finally { if (ownLog) store.logging = true; }
 }

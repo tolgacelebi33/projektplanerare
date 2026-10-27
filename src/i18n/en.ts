@@ -199,6 +199,12 @@ export const enDict: Dict = {
   },
   gate: { checking: "Checking sign-in...", intro: "Sign in with your organization account to use Projektplanerare.", login: "Sign in with Microsoft" },
   storage: { title: "Storage in this browser", used: (u: string, q: string) => `Used: ${u} of about ${q}.`, persisted: "The browser has promised not to clear the data by itself.", notPersisted: "The browser has not promised to keep the data: it may be cleared if the device runs low on space. Save a backup.", unknown: "The browser cannot report how much is used." },
+  trash: {
+    intro: "What you delete stays here for 30 days (at most 50 deletions), then it is gone for good. The trash is carried by sync.",
+    empty: "The trash is empty.", project: (n: number) => `Project, ${n} items`, items: (n: number) => (n === 1 ? "1 item" : `${n} items`), deleted: (d: string) => `Deleted ${d}`,
+    restore: "Restore", forever: "Delete forever", emptyAll: "Empty the trash", confirmAll: (n: number) => `Delete all ${n} forever? This cannot be undone.`, confirmYes: "Delete forever", cancel: "Cancel",
+    restoredProject: (n: string) => `The project ${n} is back.`, restoredItems: (n: number) => `${n === 1 ? "The item is" : `${n} items are`} back.`,
+  },
   sync: {
     intro: "Keep your data in your own OneDrive to see the same projects on another computer. The file is Projektplanerare/data.json. Two people should not edit at the same time: whoever syncs last chooses.",
     clientId: "Application (client) ID", tenantId: "Directory (tenant) ID", login: "Sign in with Microsoft", logout: "Sign out", syncNow: "Sync now", auto: "Sync automatically every minute while the app is open",
@@ -274,7 +280,7 @@ export const enDict: Dict = {
   },
   settings: {
     button: "Settings", title: "Settings",
-    tabs: { label: "Settings, sections", list: "List view", board: "Board view", views: "More views", item: "Item", rules: "Rules", people: "People", reminders: "Reminders", backup: "Backup", sync: "Account and sync", start: "Start and theme", touch: "Touch screen", info: "Information and help" },
+    tabs: { label: "Settings, sections", list: "List view", board: "Board view", views: "More views", item: "Item", rules: "Rules", people: "People", reminders: "Reminders", backup: "Backup", sync: "Account and sync", trash: "Trash", start: "Start and theme", touch: "Touch screen", info: "Information and help" },
     people: { capacityOf: (n: string) => `Hours per week for ${n}`, capacityShort: "h/w", capacityUnit: "h/week", capacityHint: "Capacity in hours per week. Used by the workload in hours. Empty: no capacity set.", intro: "The people you can choose as assignee. A name changes right away. If a person is removed, their items have no assignee in any project.", nameOf: (n: string) => `Name: ${n}`, newName: "Name of new person", add: "Add", remove: "Remove", confirm: (n: string) => `Remove ${n}? The items will have no assignee in any project and the undo history is cleared.`, confirmYes: "Remove", cancel: "Cancel", none: "No people yet.", removed: (n: number) => `The person was removed. ${n} items now have no assignee.` },
     rulesIntro: "A few fixed rules that apply to all items. All are off by default.",
     rules: { doneSetsProgress: "When status becomes Done, set progress to 100", doneSetsProgressHint: "Applies to tasks and milestones. If progress is changed in the same edit (for example in the panel) that value is kept.", seriesNext: "When an occurrence in a series is done, create the next one after the last", seriesNextHint: "The series keeps going on its own, with the same repetition. A series has at most 120 occurrences." },

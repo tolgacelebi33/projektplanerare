@@ -58,6 +58,7 @@ export class PersistentStore extends MemoryStore {
       validateItemShape(i);
       if (i.parent_id !== null && !ids.has(i.parent_id)) throw new Error(sv.persist.parentMissing(i.id));
     }
+    if (s.trash !== undefined && !Array.isArray(s.trash)) throw new Error(sv.persist.badShape);
     for (const d of s.dependencies) if (!ids.has(d.from_item_id) || !ids.has(d.to_item_id)) throw new Error(sv.persist.depMissing(d.id));
   }
 

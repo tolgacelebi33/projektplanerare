@@ -620,3 +620,11 @@ Tillägg 2026-10-27: egna regler (`customRules`) följer med synkfilen (beslut: 
 Tillägg 2026-10-27: egna regler följer också med säkerhetskopian (`custom_rules`, läggs till vid återställning, befintliga id:n orörda, regel för saknat projekt hoppas över). Lagringsindikator under Information och hjälp (`navigator.storage.estimate()` och `persisted()`: använt av cirka, om webbläsaren lovat att inte rensa). Texten om lagring ändrad: en kopia i OneDrive om synken är på. Beslut av användaren: statusfärg på kalender- och boardkort, deluppgifter och projektradens textfärg lämnas som de är, minimeringsvarianterna 2 och 3 byggs inte, alla projekt i ett hjul/Gantt väntar.
 
 Tillägg 2026-10-27: länkar i postpanelen är av som standard (`features.links` false; data finns kvar och delen slås på under Inställningar, Posten). Sparade inställningar behålls. Mer luft (14 px) mellan Tillhör grupp, Deluppgift till och Flytta upp/ner i panelen.
+
+## 2026-10-27: Papperskorg
+
+- Beslut: det som tas bort (projekt, och poster som tas bort i samma handling: en post med allt under den, eller en serie) läggs i en papperskorg i stället för att försvinna. Flik "Papperskorg" i Inställningar: Återställ, Ta bort för gott, Töm. Användarens val: 30 dagar, högst 50 borttagningar, projekt och poster i samma lista.
+- Lagring: `Snapshot.trash` (`src/data/trash.ts`, `MemoryStore.listTrash/restoreTrash/emptyTrash`), utanför ångra-historiken som mallar och kommentarer. Den följer därför med omladdning och med OneDrive-synken, men inte med säkerhetskopian eller exporten.
+- Ångra: en ångrad borttagning döljs i listan (visas igen om Gör om tar bort posten på nytt). Importens egen rullning tillbaka lägger inget i papperskorgen (`noTrash`).
+- Återställning: poster kräver att projektet finns (annars felmeddelande, raden ligger kvar); saknas deras grupp hamnar de överst; beroenden återställs bara om båda ändar finns. Ett återställt projekt får tillbaka poster, beroenden, kommentarer, statusuppdateringar och räknare men inte loggen (historiken över ändringar togs bort med projektet).
+- Overifierat: storleken. Ett stort projekt i papperskorgen ökar synkfilen, och gränsen för enkel uppladdning är 4 MB.

@@ -8,6 +8,7 @@ import { applyPatch, isPatchList, json, makePatch, type Entry, type Patch } from
 import { MAX_CAPACITY, ACTIVITY_LIMITS, COMMENT_LIMITS, PROJECT_HEALTH, STATUS_UPDATE_LIMITS, TEMPLATE_LIMITS, type Template, type TemplateNode, type StatusDef, type Activity, type ProjectHealth, type StatusUpdate } from "./types";
 import { depDraft, describeChange } from "./activity";
 import { defOf, statusDefs } from "./statuses";
+import { TRASH_LIMITS, purgeTrash, trashLabel, type TrashEntry, type TrashView } from "./trash";
 import { RULE_LIMITS, actionPatch, ruleApplies, timeTriggered, type CustomRule } from "./customRules";
 import type { Baseline, Comment, Dependency, DependencyMode, FieldDef, Fixture, Item, Project, SavedView, Status, User } from "./types";
 
@@ -26,6 +27,8 @@ export interface Snapshot {
   status_updates?: StatusUpdate[];
   /** Mallar (för hela arbetsytan). Ligger utanför ångra-historiken. */
   templates?: Template[];
+  /** Papperskorgen (det som tagits bort). Ligger utanför ångra-historiken. */
+  trash?: TrashEntry[];
 }
 
 export interface MemoryStoreOptions {
@@ -67,6 +70,8 @@ export class MemoryStore implements DataStore {
   protected statusUpdates: StatusUpdate[] = [];
   /** Mallar: poster och grupper som kan skapas igen på ett annat datum. Hela arbetsytan, utanför ångra-historiken. */
   protected templates: Template[] = [];
+  /** Papperskorgen: borttagna projekt och poster, så att de går att få tillbaka (högst 30 dagar, 50 borttagningar). Utanför ångra-historiken. */
+  protected trash: TrashEntry[] = [];
   private activityCount = new Map<string, number>();
   /** Den som gör ändringarna just nu (sätts av appen från "Skriv som"). Tomt namn visas som okänd. */
   actor: { id: string | null; name: string } = { id: null, name: "" };
@@ -250,13 +255,14 @@ export class MemoryStore implements DataStore {
     const now = this.snapshot();
     const target = applyPatch(now, patch);
     to.push(makePatch(target, now)); // från målläget tillbaka till nuläget, för att kunna gå åt andra hållet
-    const seq = this.seq, projectSeq = this.projectSeq, counters = this.counters, comments = this.comments, activity = this.activity, statusUpdates = this.statusUpdates, templates = this.templates;
+    const seq = this.seq, projectSeq = this.projectSeq, counters = this.counters, comments = this.comments, activity = this.activity, statusUpdates = this.statusUpdates, templates = this.templates, trash = this.trash;
     const was = new Map(this.items);
     this.logBase = new Map(); this.direct = new Set();
     this.restore(target);
     this.comments = comments; // Ångra och Gör om rör aldrig kommentarerna
     this.statusUpdates = statusUpdates; // projektstatusen också
     this.templates = templates; // och mallarna
+    this.trash = trash; // och papperskorgen
     this.activity = activity; this.rebuildActivityCount(); // och loggen står kvar, med själva Ångra som nya rader
     for (const [id, after] of this.items) { // vad Ångra eller Gör om ändrade, i loggen
       const before = was.get(id);
@@ -292,6 +298,7 @@ export class MemoryStore implements DataStore {
       activity: this.activity,
       status_updates: this.statusUpdates,
       templates: this.templates,
+      trash: this.trash,
     };
   }
 
@@ -309,6 +316,7 @@ export class MemoryStore implements DataStore {
     this.projectSeq = snap.project_seq ?? 0;
     this.counters = new Map();
     for (const [pid, c] of Object.entries(snap.counters ?? {})) if (this.projects.has(pid) && validCounters(c)) this.counters.set(pid, { ...c });
+    this.trash = (Array.isArray(snap.trash) ? snap.trash : []).map((e) => ({ ...e }));
     this.suppress = false;
     this.closeStep();
   }
@@ -469,10 +477,16 @@ export class MemoryStore implements DataStore {
     this.commit();
     return { ...next };
   }
-  async deleteProject(id: string) {
+  async deleteProject(id: string, opts?: { noTrash?: boolean }) {
     await this.tick("deleteProject");
     if (!this.projects.has(id)) throw new RuleError("not_found", `Projekt ${id} finns inte`);
     const gone = new Set([...this.items.values()].filter((i) => i.project_id === id).map((i) => i.id));
+    if (!opts?.noTrash) this.toTrash({
+      id: `t_${Date.now().toString(36)}_${++this.trashSeq}`, kind: "project", deleted_at: new Date().toISOString(), project_id: id, project: { ...this.projects.get(id)! },
+      counters: this.counters.get(id) ? { ...this.counters.get(id)! } : undefined, status_updates: this.statusUpdates.filter((u) => u.project_id === id).map((u) => ({ ...u })),
+      items: [...gone].map((g) => ({ ...this.items.get(g)! })), deps: [...this.deps.values()].filter((d) => gone.has(d.from_item_id) || gone.has(d.to_item_id)).map((d) => ({ ...d })),
+      comments: this.comments.filter((c) => c.project_id === id).map((c) => ({ ...c })),
+    });
     for (const itemId of gone) this.items.delete(itemId);
     for (const d of [...this.deps.values()]) if (gone.has(d.from_item_id) || gone.has(d.to_item_id)) this.deps.delete(d.id);
     this.projects.delete(id);
@@ -602,17 +616,75 @@ export class MemoryStore implements DataStore {
     }
     return n;
   }
-  async deleteItem(id: string) {
+  /** `batch`: poster som tas bort i samma handling (en post med allt under, en serie) delar id och hamnar som en rad i papperskorgen. `noTrash`: för att rulla tillbaka egna misslyckade skapanden. */
+  async deleteItem(id: string, opts?: { batch?: string; noTrash?: boolean }) {
     await this.tick("deleteItem");
     if ([...this.items.values()].some((i) => i.parent_id === id))
       throw new RuleError("has_children", "Item har barn");
     const parentId = this.items.get(id)?.parent_id ?? null;
+    const gone = this.items.get(id);
+    if (gone && !opts?.noTrash) {
+      const deps = [...this.deps.values()].filter((d) => d.from_item_id === id || d.to_item_id === id).map((d) => ({ ...d }));
+      const open = opts?.batch ? this.trash.find((e) => e.id === opts.batch) : undefined;
+      if (open) { open.items.push({ ...gone }); open.deps.push(...deps.filter((d) => !open.deps.some((x) => x.id === d.id))); }
+      else this.toTrash({ id: opts?.batch ?? `t_${Date.now().toString(36)}_${++this.trashSeq}`, kind: "items", deleted_at: new Date().toISOString(), project_id: gone.project_id, items: [{ ...gone }], deps, comments: [] });
+    }
     this.items.delete(id);
     rederiveEpics(this.items, [parentId]);
     for (const d of [...this.deps.values()]) if (d.from_item_id === id || d.to_item_id === id) this.deps.delete(d.id);
     this.writes.push({ method: "deleteItem", args: [id] });
     this.commit();
   }
+  private trashSeq = 0;
+  private toTrash(e: TrashEntry): void { this.trash = purgeTrash([...this.trash, e], new Date()); }
+
+  /** Det som tagits bort, nyast först. En rad vars projekt eller poster finns igen (borttagningen ångrades) visas inte. */
+  async listTrash(): Promise<TrashView[]> {
+    await this.tick("listTrash");
+    return this.trash.filter((e) => (e.kind === "project" ? !this.projects.has(e.project_id) : !e.items.some((i) => this.items.has(i.id))))
+      .map((e): TrashView => ({ id: e.id, kind: e.kind, label: trashLabel(e), deleted_at: e.deleted_at, count: e.items.length, project_id: e.project_id }))
+      .reverse();
+  }
+
+  /** Lägger tillbaka en borttagning. Poster kräver att deras projekt finns; saknas deras grupp hamnar de överst i projektet. Beroenden återställs bara om båda ändar finns. */
+  async restoreTrash(id: string): Promise<{ kind: "project" | "items"; project_id: string; items: number }> {
+    await this.tick("restoreTrash");
+    const e = this.trash.find((x) => x.id === id);
+    if (!e) throw new RuleError("not_found", "Finns inte i papperskorgen");
+    if (e.kind === "project") {
+      if (this.projects.has(e.project_id) || e.items.some((i) => this.items.has(i.id))) throw new RuleError("exists", "Projektet finns redan");
+      this.projects.set(e.project_id, { ...e.project! });
+      for (const i of e.items) this.items.set(i.id, { ...i });
+      for (const d of e.deps) if (this.items.has(d.from_item_id) && this.items.has(d.to_item_id)) this.deps.set(d.id, { ...d });
+      if (e.counters) this.counters.set(e.project_id, { ...e.counters });
+      this.comments = [...this.comments, ...e.comments.map((c) => ({ ...c }))];
+      this.statusUpdates = [...this.statusUpdates, ...(e.status_updates ?? []).map((u) => ({ ...u }))];
+    } else {
+      if (!this.projects.has(e.project_id)) throw new RuleError("project_missing", "Projektet finns inte längre. Återställ projektet först.");
+      if (e.items.some((i) => this.items.has(i.id))) throw new RuleError("exists", "Posterna finns redan");
+      const inside = new Set(e.items.map((i) => i.id));
+      const parents: (string | null)[] = [];
+      for (const i of e.items) {
+        const lost = i.parent_id !== null && !inside.has(i.parent_id) && !this.items.has(i.parent_id);
+        this.items.set(i.id, { ...i, parent_id: lost ? null : i.parent_id });
+        if (i.parent_id !== null && !inside.has(i.parent_id)) parents.push(lost ? null : i.parent_id);
+      }
+      for (const d of e.deps) if (this.items.has(d.from_item_id) && this.items.has(d.to_item_id) && !this.deps.has(d.id)) this.deps.set(d.id, { ...d });
+      rederiveEpics(this.items, parents);
+    }
+    this.trash = this.trash.filter((x) => x.id !== id);
+    this.writes.push({ method: "restoreTrash", args: [id] });
+    this.commit(e.kind === "project");
+    return { kind: e.kind, project_id: e.project_id, items: e.items.length };
+  }
+
+  /** Tar bort en rad (`id`) eller allt (utan id) för gott. */
+  async emptyTrash(id?: string): Promise<void> {
+    await this.tick("emptyTrash");
+    this.trash = id ? this.trash.filter((x) => x.id !== id) : [];
+    this.commit();
+  }
+
   async listComments(projectId: string): Promise<Comment[]> {
     await this.tick("listComments");
     return this.comments.filter((c) => c.project_id === projectId && this.items.has(c.item_id)).map((c) => ({ ...c })).sort((a, b) => (a.created_at < b.created_at ? -1 : a.created_at > b.created_at ? 1 : a.id < b.id ? -1 : 1));

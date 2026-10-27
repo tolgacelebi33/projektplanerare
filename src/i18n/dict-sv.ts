@@ -204,6 +204,12 @@ export const svDict = {
   },
   gate: { checking: "Kontrollerar inloggning...", intro: "Logga in med ditt konto i organisationen för att använda Projektplanerare.", login: "Logga in med Microsoft" },
   storage: { title: "Lagring i den här webbläsaren", used: (u: string, q: string) => `Använt: ${u} av cirka ${q}.`, persisted: "Webbläsaren har lovat att inte rensa datan av sig själv.", notPersisted: "Webbläsaren har inte lovat att spara datan: den kan rensas om enheten får ont om utrymme. Spara en säkerhetskopia.", unknown: "Webbläsaren kan inte uppge hur mycket som används." },
+  trash: {
+    intro: "Det du tar bort ligger här i 30 dagar (högst 50 borttagningar), sedan försvinner det för gott. Papperskorgen följer med synken.",
+    empty: "Papperskorgen är tom.", project: (n: number) => `Projekt, ${n} poster`, items: (n: number) => (n === 1 ? "1 post" : `${n} poster`), deleted: (d: string) => `Borttaget ${d}`,
+    restore: "Återställ", forever: "Ta bort för gott", emptyAll: "Töm papperskorgen", confirmAll: (n: number) => `Ta bort alla ${n} för gott? Det går inte att ångra.`, confirmYes: "Ta bort för gott", cancel: "Avbryt",
+    restoredProject: (n: string) => `Projektet ${n} är tillbaka.`, restoredItems: (n: number) => `${n === 1 ? "Posten" : `${n} poster`} är tillbaka.`,
+  },
   sync: {
     intro: "Lägg datan i din egen OneDrive så att du ser samma projekt på en annan dator. Filen heter Projektplanerare/data.json. Två personer ska inte redigera samtidigt: den som synkar sist får välja.",
     clientId: "Program-ID (klient)", tenantId: "Katalog-ID (hyresgäst)", login: "Logga in med Microsoft", logout: "Logga ut", syncNow: "Synka nu", auto: "Synka automatiskt varje minut medan appen är öppen",
@@ -279,7 +285,7 @@ export const svDict = {
   },
   settings: {
     button: "Inställningar", title: "Inställningar",
-    tabs: { label: "Inställningar, avsnitt", list: "Listvy", board: "Boardvy", views: "Fler vyer", item: "Posten", rules: "Regler", people: "Personer", reminders: "Påminnelser", backup: "Säkerhetskopia", sync: "Konto och synk", start: "Start och tema", touch: "Pekskärm", info: "Information och hjälp" },
+    tabs: { label: "Inställningar, avsnitt", list: "Listvy", board: "Boardvy", views: "Fler vyer", item: "Posten", rules: "Regler", people: "Personer", reminders: "Påminnelser", backup: "Säkerhetskopia", sync: "Konto och synk", trash: "Papperskorg", start: "Start och tema", touch: "Pekskärm", info: "Information och hjälp" },
     people: { capacityOf: (n: string) => `Timmar per vecka för ${n}`, capacityShort: "h/v", capacityUnit: "h/vecka", capacityHint: "Kapacitet i timmar per vecka. Används av belastningen i timmar. Tomt: ingen kapacitet satt.", intro: "Personerna du kan välja som ansvarig. Ett namn ändras direkt. Tas en person bort blir hens poster utan ansvarig i alla projekt.", nameOf: (n: string) => `Namn: ${n}`, newName: "Namn på ny person", add: "Lägg till", remove: "Ta bort", confirm: (n: string) => `Ta bort ${n}? Posterna blir utan ansvarig i alla projekt och ångra-historiken töms.`, confirmYes: "Ta bort", cancel: "Avbryt", none: "Inga personer än.", removed: (n: number) => `Personen togs bort. ${n} poster blev utan ansvarig.` },
     rulesIntro: "Några fasta regler som gäller alla poster. Alla är av som standard.",
     rules: { doneSetsProgress: "När status blir Klar, sätt framsteg till 100", doneSetsProgressHint: "Gäller uppgifter och milstolpar. Ändras framsteget i samma ändring (till exempel i panelen) står det värdet kvar.", seriesNext: "När ett tillfälle i en serie blir klart, skapa nästa efter det sista", seriesNextHint: "Serien fortsätter framåt av sig själv, med samma upprepning. En serie har högst 120 tillfällen." },

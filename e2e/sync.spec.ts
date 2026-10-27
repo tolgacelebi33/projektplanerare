@@ -31,3 +31,21 @@ test("SY3 Information och hjälp visar lagringen i webbläsaren", async ({ page 
   await dlg.getByRole("tab", { name: "Information och hjälp", exact: true }).click();
   await expect(dlg.locator('[data-part="storage"]')).toContainText(/Använt: .* av cirka|kan inte uppge/);
 });
+
+test("TR1 en borttagen uppgift ligger i papperskorgen under Inställningar och kan återställas", async ({ page }) => {
+  await page.setViewportSize({ width: 1400, height: 1100 });
+  await page.goto("/"); await page.waitForSelector(".gantt_task_line");
+  const ids = () => page.evaluate(async () => ((await (window as any).__store.listItems("proj_1")) as { id: string }[]).map((i) => i.id));
+  const before = await ids();
+  await page.locator('.gantt_row[data-task-id="i7"] .grid-title').click({ button: "right" });
+  await page.getByRole("menuitem", { name: "Ta bort" }).click();
+  await page.getByRole("button", { name: /Ta bort/ }).last().click();
+  await expect.poll(async () => (await ids()).includes("i7")).toBe(false);
+  await page.getByRole("button", { name: "Inställningar" }).click();
+  const dlg = page.getByRole("dialog", { name: "Inställningar" });
+  await dlg.getByRole("tab", { name: "Papperskorg", exact: true }).click();
+  await expect(dlg.locator("[data-trash]")).toHaveCount(1);
+  await dlg.locator("[data-trash]").getByRole("button", { name: "Återställ", exact: true }).click();
+  await expect(dlg.locator('[data-part="empty"]')).toBeVisible();
+  expect((await ids()).sort()).toEqual([...before].sort());
+});

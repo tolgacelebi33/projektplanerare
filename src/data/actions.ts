@@ -25,7 +25,8 @@ export async function deleteSubtree(store: DataStore, items: Item[], id: string)
   const byId = new Map(items.map((i) => [i.id, i]));
   const all = [...descendants(items, id), byId.get(id)!].filter(Boolean);
   all.sort((a, b) => depthOf(byId, b) - depthOf(byId, a));
-  for (const i of all) await store.deleteItem(i.id);
+  const batch = `t_${Date.now().toString(36)}_${id}`;
+  for (const i of all) await store.deleteItem(i.id, { batch });
   return all.length;
 }
 
@@ -330,7 +331,8 @@ export async function extendSeries(store: DataStore, items: Item[], member: Item
 /** Tar bort tillfällen i en serie: `later` = det här och alla senare, `all` = hela serien. Returnerar antal borttagna. */
 export async function deleteSeries(store: DataStore, items: Item[], member: Item, scope: "later" | "all"): Promise<number> {
   const list = seriesMembers(items, member).filter((i) => scope === "all" || i.start >= member.start);
-  for (const i of list) await store.deleteItem(i.id);
+  const batch = `t_${Date.now().toString(36)}_${member.id}`;
+  for (const i of list) await store.deleteItem(i.id, { batch });
   return list.length;
 }
 
