@@ -3,6 +3,7 @@ import { friendlyError } from "../i18n/errors";
 import { ImportError, parseJson, toJson, toParsed, type ParsedProject } from "./exchange";
 import { importParsed } from "./importExport";
 import type { MemoryStore } from "./MemoryStore";
+import { normalizeCustomRules, type CustomRule } from "./customRules";
 
 /**
  * Säkerhetskopia: alla projekt (poster, beroenden, egna fält, vyer, baslinje) och personerna i en fil. Varje projekt är en vanlig JSON-export, så filen går
@@ -17,11 +18,13 @@ export interface BackupSummary {
   templates: { name: string; nodes: import("./types").TemplateNode[]; deps: import("./types").TemplateDep[]; created_at?: string }[];
   exportedAt: string;
   users: string[];
+  /** Egna regler (gäller alla projekt). */
+  customRules: CustomRule[];
   projects: { name: string; items: number; parsed: ParsedProject }[];
   items: number;
 }
 
-export async function buildBackup(store: MemoryStore, now: Date): Promise<{ filename: string; mime: string; text: string; projects: number; items: number }> {
+export async function buildBackup(store: MemoryStore, now: Date, customRules: CustomRule[] = []): Promise<{ filename: string; mime: string; text: string; projects: number; items: number }> {
   const [projects, users] = await Promise.all([store.listProjects(), store.listUsers()]);
   const out: unknown[] = [];
   let items = 0;
@@ -33,7 +36,7 @@ export async function buildBackup(store: MemoryStore, now: Date): Promise<{ file
   const date = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
   return {
     filename: `projektplanerare-sakerhetskopia-${date}.json`, mime: "application/json", projects: projects.length, items,
-    text: JSON.stringify({ format: BACKUP_FORMAT, version: 1, exported_at: now.toISOString(), users: users.map((u) => u.name), templates: (await store.listTemplates()).map(({ name, nodes, deps, created_at }) => ({ name, nodes, deps, created_at })), projects: out }, null, 1),
+    text: JSON.stringify({ format: BACKUP_FORMAT, version: 1, exported_at: now.toISOString(), users: users.map((u) => u.name), custom_rules: customRules, templates: (await store.listTemplates()).map(({ name, nodes, deps, created_at }) => ({ name, nodes, deps, created_at })), projects: out }, null, 1),
   };
 }
 
@@ -41,7 +44,7 @@ export function parseBackup(text: string): BackupSummary {
   if (text.length > MAX_BACKUP_BYTES) throw new ImportError(sv.backup.tooBig);
   let raw: unknown;
   try { raw = JSON.parse(text); } catch { throw new ImportError(sv.backup.notBackup); }
-  const o = raw as { format?: unknown; version?: unknown; exported_at?: unknown; users?: unknown; projects?: unknown; templates?: unknown } | null;
+  const o = raw as { format?: unknown; version?: unknown; exported_at?: unknown; users?: unknown; projects?: unknown; templates?: unknown; custom_rules?: unknown } | null;
   if (!o || typeof o !== "object" || o.format !== BACKUP_FORMAT) throw new ImportError(sv.backup.notBackup);
   if (o.version !== 1) throw new ImportError(sv.backup.version(String(o.version)));
   if (!Array.isArray(o.projects) || o.projects.length > MAX_BACKUP_PROJECTS) throw new ImportError(sv.backup.tooManyProjects(MAX_BACKUP_PROJECTS));
@@ -60,7 +63,7 @@ export function parseBackup(text: string): BackupSummary {
     const deps = (Array.isArray(x.deps) ? (x.deps as Record<string, unknown>[]) : []).filter((d) => d && keys.has(String(d.from)) && keys.has(String(d.to)) && ["finish_to_start", "start_to_start", "finish_to_finish", "start_to_finish"].includes(String(d.type))) as unknown as import("./types").TemplateDep[];
     return [{ name: x.name, nodes, deps, ...(typeof x.created_at === "string" ? { created_at: x.created_at } : {}) }];
   });
-  return { templates, exportedAt: typeof o.exported_at === "string" ? o.exported_at : "", users, projects, items: projects.reduce((n, p) => n + p.items, 0) };
+  return { templates, customRules: normalizeCustomRules(o.custom_rules), exportedAt: typeof o.exported_at === "string" ? o.exported_at : "", users, projects, items: projects.reduce((n, p) => n + p.items, 0) };
 }
 
 export interface RestoreResult { projects: number; items: number; warnings: string[]; firstProjectId: string | null }

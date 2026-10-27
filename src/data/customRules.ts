@@ -87,3 +87,15 @@ export function actionPatch(a: RuleAction, item: Item): Partial<Item> | null {
     case "comment": return null;
   }
 }
+
+/** Regler från en säkerhetskopia läggs till (finns id:t redan ändras ingenting). En regel för ett enskilt projekt som inte finns här hoppas över, och högst `RULE_LIMITS.count` behålls. */
+export function mergeRestoredRules(have: CustomRule[], incoming: CustomRule[], projectIds: Set<string>): { rules: CustomRule[]; added: number; skipped: number } {
+  const ids = new Set(have.map((r) => r.id)), rules = [...have];
+  let added = 0, skipped = 0;
+  for (const r of incoming) {
+    if (ids.has(r.id)) continue;
+    if ((r.project && !projectIds.has(r.project)) || rules.length >= RULE_LIMITS.count) { skipped++; continue; }
+    rules.push(r); ids.add(r.id); added++;
+  }
+  return { rules, added, skipped };
+}

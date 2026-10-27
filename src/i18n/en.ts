@@ -212,6 +212,7 @@ export const enDict: Dict = {
     save: "Save backup", saved: (p: number, i: number) => `Saved ${p} projects with ${i} items.`, lastSaved: (d: string) => `Last saved: ${d}`, never: "You have not saved a backup here yet.",
     restore: "Restore from file...", restoreFile: "Backup file", restoreHint: "Restoring always adds the projects as new projects. Nothing that exists is removed or overwritten.",
     previewTitle: "Restore backup", previewLine: (p: number, i: number, d: string) => `The file has ${p} projects with ${i} items${d ? `, saved ${d}` : ""}.`, previewUsers: (n: number) => `${n} people (missing ones are added).`, previewProject: (n: string, i: number) => `${n}: ${i} items`,
+    rulesAdded: (n: number) => `${n} custom rules were added.`, rulesSkipped: (n: number) => `${n} rules were skipped (they belong to a project that does not exist here, or the limit was reached).`,
     previewGo: "Add as new projects", restored: (p: number, i: number) => `Restored ${p} projects with ${i} items as new projects.`,
     reminder: "Remind me to back up", reminderOff: "Never", reminderDays: (n: number) => `After ${n} days`, reminderHint: "A reminder at the top when that long has passed since you saved a backup (and there is something to save).",
     nag: (n: number) => `It has been ${n} days since you saved a backup of your projects.`, nagNever: "You have not saved a backup of your projects yet.", nagSave: "Save now", nagLater: "Later",

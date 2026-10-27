@@ -55,7 +55,7 @@ import { WorkloadView } from "./views/WorkloadView";
 import { PortfolioView } from "./views/PortfolioView";
 import { ReportView } from "./views/ReportView";
 import { useSync } from "./sync/useSync";
-import { normalizeCustomRules } from "./data/customRules";
+import { mergeRestoredRules, normalizeCustomRules } from "./data/customRules";
 import { myWeekGroups, portfolioRows, shiftPatch } from "./data/overviews";
 import { THEMES, applyTheme, getTheme, type Theme } from "./theme";
 
@@ -487,7 +487,7 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
   }, [store, projects.projectId]);
   const [backupPreview, setBackupPreview] = useState<{ file: string; summary: BackupSummary } | null>(null);
   const [nagHidden, setNagHidden] = useState(false);
-  const syncBackup = useCallback(async () => { const b = await buildBackup(store, new Date()); downloadText(b.filename, b.mime, b.text); }, [store]);
+  const syncBackup = useCallback(async () => { const b = await buildBackup(store, new Date(), settingsRef.current.customRules); downloadText(b.filename, b.mime, b.text); }, [store]);
   const syncStore = useMemo(() => {
     const ps = store as unknown as PersistentStore;
     return {
@@ -499,7 +499,7 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
   const sync = useSync(syncStore, syncBackup, sv.sync);
   const saveBackupFile = async (): Promise<string> => {
     const now = new Date();
-    const b = await buildBackup(store, now);
+    const b = await buildBackup(store, now, settingsRef.current.customRules);
     downloadText(b.filename, b.mime, b.text);
     markBackupSaved(now); setLastBackup(lastBackupAt()); setNagHidden(true);
     return sv.backup.saved(b.projects, b.items);
@@ -516,7 +516,9 @@ function AppInner({ app, lng, onLang }: { app: ReturnType<typeof getApp>; lng: L
       focusMedianOnNextProject();
       await reloadUsers();
       await projects.reload(r.firstProjectId);
-      setWriteError([sv.backup.restored(r.projects, r.items), ...r.warnings].join(" "));
+      const m = mergeRestoredRules(settingsRef.current.customRules, p.summary.customRules, new Set((await store.listProjects()).map((x) => x.id)));
+      if (m.added) setSettings({ ...settingsRef.current, customRules: m.rules });
+      setWriteError([sv.backup.restored(r.projects, r.items), ...(m.added ? [sv.backup.rulesAdded(m.added)] : []), ...(m.skipped ? [sv.backup.rulesSkipped(m.skipped)] : []), ...r.warnings].join(" "));
     } catch (e) { setWriteError(friendlyError(e)); }
   };
   const nag = app.persistent && !nagHidden && settings.backupReminderDays > 0 && state.kind === "ready" && state.items.length > 0

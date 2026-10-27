@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { MemoryStore } from "../src/data/MemoryStore";
 import { smallFixture } from "../src/data/fixtures";
+import { mergeRestoredRules, type CustomRule } from "../src/data/customRules";
 import { buildBackup, parseBackup, restoreBackup, BACKUP_FORMAT } from "../src/data/backup";
 
 const when = new Date("2026-10-11T12:00:00");
@@ -104,5 +105,19 @@ describe("påminnelse om säkerhetskopia", () => {
   it("utan någon sparad kopia räknas det från första användningen, så en ny installation inte tjatar direkt", () => {
     expect(reminderDue({ days: 30, hasData: true, last: null, firstSeen: "2026-10-10T12:00:00Z", now })).toMatchObject({ due: false, never: true });
     expect(reminderDue({ days: 30, hasData: true, last: null, firstSeen: "2026-08-01T12:00:00Z", now })).toMatchObject({ due: true, never: true });
+  });
+});
+
+describe("egna regler i säkerhetskopian", () => {
+  const rule = (id: string, project: string | null = null): CustomRule => ({ id, name: id, enabled: true, project, when: { kind: "status", to: "done" }, then: { kind: "priority", value: "high" } });
+  it("följer med filen och läggs till vid återställning utan att ändra befintliga", async () => {
+    const b = parseBackup((await buildBackup(await rich(), when, [rule("a"), rule("b", "proj_1")])).text);
+    expect(b.customRules.map((r) => r.id)).toEqual(["a", "b"]);
+    const m = mergeRestoredRules([{ ...rule("a"), name: "lokal" }], b.customRules, new Set(["proj_1"]));
+    expect(m.rules.map((r) => r.name)).toEqual(["lokal", "b"]); expect(m.added).toBe(1);
+  });
+  it("hoppar över en regel för ett projekt som saknas, och en fil utan regler ger inga", async () => {
+    expect(mergeRestoredRules([], [rule("x", "borta")], new Set())).toMatchObject({ added: 0, skipped: 1 });
+    expect(parseBackup((await buildBackup(await rich(), when)).text).customRules).toEqual([]);
   });
 });

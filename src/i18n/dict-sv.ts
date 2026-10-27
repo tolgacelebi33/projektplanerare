@@ -217,6 +217,7 @@ export const svDict = {
     save: "Spara säkerhetskopia", saved: (p: number, i: number) => `Sparade ${p} projekt med ${i} poster.`, lastSaved: (d: string) => `Senast sparad: ${d}`, never: "Du har inte sparat någon säkerhetskopia här än.",
     restore: "Återställ från fil...", restoreFile: "Fil med säkerhetskopia", restoreHint: "Återställning lägger alltid till projekten som nya projekt. Inget som finns tas bort eller skrivs över.",
     previewTitle: "Återställ säkerhetskopia", previewLine: (p: number, i: number, d: string) => `Filen har ${p} projekt med ${i} poster${d ? `, sparad ${d}` : ""}.`, previewUsers: (n: number) => `${n} personer (de som saknas läggs till).`, previewProject: (n: string, i: number) => `${n}: ${i} poster`,
+    rulesAdded: (n: number) => `${n} egna regler lades till.`, rulesSkipped: (n: number) => `${n} regler hoppades över (de gäller ett projekt som inte finns här, eller gränsen är nådd).`,
     previewGo: "Lägg till som nya projekt", restored: (p: number, i: number) => `Återställde ${p} projekt med ${i} poster som nya projekt.`,
     reminder: "Påminn om säkerhetskopia", reminderOff: "Aldrig", reminderDays: (n: number) => `Efter ${n} dagar`, reminderHint: "En påminnelse högst upp när det gått så lång tid sedan du sparade en säkerhetskopia (och det finns något att spara).",
     nag: (n: number) => `Det har gått ${n} dagar sedan du sparade en säkerhetskopia av dina projekt.`, nagNever: "Du har inte sparat någon säkerhetskopia av dina projekt än.", nagSave: "Spara nu", nagLater: "Senare",
