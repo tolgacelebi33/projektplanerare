@@ -22,3 +22,12 @@ test("SY2 på publicerad adress visas inloggning före appen och knappen skickar
   expect(ms[0]).toContain("19c8ee62-a8e6-4d23-bb19-d5076555d8a2");
   expect(ms[0]).toContain("client_id=3d00acf1-28f5-4413-9ee9-977966512e3d");
 });
+
+test("SY3 Information och hjälp visar lagringen i webbläsaren", async ({ page }) => {
+  await page.setViewportSize({ width: 1400, height: 900 });
+  await page.goto("/"); await page.waitForSelector(".gantt_task_line");
+  await page.getByRole("button", { name: "Inställningar" }).click();
+  const dlg = page.getByRole("dialog", { name: "Inställningar" });
+  await dlg.getByRole("tab", { name: "Information och hjälp", exact: true }).click();
+  await expect(dlg.locator('[data-part="storage"]')).toContainText(/Använt: .* av cirka|kan inte uppge/);
+});

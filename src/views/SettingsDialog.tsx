@@ -143,6 +143,7 @@ export function SettingsDialog({ theme, onTheme, fieldDefs = [], settings, peopl
             {tab === "info" && (<section>
               <p>{t.infoStorage}</p>
               <p>{t.infoCodes}</p>
+              <StorageLine />
               <h4>{t.shortcutsTitle}</h4>
               <p className="panel-muted">{t.shortcutsHint}</p>
               <dl className="settings-keys">
@@ -216,6 +217,33 @@ function PeopleTab({ api }: { api: PeopleApi }) {
       </form>
       {msg && <p role={msg.kind === "error" ? "alert" : "status"} className={msg.kind === "error" ? "people-error" : "panel-muted"}>{msg.text}</p>}
     </section>
+  );
+}
+
+const fmtBytes = (n: number) => (n >= 1e9 ? `${(n / 1e9).toFixed(1)} GB` : n >= 1e6 ? `${(n / 1e6).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1e3))} kB`);
+function StorageLine() {
+  const t = sv.storage;
+  const [info, setInfo] = useState<{ used: string; quota: string; persisted: boolean | null } | "unknown" | null>(null);
+  useEffect(() => {
+    let dead = false;
+    void (async () => {
+      try {
+        const e = await navigator.storage.estimate();
+        const persisted = (await navigator.storage.persisted?.()) ?? null;
+        if (!dead) setInfo(e.usage === undefined || !e.quota ? "unknown" : { used: fmtBytes(e.usage), quota: fmtBytes(e.quota), persisted });
+      } catch { if (!dead) setInfo("unknown"); }
+    })();
+    return () => { dead = true; };
+  }, []);
+  if (!info) return null;
+  return (
+    <div data-part="storage">
+      <h4>{t.title}</h4>
+      {info === "unknown" ? <p className="panel-muted">{t.unknown}</p> : (<>
+        <p className="panel-muted">{t.used(info.used, info.quota)}</p>
+        {info.persisted !== null && <p className="panel-muted">{info.persisted ? t.persisted : t.notPersisted}</p>}
+      </>)}
+    </div>
   );
 }
 
