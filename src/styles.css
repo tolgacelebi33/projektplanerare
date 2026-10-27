@@ -990,3 +990,7 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); opacity: 
 /* Inloggningsspärr före appen */
 .gate { max-width: 420px; margin: 18vh auto 0; padding: 0 16px; display: flex; flex-direction: column; gap: 12px; align-items: flex-start; color: var(--text); }
 .gate h1 { font-family: var(--font-title); font-weight: 400; margin: 0; }
+
+/* Placering i panelen: luft mellan grupp, deluppgift av och flytta */
+.panel-section[data-section="placement"] { display: grid; gap: 14px; }
+.panel-section[data-section="placement"] .panel-row { margin-top: 0; }

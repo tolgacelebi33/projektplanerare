@@ -76,6 +76,7 @@ test("B3 checklista: lägg till, bocka, ändra text, ta bort, räknare på korte
 });
 
 test("B4 länkar: https läggs till, farliga avvisas, länken öppnas säkert i ny flik, och ta bort", async ({ page }) => {
+  await settingsBtn(page).click(); await openTab(page, "Posten"); await dlg(page).getByLabel("Länkar", { exact: true }).check(); await page.keyboard.press("Escape"); // länkar är av som standard
   await open(page, "i7");
   const s = sec(page, "links");
   await s.getByLabel("Länkadress").fill("javascript:alert(1)"); await s.getByRole("button", { name: "Lägg till länk" }).click();

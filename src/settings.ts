@@ -62,7 +62,7 @@ export type ViewId = "gantt" | "wheel" | "board" | "calendar" | "week" | "worklo
 export const MORE_VIEWS = ["calendar", "week", "workload", "portfolio", "report"] as const;
 export type MoreView = (typeof MORE_VIEWS)[number];
 export interface Features { labels: boolean; checklist: boolean; links: boolean; log: boolean; comments: boolean }
-export const DEFAULT_FEATURES: Features = { labels: true, checklist: true, links: true, log: true, comments: true };
+export const DEFAULT_FEATURES: Features = { labels: true, checklist: true, links: false, log: true, comments: true };
 export interface CardFields { date: boolean; assignee: boolean; priority: boolean; description: boolean; series: boolean; progress: boolean; labels: boolean; checklist: boolean; links: boolean; lastUpdate: boolean; code: boolean; comments: boolean; estimate: boolean }
 export type BoardGroup = "status" | "assignee" | "priority" | "group" | `field:${string}`;
 export const DEFAULT_CARD_FIELDS: CardFields = { date: true, assignee: true, priority: true, description: false, series: true, progress: false, labels: true, checklist: true, links: true, lastUpdate: false, code: false, comments: true, estimate: false };
@@ -83,7 +83,7 @@ export function normalizeSettings(raw: unknown): Settings {
     highlightOverdue: bool(o.highlightOverdue, DEFAULT_SETTINGS.highlightOverdue),
     quickFilters: bool(o.quickFilters, DEFAULT_SETTINGS.quickFilters),
     boardGroup: typeof o.boardGroup === "string" && /^field:.{1,60}$/.test(o.boardGroup) ? (o.boardGroup as BoardGroup) : pick(o.boardGroup, ["status", "assignee", "priority", "group"], DEFAULT_SETTINGS.boardGroup),
-    features: ((f) => ({ labels: bool(f.labels, true), checklist: bool(f.checklist, true), links: bool(f.links, true), log: bool(f.log, true), comments: bool(f.comments, true) }))((o.features && typeof o.features === "object" ? o.features : {}) as Record<string, unknown>),
+    features: ((f) => ({ labels: bool(f.labels, true), checklist: bool(f.checklist, true), links: bool(f.links, false), log: bool(f.log, true), comments: bool(f.comments, true) }))((o.features && typeof o.features === "object" ? o.features : {}) as Record<string, unknown>),
     checklistProgress: bool(o.checklistProgress, DEFAULT_SETTINGS.checklistProgress),
     hidePastSeries: bool(o.hidePastSeries, DEFAULT_SETTINGS.hidePastSeries),
     // Beslut 2026-10-11: serier som en rad är standard. Inställningar sparade innan dess (utan markören) får det nya standardvärdet en gång.
